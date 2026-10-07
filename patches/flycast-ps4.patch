@@ -263,7 +263,7 @@ index 2a02ab625..a1d091484 100644
  #elif defined(__ANDROID__)
  #define DECLARE_CODE_CACHE(Name, Size) alignas(4096) static u8 Name[Size];
 diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_context.cpp
-index 2cb703a9c..d3257f05a 100644
+index 2cb703a9c..4705d3fe6 100644
 --- a/core/rend/vulkan/vulkan_context.cpp
 +++ b/core/rend/vulkan/vulkan_context.cpp
 @@ -27,6 +27,9 @@
@@ -304,6 +304,57 @@ index 2cb703a9c..d3257f05a 100644
  #else
  #error "Unknown Vulkan platform"
  #endif
+@@ -991,7 +1001,13 @@ void VulkanContext::NewFrame()
+ 	recreateSwapChainIfNeeded();
+ 	if (!IsValid())
+ 		throw InvalidVulkanContext();
++#ifdef __ORBIS__
++	// shell/ps4/ps4_wsi.cpp: acquire waits on the CPU until the image is off screen and there is
++	// one in-order queue, so no semaphores (Crema: the empty submit signalling one fails on PS4)
++	vk::Result res = device->acquireNextImageKHR(*swapChain, UINT64_MAX, nullptr, nullptr, &currentImage);
++#else
+ 	vk::Result res = device->acquireNextImageKHR(*swapChain, UINT64_MAX, *imageAcquiredSemaphores[currentSemaphore], nullptr, &currentImage);
++#endif
+ 	if (res != vk::Result::eSuccess)
+ 		throw InvalidVulkanContext();
+ 	try {
+@@ -1032,7 +1048,12 @@ void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)
+ 	if (overlayCmdBuffer)
+ 		allCmdBuffers.push_back(overlayCmdBuffer);
+ 	allCmdBuffers.push_back(commandBuffer);
++#ifdef __ORBIS__
++	// the flip is queued behind this submit on the same queue (ps4_wsi.cpp): no semaphores
++	vk::SubmitInfo submitInfo(nullptr, nullptr, allCmdBuffers, nullptr);
++#else
+ 	vk::SubmitInfo submitInfo(*imageAcquiredSemaphores[currentSemaphore], wait_stage, allCmdBuffers, *renderCompleteSemaphores[currentSemaphore]);
++#endif
+ 	device->resetFences(*drawFences[currentImage]);
+ 	graphicsQueue.submit(submitInfo, *drawFences[currentImage]);
+ 	assert(rendering);
+@@ -1046,7 +1067,11 @@ void VulkanContext::Present() noexcept
+ 	{
+ 		try {
+ 			DoSwapAutomation();
++#ifdef __ORBIS__
++			vk::Result res = presentQueue.presentKHR(vk::PresentInfoKHR(0, nullptr, 1, &(*swapChain), &currentImage));
++#else
+ 			vk::Result res = swappyvk::present(presentQueue, vk::PresentInfoKHR(1, &(*renderCompleteSemaphores[currentSemaphore]), 1, &(*swapChain), &currentImage));
++#endif
+ #if defined(VK_USE_PLATFORM_METAL_EXT) || defined(__APPLE__)
+ 			// presentKHR lists eSuboptimalKHR as a success code so it is
+ 			// returned rather than thrown. Treat it as a request to
+@@ -1068,7 +1093,11 @@ void VulkanContext::Present() noexcept
+ 				for (int i = 1; i < interval; i++)
+ 				{
+ 					PresentFrame(vk::Image(), lastFrameView, lastFrameExtent, lastFrameAR);
++#ifdef __ORBIS__
++					res = presentQueue.presentKHR(vk::PresentInfoKHR(0, nullptr, 1, &(*swapChain), &currentImage));
++#else
+ 					res = presentQueue.presentKHR(vk::PresentInfoKHR(1, &(*renderCompleteSemaphores[currentSemaphore]), 1, &(*swapChain), &currentImage));
++#endif
+ 					currentSemaphore = (currentSemaphore + 1) % renderCompleteSemaphores.size();
+ 					if (res == vk::Result::eSuboptimalKHR)
+ 					{
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
 index 000000000..1ba54b882
@@ -1556,10 +1607,10 @@ index 000000000..d68c3d954
 +} // namespace virtmem
 diff --git a/shell/ps4/ps4_wsi.cpp b/shell/ps4/ps4_wsi.cpp
 new file mode 100644
-index 000000000..0c5fddbf3
+index 000000000..6ec3651bd
 --- /dev/null
 +++ b/shell/ps4/ps4_wsi.cpp
-@@ -0,0 +1,550 @@
+@@ -0,0 +1,554 @@
 +/*
 +	DeCast-S4: Vulkan window system integration on the PS4 (from Crema's PS4WSI.cpp).
 +
@@ -2089,6 +2140,10 @@ index 000000000..0c5fddbf3
 +
 +VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetDeviceProcAddr(VkDevice device, const char *name)
 +{
++	// vulkan.hpp's DispatchLoaderDynamic::init(device) looks vkGetDeviceProcAddr up again through
++	// itself: RADV's would then resolve the swapchain functions, and it has none (all null)
++	if (strcmp(name, "vkGetDeviceProcAddr") == 0)
++		return (PFN_vkVoidFunction)&GetDeviceProcAddr;
 +	if (auto fn = Intercept(name))
 +		return fn;
 +	return vk_common_GetDeviceProcAddr(device, name);

@@ -13,6 +13,12 @@ mkdir -p "$OUT"
 for f in boot-trace.log crash.log hang.log data/flycast.log; do
     curl -s --max-time 30 -o "$OUT/$(basename "$f")" "$HOST/data/DeCast-S4/$f" || rm -f "$OUT/$(basename "$f")"
 done
+# symbolize against the build that ran (boot-trace.log: "DeCast-S4 XX.YY starting")
+if [ -z "${1:-}" ]; then
+    ran="$(grep -oE "DeCast-S4 [0-9]{2}\.[0-9]{2} starting" "$OUT/boot-trace.log" 2>/dev/null | head -1 | cut -d' ' -f2 || true)"
+    [ -n "$ran" ] && [ -f "$PS4_BUILD_ROOT/oelf/v$ran.elf" ] && ELF="$PS4_BUILD_ROOT/oelf/v$ran.elf"
+fi
+echo "== symbols from $(basename "$ELF")"
 symbolize() {
     llvm-symbolizer-21 --obj="$ELF" --functions=linkage --demangle --no-inlines "$1" | head -2 | paste -sd' '
 }
