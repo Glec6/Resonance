@@ -163,12 +163,11 @@ void crashHandler(int sig, siginfo_t* info, void* context) {
     }, nullptr);
     // Where every other thread was (stacks, and the lock each one waits on), after the crash.
     ps4_dump_thread_stacks("/data/DeCast-S4/crash.log", "every thread at the crash");
-    // The emulator's view of the crash (Cemu: the guest CPU state, stack trace and threads, into
-    // log.txt).
+    // The emulator's view of the crash (DeCast-S4: the SH4 registers, into crash.log).
     if (ps4_crash_guest_info) {
         ps4_crash_guest_info();
         if (traceFd() >= 0)
-            writeAll(traceFd(), "guest state written to log.txt\n");
+            writeAll(traceFd(), "SH4 state written to crash.log\n");
     }
 
     // End the process here rather than with the system's crash report: on FW 13.52 that

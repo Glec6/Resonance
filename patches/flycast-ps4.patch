@@ -180,19 +180,20 @@ index 0d5086b0d..f16043804 100644
  #else
  			std::string logPath = "flycast.log";
 diff --git a/core/oslib/oslib.cpp b/core/oslib/oslib.cpp
-index 9d308dfd3..cf96de959 100644
+index 9d308dfd3..318d79d09 100644
 --- a/core/oslib/oslib.cpp
 +++ b/core/oslib/oslib.cpp
-@@ -27,6 +27,8 @@
+@@ -27,6 +27,9 @@
  #endif
  #if defined(USE_SDL)
  #include "sdl/sdl.h"
 +#elif defined(__ORBIS__)
 +#include "ps4_gamepad.h"
++#include "wsi/context.h"
  #else
  	#if defined(SUPPORT_X11)
  		#include "linux-dist/x11.h"
-@@ -304,7 +306,7 @@ std::string getTextureDumpPath()
+@@ -304,7 +307,7 @@ std::string getTextureDumpPath()
  	return get_writable_data_path("texdump/");
  }
  
@@ -201,15 +202,26 @@ index 9d308dfd3..cf96de959 100644
  
  static std::string runCommand(const std::string& cmd)
  {
-@@ -436,6 +438,7 @@ void os_CreateWindow()
+@@ -435,6 +438,9 @@ void os_CreateWindow()
+ 	sdl_window_create();
  #elif defined(SUPPORT_X11)
  	x11_window_create();
++#elif defined(__ORBIS__)
++	// no window: VideoOut is opened with the swapchain (shell/ps4/ps4_wsi.cpp)
++	initRenderApi();
  #endif
-+	// PS4: no window, VideoOut is opened with the swapchain (shell/ps4/ps4_wsi.cpp)
  }
  
- void os_DestroyWindow()
-@@ -451,6 +454,8 @@ void os_SetupInput()
+@@ -444,6 +450,8 @@ void os_DestroyWindow()
+ 	sdl_window_destroy();
+ #elif defined(SUPPORT_X11)
+ 	x11_window_destroy();
++#elif defined(__ORBIS__)
++	termRenderApi();
+ #endif
+ }
+ 
+@@ -451,6 +459,8 @@ void os_SetupInput()
  {
  #if defined(USE_SDL)
  	input_sdl_init();
@@ -218,7 +230,7 @@ index 9d308dfd3..cf96de959 100644
  #else
  	#if defined(SUPPORT_X11)
  		input_x11_init();
-@@ -471,6 +476,8 @@ void os_TermInput()
+@@ -471,6 +481,8 @@ void os_TermInput()
  	dreampotato::term();
  #if defined(USE_SDL)
  	input_sdl_quit();
@@ -227,7 +239,7 @@ index 9d308dfd3..cf96de959 100644
  #else
  	#if defined(SUPPORT_X11)
  		input_x11_term();
-@@ -492,6 +499,8 @@ void os_UpdateInputState()
+@@ -492,6 +504,8 @@ void os_UpdateInputState()
  	GamepadDevice::RampAnalog();
  #if defined(USE_SDL)
  	input_sdl_handle();
@@ -1240,10 +1252,10 @@ index 000000000..4cad82eb3
 +void ZSTD_trace_decompress_end(unsigned long long ctx, const void *trace) {}
 diff --git a/shell/ps4/ps4_vmem.cpp b/shell/ps4/ps4_vmem.cpp
 new file mode 100644
-index 000000000..69364744a
+index 000000000..d68c3d954
 --- /dev/null
 +++ b/shell/ps4/ps4_vmem.cpp
-@@ -0,0 +1,290 @@
+@@ -0,0 +1,298 @@
 +/*
 +	DeCast-S4: virtual memory (fast memory) on the PS4.
 +
@@ -1415,9 +1427,17 @@ index 000000000..69364744a
 +	dmem = physical;
 +
 +	reservedSize = 512_MB + sizeof(Sh4RCB) + ARAM_SIZE_MAX + kReserveAlign;
-+	// above the kernel's own allocations at 0x200000000 (DolphinPS4: they wrecked a heap there)
-+	void *base = (void *)0x700000000ull;
-+	r = sceKernelReserveVirtualRange(&base, reservedSize, 0, kReserveAlign);
++	// above the kernel's own allocations at 0x200000000 (DolphinPS4: they wrecked a heap there).
++	// A hint whose range isn't free fails (ENOMEM) instead of searching on: try a few.
++	void *base = nullptr;
++	for (uintptr_t hint : { 0x2000000000ull, 0x1800000000ull, 0x3000000000ull, 0x900000000ull, 0x0ull })
++	{
++		base = (void *)hint;
++		r = sceKernelReserveVirtualRange(&base, reservedSize, 0, kReserveAlign);
++		if (r == 0)
++			break;
++		trace("vmem: reserving %zu MiB at %p failed: %x", reservedSize >> 20, (void *)hint, r);
++	}
 +	if (r != 0)
 +	{
 +		trace("vmem: reserving %zu MiB of address space failed: %x", reservedSize >> 20, r);
