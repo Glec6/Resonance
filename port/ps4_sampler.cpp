@@ -625,6 +625,14 @@ extern "C" void ps4_thread_busy_report(char* out, size_t size, int min_percent) 
 
 extern "C" void ps4_sampler_register_thread(const char* name) {
     ps4_watch_thread(name);
+    // a thread that is started again (DeCast-S4: the emulation thread at every game start) takes
+    // over its predecessor's slot instead of a new one
+    for (int i = 0; i < g_thread_count.load(); i++) {
+        if (g_threads[i].name && name && strcmp(g_threads[i].name, name) == 0) {
+            g_threads[i].thread.store(pthread_self());
+            return;
+        }
+    }
     const int index = g_thread_count.load();
     if (index >= kMaxThreads)
         return;

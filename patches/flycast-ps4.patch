@@ -117,14 +117,16 @@ index f2f0cca50..2cac65b91 100755
  			u64 now = getTimeMs();
  			cpu_time_idx = (cpu_time_idx + 1) % cpu_cycles.size();
 diff --git a/core/linux/common.cpp b/core/linux/common.cpp
-index 9e2078486..7dc359328 100644
+index 9e2078486..2aab50571 100644
 --- a/core/linux/common.cpp
 +++ b/core/linux/common.cpp
-@@ -30,13 +30,17 @@ extern "C" char __start__;
+@@ -30,31 +30,50 @@ extern "C" char __start__;
  #define siginfo_t switch_siginfo_t
  #endif // __SWITCH__
  
 +#ifdef __ORBIS__
++#include "ps4_stats.h"
++std::atomic<u64> decast_fault_count[ps4fault::Count];
 +void ps4_name_thread(const char *name);	// shell/ps4/ps4_main.cpp
 +#endif
 +
@@ -139,7 +141,53 @@ index 9e2078486..7dc359328 100644
  static struct sigaction next_bus_handler;
  #endif
  
-@@ -93,10 +97,14 @@ void os_InstallFaultHandler()
+ void fault_handler(int sn, siginfo_t * si, void *segfault_ctx)
+ {
++#ifdef __ORBIS__
++#define PS4_COUNT_FAULT(kind) decast_fault_count[ps4fault::kind]++
++#else
++#define PS4_COUNT_FAULT(kind)
++#endif
+ 	// Ram watcher for net rollback
+-	if (memwatch::writeAccess(si->si_addr))
++	if (memwatch::writeAccess(si->si_addr)) {
++		PS4_COUNT_FAULT(MemWatch);
+ 		return;
++	}
+ 	// code protection in RAM
+-	if (bm_RamWriteAccess(si->si_addr))
++	if (bm_RamWriteAccess(si->si_addr)) {
++		PS4_COUNT_FAULT(CodePage);
+ 		return;
++	}
+ 	// texture protection in VRAM
+-	if (VramLockedWrite((u8*)si->si_addr))
++	if (VramLockedWrite((u8*)si->si_addr)) {
++		PS4_COUNT_FAULT(Vram);
+ 		return;
++	}
+ #if FEAT_SHREC == DYNAREC_JIT
+ 	// FPCB jump table protection
+-	if (addrspace::bm_lockedWrite((u8*)si->si_addr))
++	if (addrspace::bm_lockedWrite((u8*)si->si_addr)) {
++		PS4_COUNT_FAULT(Fpcb);
+ 		return;
++	}
+ 
+ 	// fast mem access rewriting
+ 	host_context_t ctx;
+@@ -62,8 +81,10 @@ void fault_handler(int sn, siginfo_t * si, void *segfault_ctx)
+ 	if (sh4Dynarec->rewrite(ctx, si->si_addr))
+ 	{
+ 		context_to_segfault(&ctx, segfault_ctx);
++		PS4_COUNT_FAULT(Rewrite);
+ 		return;
+ 	}
++	PS4_COUNT_FAULT(Unhandled);
+ 
+ 	ERROR_LOG(COMMON, "SIGSEGV @ %p invalid access to %p", (void *)ctx.pc, si->si_addr);
+ #endif
+@@ -93,10 +114,14 @@ void os_InstallFaultHandler()
  	act.sa_sigaction = fault_handler;
  	sigemptyset(&act.sa_mask);
  	act.sa_flags = SA_SIGINFO;
@@ -156,7 +204,7 @@ index 9e2078486..7dc359328 100644
      sigaction(SIGBUS, &act, &next_bus_handler);
  #endif
  }
-@@ -106,7 +114,7 @@ void os_UninstallFaultHandler()
+@@ -106,7 +131,7 @@ void os_UninstallFaultHandler()
  #ifndef __SWITCH__
  	sigaction(SIGSEGV, &next_segv_handler, nullptr);
  #endif
@@ -165,7 +213,7 @@ index 9e2078486..7dc359328 100644
  	sigaction(SIGBUS, &next_bus_handler, nullptr);
  #endif
  }
-@@ -187,6 +195,9 @@ void os_SetThreadName(const char *name)
+@@ -187,6 +212,9 @@ void os_SetThreadName(const char *name)
  		name = tmp;
  	}
  	pthread_setname_np(pthread_self(), name);
@@ -1174,10 +1222,10 @@ index 000000000..8946466f3
 +int ps4_first_pad_handle();
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..5495be4cb
+index 000000000..b6c1d3386
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
-@@ -0,0 +1,281 @@
+@@ -0,0 +1,300 @@
 +/*
 +	DeCast-S4: Flycast's PS4 frontend.
 +
@@ -1215,6 +1263,7 @@ index 000000000..5495be4cb
 +#include "ui/mainui.h"
 +#include "hw/sh4/sh4_if.h"
 +#include "ps4_wsi.h"
++#include "ps4_stats.h"
 +
 +#include <orbis/Sysmodule.h>
 +#include <orbis/libkernel.h>
@@ -1226,6 +1275,7 @@ index 000000000..5495be4cb
 +#include <atomic>
 +#include <chrono>
 +#include <cstdio>
++#include <cstring>
 +#include <thread>
 +#include <string>
 +#include <vector>
@@ -1295,6 +1345,7 @@ index 000000000..5495be4cb
 +		u32 lastFrames = MainFrameCount;
 +		u64 lastVblanks = ps4_vblank_count;
 +		u64 lastBusy = 0, lastSpan = 0;
++		u64 lastFaults[ps4fault::Count] {};
 +		ac_ps4_get_gpu_busy(&lastBusy, &lastSpan);
 +		auto last = std::chrono::steady_clock::now();
 +		for (;;)
@@ -1309,10 +1360,21 @@ index 000000000..5495be4cb
 +			ac_ps4_get_gpu_busy(&busy, &span);
 +			char threads[640];
 +			ps4_thread_busy_report(threads, sizeof(threads), 10);
++			// faults per second by kind (core/linux/common.cpp) and page (un)protections (ps4_vmem.cpp)
++			u64 faults[ps4fault::Count];
++			for (int i = 0; i < ps4fault::Count; i++)
++			{
++				const u64 v = decast_fault_count[i];
++				faults[i] = v - lastFaults[i];
++				lastFaults[i] = v;
++			}
 +			char line[900];
-+			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | %s",
++			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | faults/s: memwatch %.0f code %.0f vram %.0f fpcb %.0f rewrite %.0f other %.0f, protect %.0f unprotect %.0f | %s",
 +					(frames - lastFrames) / secs, (vblanks - lastVblanks) / secs / ps4_vblank_rate() * 100.0,
-+					span > lastSpan ? (unsigned long long)((busy - lastBusy) * 100 / (span - lastSpan)) : 0ull, threads);
++					span > lastSpan ? (unsigned long long)((busy - lastBusy) * 100 / (span - lastSpan)) : 0ull,
++					faults[ps4fault::MemWatch] / secs, faults[ps4fault::CodePage] / secs, faults[ps4fault::Vram] / secs,
++					faults[ps4fault::Fpcb] / secs, faults[ps4fault::Rewrite] / secs, faults[ps4fault::Unhandled] / secs,
++					faults[ps4fault::Protect] / secs, faults[ps4fault::Unprotect] / secs, threads);
 +			ps4_boot_trace(line);
 +			lastFrames = frames;
 +			lastVblanks = vblanks;
@@ -1403,7 +1465,12 @@ index 000000000..5495be4cb
 +// in the profiler's samples when it runs
 +void ps4_name_thread(const char *name)
 +{
-+	if (profiling)
++	// the sampler has a few slots: the threads that do the emulation's work
++	static const char *const profiled[] = { "Flycast-emu", "Flycast-rend", "PS4AudioOut" };
++	bool sample = false;
++	for (const char *p : profiled)
++		sample |= profiling && strcmp(name, p) == 0;
++	if (sample)
 +		ps4_sampler_register_thread(name);
 +	else
 +		ps4_watch_thread(name);
@@ -1459,6 +1526,40 @@ index 000000000..5495be4cb
 +}
 +
 +}
+diff --git a/shell/ps4/ps4_stats.h b/shell/ps4/ps4_stats.h
+new file mode 100644
+index 000000000..57d13baee
+--- /dev/null
++++ b/shell/ps4/ps4_stats.h
+@@ -0,0 +1,28 @@
++/*
++	DeCast-S4: counters for the performance monitor (shell/ps4/ps4_main.cpp).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#pragma once
++#include "types.h"
++#include <atomic>
++
++namespace ps4fault
++{
++// What a memory fault was (fault_handler) or a page protection change (virtmem::region_*)
++enum : int { MemWatch, CodePage, Vram, Fpcb, Rewrite, Unhandled, Protect, Unprotect, Count };
++}
++extern std::atomic<u64> decast_fault_count[ps4fault::Count];
 diff --git a/shell/ps4/ps4_stubs.c b/shell/ps4/ps4_stubs.c
 new file mode 100644
 index 000000000..4cad82eb3
@@ -1492,10 +1593,10 @@ index 000000000..4cad82eb3
 +void ZSTD_trace_decompress_end(unsigned long long ctx, const void *trace) {}
 diff --git a/shell/ps4/ps4_vmem.cpp b/shell/ps4/ps4_vmem.cpp
 new file mode 100644
-index 000000000..d68c3d954
+index 000000000..8f36c28e1
 --- /dev/null
 +++ b/shell/ps4/ps4_vmem.cpp
-@@ -0,0 +1,298 @@
+@@ -0,0 +1,301 @@
 +/*
 +	DeCast-S4: virtual memory (fast memory) on the PS4.
 +
@@ -1527,6 +1628,7 @@ index 000000000..d68c3d954
 +#include "hw/mem/addrspace.h"
 +#include "hw/sh4/sh4_if.h"
 +#include "oslib/virtmem.h"
++#include "ps4_stats.h"
 +
 +#include <sys/mman.h>
 +#include <sys/types.h>
@@ -1620,6 +1722,7 @@ index 000000000..d68c3d954
 +
 +bool region_lock(void *start, size_t len)
 +{
++	decast_fault_count[ps4fault::Protect]++;
 +	const size_t inpage = (uintptr_t)start & PAGE_MASK;
 +	const int32_t r = sceKernelMprotect((u8 *)start - inpage, alignUp(len + inpage, kPage), kProtRead);
 +	if (r != 0)
@@ -1629,6 +1732,7 @@ index 000000000..d68c3d954
 +
 +bool region_unlock(void *start, size_t len)
 +{
++	decast_fault_count[ps4fault::Unprotect]++;
 +	const size_t inpage = (uintptr_t)start & PAGE_MASK;
 +	const int32_t r = sceKernelMprotect((u8 *)start - inpage, alignUp(len + inpage, kPage), kProtRW);
 +	if (r != 0)
