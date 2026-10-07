@@ -138,6 +138,28 @@ index 9e2078486..8ccf59518 100644
  #endif
  }
  
+diff --git a/core/linux/context.cpp b/core/linux/context.cpp
+index 461ff2681..cd97718c4 100644
+--- a/core/linux/context.cpp
++++ b/core/linux/context.cpp
+@@ -97,7 +97,16 @@ static void context_segfault(host_context_t* hostctx, void* segfault_ctx)
+ 		#error "Unsupported OS"
+ 	#endif
+ #elif HOST_CPU == CPU_X64
+-	#if defined(__FreeBSD__) || defined(__DragonFly__)
++	#if defined(__ORBIS__)
++		// PS4: the FreeBSD register block starts at byte 0x40 of the signal context (measured on
++		// hardware by DolphinPS4; the libc overlay's ucontext_t places it elsewhere). Word indexes
++		// in FreeBSD mcontext order: mc_onstack, rdi 1, ..., r9 6, ..., rip 20, rsp 23.
++		u64 *mc = (u64 *)((u8 *)segfault_ctx + 0x40);
++		bicopy<ToSegfault>(hostctx->pc, mc[20]);
++		bicopy<ToSegfault>(hostctx->rsp, mc[23]);
++		bicopy<ToSegfault>(hostctx->r9, mc[6]);
++		bicopy<ToSegfault>(hostctx->rdi, mc[1]);
++	#elif defined(__FreeBSD__) || defined(__DragonFly__)
+ 		bicopy<ToSegfault>(hostctx->pc, MCTX(.mc_rip));
+ 		bicopy<ToSegfault>(hostctx->rsp, MCTX(.mc_rsp));
+ 		bicopy<ToSegfault>(hostctx->r9, MCTX(.mc_r9));
 diff --git a/core/linux/posix_vmem.cpp b/core/linux/posix_vmem.cpp
 index 2d4241090..0abe87530 100644
 --- a/core/linux/posix_vmem.cpp
