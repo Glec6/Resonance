@@ -67,6 +67,21 @@ constexpr int kRipIndex = 20, kRspIndex = 23;
 constexpr uintptr_t kTextWindow = 0x4000000;  // 64 MiB covers the eboot's code
 
 int g_traceFd = -1;
+int g_probePipe[2] = {-1, -1};  // readability probe (readable() below)
+
+// Whether 8 bytes at an address can be read, without touching them: the kernel copies them into
+// a pipe and reports EFAULT instead of faulting. The crash handler's stack scan used to read past
+// the top of a thread's stack, fault again inside the handler, and the system then ended the app
+// with nothing in crash.log.
+bool readable(const void* address) {
+    if (g_probePipe[0] < 0)
+        return false;
+    if (write(g_probePipe[1], address, 8) != 8)
+        return false;
+    char drain[8];
+    read(g_probePipe[0], drain, sizeof(drain));
+    return true;
+}
 
 // Opened on first use: the heap may log before this file's constructor runs.
 int traceFd() {
@@ -144,6 +159,9 @@ void crashHandler(int sig, siginfo_t* info, void* context) {
         const auto* stack = reinterpret_cast<const uint64_t*>(rsp);
         int found = 0;
         for (int i = 0; i < 2048 && found < 48; i++) {
+            // check each new 4 KiB page (and the first word) before reading it
+            if ((i == 0 || ((reinterpret_cast<uintptr_t>(&stack[i]) & 0xfff) == 0)) && !readable(&stack[i]))
+                break;
             if (isCode(stack[i])) {
                 writeFormat(fd, "  [rsp+0x%x] 0x%llx\n", i * 8, static_cast<unsigned long long>(toElf(stack[i])));
                 found++;
@@ -206,6 +224,10 @@ __attribute__((constructor(101))) void earlyInit() {
     if (traceFd() >= 0)
         writeFormat(traceFd(), "static init (text at %p)\n", static_cast<void*>(__text_start));
     std::set_terminate(terminateHandler);
+    if (pipe(g_probePipe) == 0) {
+        fcntl(g_probePipe[0], F_SETFL, O_NONBLOCK);
+        fcntl(g_probePipe[1], F_SETFL, O_NONBLOCK);
+    }
     ps4_install_signal_stack();
     const int signals[] = {kSigIll, kSigAbrt, kSigFpe, kSigBus, kSigSegv};
     for (int sig : signals)

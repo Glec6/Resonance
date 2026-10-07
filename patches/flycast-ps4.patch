@@ -80,7 +80,7 @@ index c5ac6f6e8..488f1c238 100644
  
  if(NOT LIBRETRO)
 diff --git a/core/linux/common.cpp b/core/linux/common.cpp
-index 9e2078486..0b98b6be1 100644
+index 9e2078486..8ccf59518 100644
 --- a/core/linux/common.cpp
 +++ b/core/linux/common.cpp
 @@ -30,13 +30,17 @@ extern "C" char __start__;
@@ -102,8 +102,14 @@ index 9e2078486..0b98b6be1 100644
  static struct sigaction next_bus_handler;
  #endif
  
-@@ -95,8 +99,8 @@ void os_InstallFaultHandler()
+@@ -93,10 +97,14 @@ void os_InstallFaultHandler()
+ 	act.sa_sigaction = fault_handler;
+ 	sigemptyset(&act.sa_mask);
  	act.sa_flags = SA_SIGINFO;
++#ifdef __ORBIS__
++	// every PS4 thread has a signal stack (DeCast-S4 port/ps4_runtime.cpp): a thread out of stack still reports
++	act.sa_flags |= SA_ONSTACK;
++#endif
  	sigaction(SIGSEGV, &act, &next_segv_handler);
  #endif
 -#if defined(__APPLE__)
@@ -113,7 +119,7 @@ index 9e2078486..0b98b6be1 100644
      sigaction(SIGBUS, &act, &next_bus_handler);
  #endif
  }
-@@ -106,7 +110,7 @@ void os_UninstallFaultHandler()
+@@ -106,7 +114,7 @@ void os_UninstallFaultHandler()
  #ifndef __SWITCH__
  	sigaction(SIGSEGV, &next_segv_handler, nullptr);
  #endif
@@ -122,7 +128,7 @@ index 9e2078486..0b98b6be1 100644
  	sigaction(SIGBUS, &next_bus_handler, nullptr);
  #endif
  }
-@@ -187,6 +191,9 @@ void os_SetThreadName(const char *name)
+@@ -187,6 +195,9 @@ void os_SetThreadName(const char *name)
  		name = tmp;
  	}
  	pthread_setname_np(pthread_self(), name);
@@ -1060,10 +1066,10 @@ index 000000000..8946466f3
 +int ps4_first_pad_handle();
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..363bd6262
+index 000000000..a0f7b9489
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,209 @@
 +/*
 +	DeCast-S4: Flycast's PS4 frontend.
 +
@@ -1113,6 +1119,7 @@ index 000000000..363bd6262
 +#include <vector>
 +
 +extern "C" void ps4_boot_trace(const char *line);	// port/ps4_crashlog.cpp
++void common_linux_setup();	// core/linux/common.cpp
 +
 +namespace
 +{
@@ -1189,6 +1196,8 @@ index 000000000..363bd6262
 +	LogManager::Init();
 +	i18n::init();
 +	warmUpExceptions();
++	// the fault handler (fast memory, the dynarec's block table, VRAM write tracking), as Linux's main()
++	common_linux_setup();
 +
 +	trace("flycast_init");
 +	if (flycast_init(argc, argv) != 0)
