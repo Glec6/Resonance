@@ -1,0 +1,2129 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c5ac6f6e8..488f1c238 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -66,6 +66,18 @@ if(NOT DEFINED ARCHITECTURE)
+ endif()
+ message(STATUS "Target architecture: ${ARCHITECTURE}")
+ 
++# PS4 homebrew (DeCast-S4): Vulkan on RADV/GNM, native ScePad/AudioOut frontend in shell/ps4,
++# no desktop libraries (SDL, X11, ALSA, ...).
++if(PS4)
++	set(USE_VULKAN ON CACHE BOOL "" FORCE)
++	foreach(_opt USE_OPENGL USE_GLES USE_GLES2 USE_DX9 USE_DX11 USE_ALSA USE_LIBAO USE_PULSEAUDIO
++			USE_OSS USE_BREAKPAD USE_LUA USE_OPENMP USE_HOST_SDL USE_HOST_LIBZIP USE_HOST_GLSLANG
++			USE_DISCORD USE_LIBCDIO)
++		set(${_opt} OFF CACHE BOOL "" FORCE)
++	endforeach()
++	enable_language(ASM)
++endif()
++
+ if(CMAKE_CXX_COMPILER MATCHES "webos" OR
+    CMAKE_CXX_COMPILER MATCHES "starfish")
+ 	set(WEBOS ON)
+@@ -289,7 +301,9 @@ if(WINDOWS_STORE)
+ 	set(USE_VULKAN OFF)
+ endif()
+ 
+-set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
++if(NOT PS4)	# create-fself needs the symbol table
++	set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
++endif()
+ if(MSVC)
+ 	target_compile_options(${PROJECT_NAME} PRIVATE /GR /GS- /utf-8)
+ 	if(WINDOWS_STORE)
+@@ -327,6 +341,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
+ if(UNIX AND NOT ANDROID AND NOT APPLE)
+ 	execute_process(COMMAND getconf PAGESIZE OUTPUT_VARIABLE PAGE_SIZE OUTPUT_STRIP_TRAILING_WHITESPACE)
+ 	target_compile_definitions(${PROJECT_NAME} PRIVATE PAGE_SIZE=${PAGE_SIZE})
++elseif(PS4)
++	# the PS4 kernel maps and protects memory in 16 KiB pages
++	target_compile_definitions(${PROJECT_NAME} PRIVATE PAGE_SIZE=16384)
+ endif()
+ 
+ if(NOT "${SENTRY_UPLOAD_URL}" STREQUAL "")
+@@ -494,7 +511,7 @@ if(NOT LIBRETRO)
+ 		target_link_libraries(${PROJECT_NAME} PRIVATE "-static-libgcc -static-libstdc++")
+ 	endif()
+ 
+-	if(NOT ANDROID AND NOT IOS)
++	if(NOT ANDROID AND NOT IOS AND NOT PS4)
+ 		if (NOT NINTENDO_SWITCH)
+ 			# DreamLink enabled for non-mobile Linux, MacOS, and Windows
+ 			target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DREAMLINK_DEVICES=1)
+@@ -731,7 +748,7 @@ add_subdirectory(core/deps/nowide EXCLUDE_FROM_ALL)
+ target_link_libraries(${PROJECT_NAME} PRIVATE nowide::nowide)
+ 
+ if(NOT MINIUPNP_FOUND)
+-	if(NINTENDO_SWITCH)
++	if(NINTENDO_SWITCH OR PS4)
+ 		target_compile_definitions(${PROJECT_NAME} PRIVATE FEAT_NO_MINIUPNPC)
+ 	else()
+ 		option(UPNPC_BUILD_SHARED "Build shared library" OFF)
+@@ -793,7 +810,7 @@ if(WIN32)
+ 	target_include_directories(${PROJECT_NAME} PRIVATE core/deps/dirent)
+ endif()
+ 
+-if(NOT LIBRETRO AND NOT NINTENDO_SWITCH)
++if(NOT LIBRETRO AND NOT NINTENDO_SWITCH AND NOT PS4)
+ 	target_compile_definitions(${PROJECT_NAME} PRIVATE USE_ICE)
+ 	# libjuice
+ 	option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+@@ -1023,6 +1040,9 @@ else()
+ 	if(NINTENDO_SWITCH)
+ 		add_subdirectory(shell/switch)
+ 	endif()
++	if(PS4)
++		add_subdirectory(shell/ps4)
++	endif()
+ endif()
+ 
+ if(NOT LIBRETRO)
+diff --git a/core/linux/common.cpp b/core/linux/common.cpp
+index 9e2078486..0b98b6be1 100644
+--- a/core/linux/common.cpp
++++ b/core/linux/common.cpp
+@@ -30,13 +30,17 @@ extern "C" char __start__;
+ #define siginfo_t switch_siginfo_t
+ #endif // __SWITCH__
+ 
++#ifdef __ORBIS__
++extern "C" void ps4_watch_thread(const char *name);
++#endif
++
+ void context_from_segfault(host_context_t* hctx, void* segfault_ctx);
+ void context_to_segfault(host_context_t* hctx, void* segfault_ctx);
+ 
+ #ifndef __SWITCH__
+ static struct sigaction next_segv_handler;
+ #endif
+-#if defined(__APPLE__)
++#if defined(__APPLE__) || defined(__ORBIS__)
+ static struct sigaction next_bus_handler;
+ #endif
+ 
+@@ -95,8 +99,8 @@ void os_InstallFaultHandler()
+ 	act.sa_flags = SA_SIGINFO;
+ 	sigaction(SIGSEGV, &act, &next_segv_handler);
+ #endif
+-#if defined(__APPLE__)
+-    //this is broken on osx/ios/mach in general
++#if defined(__APPLE__) || defined(__ORBIS__)
++    // also PS4: writes to read-only direct memory (locked VRAM pages) may raise SIGBUS
+     sigaction(SIGBUS, &act, &next_bus_handler);
+ #endif
+ }
+@@ -106,7 +110,7 @@ void os_UninstallFaultHandler()
+ #ifndef __SWITCH__
+ 	sigaction(SIGSEGV, &next_segv_handler, nullptr);
+ #endif
+-#if defined(__APPLE__)
++#if defined(__APPLE__) || defined(__ORBIS__)
+ 	sigaction(SIGBUS, &next_bus_handler, nullptr);
+ #endif
+ }
+@@ -187,6 +191,9 @@ void os_SetThreadName(const char *name)
+ 		name = tmp;
+ 	}
+ 	pthread_setname_np(pthread_self(), name);
++#elif defined(__ORBIS__)
++	// named threads appear in DeCast-S4's crash and hang reports (port/ps4_sampler.cpp)
++	ps4_watch_thread(name);
+ #endif
+ }
+ 
+diff --git a/core/linux/posix_vmem.cpp b/core/linux/posix_vmem.cpp
+index 2d4241090..0abe87530 100644
+--- a/core/linux/posix_vmem.cpp
++++ b/core/linux/posix_vmem.cpp
+@@ -4,7 +4,7 @@
+ // Android and OSX since they are slightly different in some areas.
+ #include "types.h"
+ 
+-#ifndef __SWITCH__
++#if !defined(__SWITCH__) && !defined(__ORBIS__)	// PS4: shell/ps4/ps4_vmem.cpp
+ #include <sys/mman.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+@@ -325,7 +325,7 @@ void release_jit_block(void *code_area1, void *code_area2, size_t size)
+ 
+ } // namespace virtmem
+ 
+-#endif // !__SWITCH__
++#endif // !__SWITCH__ && !__ORBIS__
+ 
+ namespace virtmem
+ {
+diff --git a/core/log/LogManager.cpp b/core/log/LogManager.cpp
+index 0d5086b0d..f16043804 100644
+--- a/core/log/LogManager.cpp
++++ b/core/log/LogManager.cpp
+@@ -145,14 +145,19 @@ LogManager::LogManager()
+ 
+ void LogManager::UpdateConfig()
+ {
++#ifdef __ORBIS__
++	// PS4 test builds: there is no console to read (/data/DeCast-S4/data/flycast.log)
++	bool logToFile = config::loadBool("log", "LogToFile", true);
++#else
+ 	bool logToFile = config::loadBool("log", "LogToFile", false);
++#endif
+ 	if (logToFile != IsListenerEnabled(LogListener::FILE_LISTENER))
+ 	{
+ 		if (!logToFile) {
+ 			m_listeners[LogListener::FILE_LISTENER].reset();
+ 		}
+ 		else {
+-#if defined(__ANDROID__) || defined(__APPLE__) || defined(TARGET_UWP)
++#if defined(__ANDROID__) || defined(__APPLE__) || defined(TARGET_UWP) || defined(__ORBIS__)
+ 			std::string logPath = get_writable_data_path("flycast.log");
+ #else
+ 			std::string logPath = "flycast.log";
+diff --git a/core/oslib/oslib.cpp b/core/oslib/oslib.cpp
+index 9d308dfd3..cf96de959 100644
+--- a/core/oslib/oslib.cpp
++++ b/core/oslib/oslib.cpp
+@@ -27,6 +27,8 @@
+ #endif
+ #if defined(USE_SDL)
+ #include "sdl/sdl.h"
++#elif defined(__ORBIS__)
++#include "ps4_gamepad.h"
+ #else
+ 	#if defined(SUPPORT_X11)
+ 		#include "linux-dist/x11.h"
+@@ -304,7 +306,7 @@ std::string getTextureDumpPath()
+ 	return get_writable_data_path("texdump/");
+ }
+ 
+-#if (defined(__unix__) && !defined(__ANDROID__)) || defined(__HAIKU__)
++#if (defined(__unix__) && !defined(__ANDROID__) && !defined(__ORBIS__)) || defined(__HAIKU__)
+ 
+ static std::string runCommand(const std::string& cmd)
+ {
+@@ -436,6 +438,7 @@ void os_CreateWindow()
+ #elif defined(SUPPORT_X11)
+ 	x11_window_create();
+ #endif
++	// PS4: no window, VideoOut is opened with the swapchain (shell/ps4/ps4_wsi.cpp)
+ }
+ 
+ void os_DestroyWindow()
+@@ -451,6 +454,8 @@ void os_SetupInput()
+ {
+ #if defined(USE_SDL)
+ 	input_sdl_init();
++#elif defined(__ORBIS__)
++	input_ps4_init();
+ #else
+ 	#if defined(SUPPORT_X11)
+ 		input_x11_init();
+@@ -471,6 +476,8 @@ void os_TermInput()
+ 	dreampotato::term();
+ #if defined(USE_SDL)
+ 	input_sdl_quit();
++#elif defined(__ORBIS__)
++	input_ps4_term();
+ #else
+ 	#if defined(SUPPORT_X11)
+ 		input_x11_term();
+@@ -492,6 +499,8 @@ void os_UpdateInputState()
+ 	GamepadDevice::RampAnalog();
+ #if defined(USE_SDL)
+ 	input_sdl_handle();
++#elif defined(__ORBIS__)
++	input_ps4_handle();
+ #elif defined(USE_EVDEV)
+ 	input_evdev_handle();
+ #endif
+diff --git a/core/oslib/virtmem.h b/core/oslib/virtmem.h
+index 2a02ab625..a1d091484 100644
+--- a/core/oslib/virtmem.h
++++ b/core/oslib/virtmem.h
+@@ -1,7 +1,8 @@
+ #pragma once
+ #include "types.h"
+ 
+-#if defined(_WIN32) || defined(__APPLE__)
++#if defined(_WIN32) || defined(__APPLE__) || defined(__ORBIS__)
++// PS4: allocated near the code by virtmem::prepare_jit_block (shell/ps4/ps4_vmem.cpp)
+ #define DECLARE_CODE_CACHE(Name, Size) static u8 *Name;
+ #elif defined(__ANDROID__)
+ #define DECLARE_CODE_CACHE(Name, Size) alignas(4096) static u8 Name[Size];
+diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_context.cpp
+index 2cb703a9c..d3257f05a 100644
+--- a/core/rend/vulkan/vulkan_context.cpp
++++ b/core/rend/vulkan/vulkan_context.cpp
+@@ -27,6 +27,9 @@
+ #include <sdl/sdl.h>
+ #include <SDL_vulkan.h>
+ #endif
++#ifdef __ORBIS__
++#include "ps4_wsi.h"
++#endif
+ #include "compiler.h"
+ #include "utils.h"
+ #include "emulator.h"
+@@ -151,6 +154,9 @@ bool VulkanContext::InitInstance(const char** extensions, uint32_t extensions_co
+ 		vkGetInstanceProcAddr = loadVulkanDriver();
+ #elif defined(__APPLE__) && defined(USE_SDL)
+ 		vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
++#elif defined(__ORBIS__)
++		// RADV is linked in: no loader to open
++		vkGetInstanceProcAddr = ps4_vk_get_instance_proc_addr();
+ #else
+ 		static vk::detail::DynamicLoader dl;
+ 		vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+@@ -934,6 +940,8 @@ bool VulkanContext::init()
+ 	extensions.push_back(vk::KHRXlibSurfaceExtensionName);
+ #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
+ 	extensions.push_back(vk::KHRAndroidSurfaceExtensionName);
++#elif defined(__ORBIS__)
++	extensions.push_back(vk::EXTHeadlessSurfaceExtensionName);	// VideoOut (shell/ps4/ps4_wsi.cpp)
+ #endif
+ 	if (!InitInstance(&extensions[0], extensions.size())) {
+ 		term();
+@@ -961,6 +969,8 @@ bool VulkanContext::init()
+ #elif defined(VK_USE_PLATFORM_METAL_EXT)
+ 	vk::MetalSurfaceCreateInfoEXT createInfo(vk::MetalSurfaceCreateFlagsEXT(), window);
+ 	surface = instance->createMetalSurfaceEXTUnique(createInfo);
++#elif defined(__ORBIS__)
++	surface = instance->createHeadlessSurfaceEXTUnique(vk::HeadlessSurfaceCreateInfoEXT());
+ #else
+ #error "Unknown Vulkan platform"
+ #endif
+diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
+new file mode 100644
+index 000000000..1ba54b882
+--- /dev/null
++++ b/shell/ps4/CMakeLists.txt
+@@ -0,0 +1,29 @@
++# DeCast-S4: Flycast on PS4 homebrew. Built with the DeCast-S4 toolchain (toolchain/ps4-decast.cmake,
++# ps4-love-style.cmake: PS4_RUNTIME_SOURCES, ps4_link_mesa, ps4_add_eboot).
++target_sources(${PROJECT_NAME} PRIVATE
++	ps4_main.cpp
++	ps4_stubs.c
++	ps4_gamepad.cpp
++	ps4_gamepad.h
++	ps4_vmem.cpp
++	ps4_wsi.cpp
++	ps4_wsi.h
++	audiobackend_ps4.cpp
++	${PS4_RUNTIME_SOURCES})
++target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
++# FreeBSD kernel without sockets for local IPC or serial ports
++target_compile_definitions(${PROJECT_NAME} PRIVATE
++	ASIO_DISABLE_LOCAL_SOCKETS
++	ASIO_DISABLE_SERIAL_PORT
++	ASIO_DISABLE_KQUEUE)
++
++# curl + OpenSSL from the sysroot (Crema's PSChrome recipes) for box art and achievements
++target_compile_definitions(${PROJECT_NAME} PRIVATE CURL_STATICLIB)
++target_link_libraries(${PROJECT_NAME} PRIVATE
++	${PS4_SYSROOT}/lib/libcurl.a ${PS4_SYSROOT}/lib/libssl.a ${PS4_SYSROOT}/lib/libcrypto.a)
++
++# RADV on GNM, the system libraries, and eboot.bin
++ps4_link_mesa(${PROJECT_NAME})
++target_link_libraries(${PROJECT_NAME} PRIVATE
++	SceSysmodule SceSystemService SceUserService SceVideoOut SceAudioOut ScePad SceNet)
++ps4_add_eboot(${PROJECT_NAME})
+diff --git a/shell/ps4/audiobackend_ps4.cpp b/shell/ps4/audiobackend_ps4.cpp
+new file mode 100644
+index 000000000..8e3fc1978
+--- /dev/null
++++ b/shell/ps4/audiobackend_ps4.cpp
+@@ -0,0 +1,196 @@
++/*
++	DeCast-S4: audio through sceAudioOut.
++
++	The AICA's 44.1 kHz stereo goes into a ring buffer; an output thread resamples it to the
++	48 kHz the PS4's audio out plays and hands it over one 256-frame grain at a time
++	(sceAudioOutOutput blocks until the previous grain plays, which paces the thread).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "audio/audiostream.h"
++#include "cfg/option.h"
++#include "oslib/oslib.h"
++#include "stdclass.h"
++
++#include <orbis/AudioOut.h>
++#include <orbis/libkernel.h>
++
++#include <algorithm>
++#include <atomic>
++#include <chrono>
++#include <condition_variable>
++#include <mutex>
++#include <thread>
++#include <vector>
++
++namespace
++{
++constexpr int32_t kSystemUser = 0xFF;		// the main port, whoever is signed in
++constexpr u32 kGrainFrames = 256;
++constexpr u32 kOutputRate = 48000;
++constexpr u32 kInputRate = 44100;
++constexpr int32_t kVolumeMax = 32768;		// SCE_AUDIO_VOLUME_0DB
++// libkernel declares these without parameters
++using SetAffinityFn = int32_t (*)(OrbisPthread, uint64_t);
++using SetPrioFn = int32_t (*)(OrbisPthread, int);
++}
++
++class PS4AudioBackend : public AudioBackend
++{
++public:
++	PS4AudioBackend()
++		: AudioBackend("ps4", "PS4 Audio Out") {}
++
++	bool init() override
++	{
++		const int32_t result = sceAudioOutInit();
++		// already initialized by an earlier backend instance is fine
++		if (result != 0 && result != (int32_t)0x8026000E)
++		{
++			ERROR_LOG(AUDIO, "PS4: sceAudioOutInit failed: %x", result);
++			return false;
++		}
++		port = sceAudioOutOpen(kSystemUser, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0, kGrainFrames, kOutputRate,
++				ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
++		if (port < 0)
++		{
++			ERROR_LOG(AUDIO, "PS4: sceAudioOutOpen failed: %x", port);
++			return false;
++		}
++		int32_t volume[2] = { kVolumeMax, kVolumeMax };
++		sceAudioOutSetVolume(port, 0x3, volume);	// front left + right
++
++		capacity = std::max<u32>(SAMPLE_COUNT * 2, (u32)config::AudioBufferSize);
++		ring.assign(capacity, 0);
++		readPos = 0;
++		count = 0;
++		position = 0.0;
++		underruns = 0;
++		running = true;
++		thread = std::thread(&PS4AudioBackend::outputLoop, this);
++		INFO_LOG(AUDIO, "PS4: audio port %x, buffer %u frames", port, capacity);
++		return true;
++	}
++
++	u32 push(const void *data, u32 frames, bool wait) override
++	{
++		const u32 *in = (const u32 *)data;
++		std::unique_lock<std::mutex> lock(mutex);
++		// timed: a signal can make a PS4 condition variable lose its wakeup (DolphinPS4)
++		if (wait)
++			while (!spaceFreed.wait_for(lock, std::chrono::milliseconds(20),
++					[&] { return count + frames <= capacity || !running; }))
++				;
++		const u32 n = std::min(frames, capacity - count);
++		u32 writePos = (readPos + count) % capacity;
++		for (u32 i = 0; i < n; i++)
++		{
++			ring[writePos] = in[i];
++			writePos = writePos + 1 == capacity ? 0 : writePos + 1;
++		}
++		count += n;
++		return 1;
++	}
++
++	void term() override
++	{
++		if (!running)
++			return;
++		{
++			std::lock_guard<std::mutex> lock(mutex);
++			running = false;
++		}
++		spaceFreed.notify_all();
++		if (thread.joinable())
++			thread.join();
++		if (port >= 0)
++		{
++			sceAudioOutClose(port);
++			port = -1;
++		}
++	}
++
++private:
++	static s16 left(u32 frame) { return (s16)(frame & 0xffff); }
++	static s16 right(u32 frame) { return (s16)(frame >> 16); }
++
++	void outputLoop()
++	{
++		ThreadName _("PS4AudioOut");
++		// a thread inherits its creator's cores; take all of the app's, and a priority above the
++		// emulation's so a slow frame doesn't make the sound crackle
++		const OrbisPthread self = scePthreadSelf();
++		((SetAffinityFn)&scePthreadSetaffinity)(self, 0x3F);
++		((SetPrioFn)&scePthreadSetprio)(self, 400);
++
++		alignas(32) s16 grains[2][kGrainFrames * 2];
++		int current = 0;
++		const double step = (double)kInputRate / kOutputRate;
++		while (running)
++		{
++			s16 *out = grains[current];
++			bool filled = false;
++			{
++				std::lock_guard<std::mutex> lock(mutex);
++				// input frames this grain reads (plus one to interpolate towards)
++				const u32 needed = (u32)(position + step * kGrainFrames) + 2;
++				if (count >= needed)
++				{
++					double pos = position;
++					for (u32 i = 0; i < kGrainFrames; i++)
++					{
++						const u32 index = (u32)pos;
++						const float frac = (float)(pos - index);
++						const u32 a = ring[(readPos + index) % capacity];
++						const u32 b = ring[(readPos + index + 1) % capacity];
++						out[i * 2] = (s16)(left(a) + (left(b) - left(a)) * frac);
++						out[i * 2 + 1] = (s16)(right(a) + (right(b) - right(a)) * frac);
++						pos += step;
++					}
++					const u32 consumed = (u32)pos;
++					position = pos - consumed;
++					readPos = (readPos + consumed) % capacity;
++					count -= consumed;
++					filled = true;
++				}
++			}
++			if (filled)
++				spaceFreed.notify_all();
++			else
++			{
++				// the emulator is behind (a slow frame, the menu, loading): silence
++				std::fill(out, out + kGrainFrames * 2, 0);
++				underruns++;
++			}
++			sceAudioOutOutput(port, out);
++			current ^= 1;
++		}
++		sceAudioOutOutput(port, nullptr);	// wait for the last grain
++	}
++
++	int32_t port = -1;
++	std::vector<u32> ring;
++	u32 capacity = 0;
++	u32 readPos = 0;
++	u32 count = 0;
++	double position = 0.0;		// fractional read position (input frames)
++	u64 underruns = 0;
++	std::atomic<bool> running { false };
++	std::mutex mutex;
++	std::condition_variable spaceFreed;
++	std::thread thread;
++};
++static PS4AudioBackend ps4AudioBackend;
+diff --git a/shell/ps4/ps4_gamepad.cpp b/shell/ps4/ps4_gamepad.cpp
+new file mode 100644
+index 000000000..b6a0932f7
+--- /dev/null
++++ b/shell/ps4/ps4_gamepad.cpp
+@@ -0,0 +1,377 @@
++/*
++	DeCast-S4: DualShock 4 input through ScePad.
++
++	Every signed-in user's pad is a Flycast gamepad: the first user's on port A, the others on
++	B to D in sign-in order. A user who signs in later gets a pad on the next free port.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "ps4_gamepad.h"
++#include "oslib/i18n.h"
++#include "stdclass.h"
++
++#include <orbis/UserService.h>
++
++#include <algorithm>
++#include <cmath>
++#include <vector>
++
++namespace
++{
++
++constexpr u32 kButtons[] = {
++	ORBIS_PAD_BUTTON_CROSS, ORBIS_PAD_BUTTON_CIRCLE, ORBIS_PAD_BUTTON_SQUARE, ORBIS_PAD_BUTTON_TRIANGLE,
++	ORBIS_PAD_BUTTON_UP, ORBIS_PAD_BUTTON_DOWN, ORBIS_PAD_BUTTON_LEFT, ORBIS_PAD_BUTTON_RIGHT,
++	ORBIS_PAD_BUTTON_L1, ORBIS_PAD_BUTTON_R1, ORBIS_PAD_BUTTON_L3, ORBIS_PAD_BUTTON_R3,
++	ORBIS_PAD_BUTTON_OPTIONS, ORBIS_PAD_BUTTON_TOUCH_PAD,
++};
++
++std::vector<std::shared_ptr<PS4Gamepad>> gamepads;
++int firstHandle = -1;
++u32 rescanCountdown = 0;
++
++int stickValue(u8 v) {
++	return std::clamp(((int)v - 128) * 256, -32768, 32767);
++}
++
++// Triggers (InputMapping::addTrigger): -32768 released .. 32767 fully pressed.
++int triggerValue(u8 v) {
++	return (int)v * 257 - 32768;
++}
++
++template<bool Arcade = false, bool Gamepad = false>
++class DefaultInputMapping : public InputMapping
++{
++public:
++	DefaultInputMapping()
++	{
++		using namespace ps4pad;
++		name = Arcade ? Gamepad ? "Arcade Gamepad" : "Arcade Hitbox" : "Default";
++		if (Arcade)
++		{
++			if (Gamepad)
++			{
++				// 1  2  3  4  5  6
++				// X  O  []  /\ L1 R1
++				set_button(DC_BTN_A, ORBIS_PAD_BUTTON_CROSS);
++				set_button(DC_BTN_B, ORBIS_PAD_BUTTON_CIRCLE);
++				set_button(DC_BTN_C, ORBIS_PAD_BUTTON_SQUARE);
++				set_button(DC_BTN_X, ORBIS_PAD_BUTTON_TRIANGLE);
++				set_button(DC_BTN_Y, ORBIS_PAD_BUTTON_L1);
++				set_button(DC_BTN_Z, ORBIS_PAD_BUTTON_R1);
++				set_axis(DC_AXIS_LT, AXIS_L2, true);
++				set_axis(DC_AXIS_RT, AXIS_R2, true);
++			}
++			else
++			{
++				// Hitbox
++				// 1  2  3  4  5  6  7  8
++				// [] /\ R1 X  O  R2 L1 L2
++				set_button(DC_BTN_A, ORBIS_PAD_BUTTON_SQUARE);
++				set_button(DC_BTN_B, ORBIS_PAD_BUTTON_TRIANGLE);
++				set_button(DC_BTN_C, ORBIS_PAD_BUTTON_R1);
++				set_button(DC_BTN_X, ORBIS_PAD_BUTTON_CROSS);
++				set_button(DC_BTN_Y, ORBIS_PAD_BUTTON_CIRCLE);
++				set_axis(DC_BTN_Z, AXIS_R2, true);
++				set_button(DC_DPAD2_LEFT, ORBIS_PAD_BUTTON_L1);	// L1 (Naomi button 7)
++				set_axis(DC_DPAD2_RIGHT, AXIS_L2, true);		// L2 (Naomi button 8)
++			}
++		}
++		else
++		{
++			set_button(DC_BTN_A, ORBIS_PAD_BUTTON_CROSS);
++			set_button(DC_BTN_B, ORBIS_PAD_BUTTON_CIRCLE);
++			set_button(DC_BTN_X, ORBIS_PAD_BUTTON_SQUARE);
++			set_button(DC_BTN_Y, ORBIS_PAD_BUTTON_TRIANGLE);
++			set_button(DC_BTN_C, ORBIS_PAD_BUTTON_R1);
++			set_button(DC_BTN_Z, ORBIS_PAD_BUTTON_L1);
++			set_axis(DC_AXIS_LT, AXIS_L2, true);
++			set_axis(DC_AXIS_RT, AXIS_R2, true);
++		}
++		set_button(DC_BTN_START, ORBIS_PAD_BUTTON_OPTIONS);
++		set_button(DC_DPAD_UP, ORBIS_PAD_BUTTON_UP);
++		set_button(DC_DPAD_DOWN, ORBIS_PAD_BUTTON_DOWN);
++		set_button(DC_DPAD_LEFT, ORBIS_PAD_BUTTON_LEFT);
++		set_button(DC_DPAD_RIGHT, ORBIS_PAD_BUTTON_RIGHT);
++		// the touchpad click opens Flycast's menu (the Share and PS buttons belong to the system)
++		set_button(EMU_BTN_MENU, ORBIS_PAD_BUTTON_TOUCH_PAD);
++
++		set_axis(DC_AXIS_LEFT, AXIS_LX, false);
++		set_axis(DC_AXIS_RIGHT, AXIS_LX, true);
++		set_axis(DC_AXIS_UP, AXIS_LY, false);
++		set_axis(DC_AXIS_DOWN, AXIS_LY, true);
++		set_axis(DC_AXIS2_LEFT, AXIS_RX, false);
++		set_axis(DC_AXIS2_RIGHT, AXIS_RX, true);
++		set_axis(DC_AXIS2_UP, AXIS_RY, false);
++		set_axis(DC_AXIS2_DOWN, AXIS_RY, true);
++		addTrigger(AXIS_L2, false);
++		addTrigger(AXIS_R2, false);
++
++		dirty = false;
++	}
++};
++
++bool portInUse(int port)
++{
++	for (const auto& pad : gamepads)
++		if (pad->maple_port() == port)
++			return true;
++	return false;
++}
++
++bool userHasPad(int userId)
++{
++	for (const auto& pad : gamepads)
++		if (pad->userId() == userId)
++			return true;
++	return false;
++}
++
++void openPad(int userId)
++{
++	int handle = scePadOpen(userId, ORBIS_PAD_PORT_TYPE_STANDARD, 0, nullptr);
++	if (handle < 0)
++	{
++		// one handle per user and pad: an earlier open in this process may still own it
++		const int error = handle;
++		handle = scePadGetHandle(userId, ORBIS_PAD_PORT_TYPE_STANDARD, 0);
++		if (handle < 0)
++		{
++			WARN_LOG(INPUT, "PS4: scePadOpen(user %x) failed: %x", userId, error);
++			return;
++		}
++		INFO_LOG(INPUT, "PS4: reusing pad handle %d of user %x", handle, userId);
++	}
++	int port = 0;
++	while (port < 4 && portInUse(port))
++		port++;
++	if (port == 4)
++	{
++		scePadClose(handle);
++		return;
++	}
++	if (firstHandle < 0)
++		firstHandle = handle;
++	auto pad = std::make_shared<PS4Gamepad>(port, userId, handle);
++	gamepads.push_back(pad);
++	GamepadDevice::Register(pad);
++}
++
++void scanUsers()
++{
++	OrbisUserServiceLoginUserIdList list{};
++	if (sceUserServiceGetLoginUserIdList(&list) != 0)
++		return;
++	// the initial user first, so they get port A
++	int initial = -1;
++	sceUserServiceGetInitialUser(&initial);
++	if (initial >= 0 && !userHasPad(initial))
++		openPad(initial);
++	for (int userId : list.userId)
++		if (userId >= 0 && userId != 0xFF && !userHasPad(userId))
++			openPad(userId);
++}
++
++} // namespace
++
++PS4Gamepad::PS4Gamepad(int maple_port, int userId, int handle)
++	: GamepadDevice(maple_port, "PS4"), user(userId), padHandle(handle)
++{
++	char userName[32]{};
++	if (sceUserServiceGetUserName(userId, userName, sizeof(userName)) == 0 && userName[0] != '\0')
++		_name = std::string("DualShock 4 (") + userName + ")";
++	else
++		_name = "DualShock 4";
++	_unique_id = "ps4_dualshock4_" + std::to_string(maple_port);
++	std::fill(std::begin(lastAxes), std::end(lastAxes), 0);
++	lastAxes[ps4pad::AXIS_L2] = lastAxes[ps4pad::AXIS_R2] = triggerValue(0);
++
++	OrbisPadInformation info{};
++	if (scePadGetControllerInformation(handle, &info) == 0 && info.touchResolutionX > 1)
++		touchMaxX = (float)(info.touchResolutionX - 1);
++
++	hasAnalogStick = true;
++	rumbleEnabled = true;
++	loadMapping();
++	// mappings saved by an older version may lack the trigger axes
++	input_mapper->addTrigger(ps4pad::AXIS_L2, false);
++	input_mapper->addTrigger(ps4pad::AXIS_R2, false);
++	NOTICE_LOG(INPUT, "PS4: %s on port %d (user %x, handle %d)", _name.c_str(), maple_port, userId, handle);
++}
++
++PS4Gamepad::~PS4Gamepad()
++{
++	setVibration(0, 0);
++	scePadClose(padHandle);
++}
++
++bool PS4Gamepad::update()
++{
++	OrbisPadData data{};
++	if (scePadReadState(padHandle, &data) != 0)
++		return true;	// no new state: keep the last one
++	if (!data.connected)
++	{
++		// release everything, the pad may come back
++		if (lastButtons != 0)
++		{
++			for (u32 button : kButtons)
++				if (lastButtons & button)
++					gamepad_btn_input(button, false);
++			lastButtons = 0;
++		}
++		return true;
++	}
++
++	const u32 buttons = data.buttons;
++	const u32 changed = buttons ^ lastButtons;
++	if (changed != 0)
++		for (u32 button : kButtons)
++			if (changed & button)
++				gamepad_btn_input(button, (buttons & button) != 0);
++	lastButtons = buttons;
++
++	const int axes[ps4pad::AXIS_COUNT] = {
++		stickValue(data.leftStick.x), stickValue(data.leftStick.y),
++		stickValue(data.rightStick.x), stickValue(data.rightStick.y),
++		triggerValue(data.analogButtons.l2), triggerValue(data.analogButtons.r2),
++	};
++	for (u32 axis = 0; axis < ps4pad::AXIS_COUNT; axis++)
++		if (axes[axis] != lastAxes[axis])
++		{
++			gamepad_axis_input(axis, axes[axis]);
++			lastAxes[axis] = axes[axis];
++		}
++	return true;
++}
++
++const char *PS4Gamepad::get_button_name(u32 code)
++{
++	using namespace i18n;
++	switch (code)
++	{
++	case ORBIS_PAD_BUTTON_CROSS: return T("Cross");
++	case ORBIS_PAD_BUTTON_CIRCLE: return T("Circle");
++	case ORBIS_PAD_BUTTON_SQUARE: return T("Square");
++	case ORBIS_PAD_BUTTON_TRIANGLE: return T("Triangle");
++	case ORBIS_PAD_BUTTON_UP: return T("DPad Up");
++	case ORBIS_PAD_BUTTON_DOWN: return T("DPad Down");
++	case ORBIS_PAD_BUTTON_LEFT: return T("DPad Left");
++	case ORBIS_PAD_BUTTON_RIGHT: return T("DPad Right");
++	case ORBIS_PAD_BUTTON_L1: return "L1";
++	case ORBIS_PAD_BUTTON_R1: return "R1";
++	case ORBIS_PAD_BUTTON_L3: return "L3";
++	case ORBIS_PAD_BUTTON_R3: return "R3";
++	case ORBIS_PAD_BUTTON_OPTIONS: return T("Options");
++	case ORBIS_PAD_BUTTON_TOUCH_PAD: return T("Touchpad");
++	default: return nullptr;
++	}
++}
++
++const char *PS4Gamepad::get_axis_name(u32 code)
++{
++	using namespace i18n;
++	switch (code)
++	{
++	case ps4pad::AXIS_LX: return T("Left Stick X");
++	case ps4pad::AXIS_LY: return T("Left Stick Y");
++	case ps4pad::AXIS_RX: return T("Right Stick X");
++	case ps4pad::AXIS_RY: return T("Right Stick Y");
++	case ps4pad::AXIS_L2: return "L2";
++	case ps4pad::AXIS_R2: return "R2";
++	default: return nullptr;
++	}
++}
++
++std::shared_ptr<InputMapping> PS4Gamepad::getDefaultMapping() {
++	return std::make_shared<DefaultInputMapping<>>();
++}
++
++void PS4Gamepad::resetMappingToDefault(bool arcade, bool gamepad)
++{
++	if (arcade)
++	{
++		if (gamepad)
++			input_mapper = std::make_shared<DefaultInputMapping<true, true>>();
++		else
++			input_mapper = std::make_shared<DefaultInputMapping<true, false>>();
++	}
++	else
++		input_mapper = std::make_shared<DefaultInputMapping<false, false>>();
++}
++
++void PS4Gamepad::setVibration(u8 large, u8 small)
++{
++	const OrbisPadVibeParam param{large, small};
++	scePadSetVibration(padHandle, &param);
++}
++
++void PS4Gamepad::rumble(float power, float inclination, u32 duration_ms)
++{
++	if (!rumbleEnabled)
++		return;
++	power = std::clamp(power * rumblePower / 100.f, 0.f, 1.f);
++	// the inclination moves the feel from the big (low) motor to the small (high) one
++	const float high = std::clamp(0.5f + inclination * 0.5f, 0.f, 1.f);
++	setVibration((u8)std::lround(power * (1.f - high) * 255.f), (u8)std::lround(power * high * 255.f));
++	vibStopTime = power != 0.f ? getTimeMs() + duration_ms : 0;
++}
++
++void PS4Gamepad::update_rumble()
++{
++	if (vibStopTime != 0 && getTimeMs() >= vibStopTime)
++	{
++		setVibration(0, 0);
++		vibStopTime = 0;
++	}
++}
++
++void input_ps4_init()
++{
++	sceUserServiceInitialize(nullptr);
++	const int result = scePadInit();
++	if (result != 0)
++		WARN_LOG(INPUT, "PS4: scePadInit failed: %x", result);
++	scanUsers();
++	rescanCountdown = 120;
++}
++
++void input_ps4_handle()
++{
++	for (auto& pad : gamepads)
++	{
++		pad->update();
++		pad->update_rumble();
++	}
++	// users signing in while the app runs (about every 2 s)
++	if (--rescanCountdown == 0)
++	{
++		rescanCountdown = 120;
++		scanUsers();
++	}
++}
++
++void input_ps4_term()
++{
++	for (auto& pad : gamepads)
++		GamepadDevice::Unregister(pad);
++	gamepads.clear();
++	firstHandle = -1;
++}
++
++int ps4_first_pad_handle() {
++	return firstHandle;
++}
+diff --git a/shell/ps4/ps4_gamepad.h b/shell/ps4/ps4_gamepad.h
+new file mode 100644
+index 000000000..8946466f3
+--- /dev/null
++++ b/shell/ps4/ps4_gamepad.h
+@@ -0,0 +1,77 @@
++/*
++	DeCast-S4: DualShock 4 input through ScePad.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#pragma once
++#include "input/gamepad_device.h"
++
++#include <orbis/Pad.h>
++
++// Input codes: buttons are the ScePad button bits, axes are numbered here.
++namespace ps4pad
++{
++enum : u32
++{
++	AXIS_LX = 0,
++	AXIS_LY,
++	AXIS_RX,
++	AXIS_RY,
++	AXIS_L2,
++	AXIS_R2,
++	AXIS_COUNT,
++	// touchpad click by half (left: the menu; right: free to map)
++	BTN_TOUCH_LEFT = 0x200000,
++	BTN_TOUCH_RIGHT = 0x400000,
++};
++}
++
++class PS4Gamepad : public GamepadDevice
++{
++public:
++	PS4Gamepad(int maple_port, int userId, int handle);
++	~PS4Gamepad() override;
++
++	// Reads the pad and reports what changed since the last read. False when the pad is gone.
++	bool update();
++
++	const char *get_button_name(u32 code) override;
++	const char *get_axis_name(u32 code) override;
++	std::shared_ptr<InputMapping> getDefaultMapping() override;
++	void resetMappingToDefault(bool arcade, bool gamepad) override;
++
++	void rumble(float power, float inclination, u32 duration_ms) override;
++	void update_rumble() override;
++
++	int userId() const { return user; }
++	int handle() const { return padHandle; }
++
++private:
++	void setVibration(u8 large, u8 small);
++
++	int user;
++	int padHandle;
++	float touchMaxX = 1919.f;
++	u32 lastButtons = 0;
++	int lastAxes[ps4pad::AXIS_COUNT];
++	u64 vibStopTime = 0;
++};
++
++void input_ps4_init();
++void input_ps4_handle();
++void input_ps4_term();
++// The first DualShock 4's handle (the frontend reads it before Flycast starts), or -1.
++int ps4_first_pad_handle();
+diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
+new file mode 100644
+index 000000000..363bd6262
+--- /dev/null
++++ b/shell/ps4/ps4_main.cpp
+@@ -0,0 +1,206 @@
++/*
++	DeCast-S4: Flycast's PS4 frontend.
++
++	  /app0                       packaged files (eboot.bin, version.txt)
++	  /data/DeCast-S4             emu.cfg, logs (boot-trace.log, crash.log, hang.log, flycast.log)
++	  /data/DeCast-S4/data        BIOS and flash (dc_boot.bin, dc_flash.bin), VMUs, save states
++	  /data/DeCast-S4/games       games (GDI, CHD, CDI, ...), the default content folder
++
++	Flycast's own menu (ImGui) is the frontend; the DualShock 4's touchpad click opens it in game.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "types.h"
++#include "stdclass.h"
++#include "emulator.h"
++#include "cfg/option.h"
++#include "log/LogManager.h"
++#include "oslib/directory.h"
++#include "oslib/i18n.h"
++#include "oslib/oslib.h"
++#include "ui/mainui.h"
++#include "hw/sh4/sh4_if.h"
++#include "ps4_wsi.h"
++
++#include <orbis/Sysmodule.h>
++#include <orbis/libkernel.h>
++
++#include <fcntl.h>
++#include <unistd.h>
++
++#include <algorithm>
++#include <cstdio>
++#include <string>
++#include <vector>
++
++extern "C" void ps4_boot_trace(const char *line);	// port/ps4_crashlog.cpp
++
++namespace
++{
++const std::string kDataRoot = "/data/DeCast-S4";
++
++void trace(const std::string& line) {
++	ps4_boot_trace(line.c_str());
++}
++
++void loadSystemModules()
++{
++	// calling into a system library whose module isn't loaded kills the app silently
++	const std::pair<const char *, u32> modules[] = {
++		{ "SystemService", 0x80000010 }, { "UserService", 0x80000011 }, { "VideoOut", 0x80000022 },
++		{ "AudioOut", 0x80000001 }, { "Pad", 0x80000024 }, { "Net", 0x8000001C },
++	};
++	for (const auto& [name, id] : modules)
++	{
++		const int result = (int)sceSysmoduleLoadModuleInternal((OrbisSysModuleInternal)id);
++		if (result != 0)
++		{
++			char line[96];
++			snprintf(line, sizeof(line), "loading system module %s failed (%x)", name, (u32)result);
++			trace(line);
++		}
++	}
++}
++
++std::string appVersion()
++{
++	FILE *f = fopen("/app0/version.txt", "r");
++	if (f == nullptr)
++		return "?";
++	char buf[32] {};
++	if (fgets(buf, sizeof(buf), f) == nullptr)
++		buf[0] = '\0';
++	fclose(f);
++	std::string v(buf);
++	while (!v.empty() && (v.back() == '\n' || v.back() == '\r' || v.back() == ' '))
++		v.pop_back();
++	return v;
++}
++
++// Exceptions thrown for the first time take a slow path (unwinder setup); do it before the JIT.
++void warmUpExceptions()
++{
++	try {
++		throw 1;
++	} catch (...) {
++	}
++}
++} // namespace
++
++int main(int argc, char *argv[])
++{
++	loadSystemModules();
++	trace("DeCast-S4 " + appVersion() + " starting");
++
++	flycast::mkdir(kDataRoot.c_str(), 0777);
++	flycast::mkdir((kDataRoot + "/data").c_str(), 0777);
++	flycast::mkdir((kDataRoot + "/games").c_str(), 0777);
++	set_user_config_dir(kDataRoot + "/");
++	set_user_data_dir(kDataRoot + "/data/");
++	add_system_config_dir(kDataRoot + "/");
++	add_system_config_dir("/app0/");
++	add_system_data_dir(kDataRoot + "/data/");
++	add_system_data_dir("/app0/data/");
++
++	// full HD through VideoOut; the menus are sized for a TV across the room
++	settings.display.width = ps4wsi::kWidth;
++	settings.display.height = ps4wsi::kHeight;
++	settings.display.dpi = 200.f;
++
++	LogManager::Init();
++	i18n::init();
++	warmUpExceptions();
++
++	trace("flycast_init");
++	if (flycast_init(argc, argv) != 0)
++	{
++		trace("flycast_init failed");
++		return 1;
++	}
++	// first start: the games folder is the content folder
++	if (config::ContentPath.get().empty())
++	{
++		config::ContentPath.get().push_back(kDataRoot + "/games");
++		SaveSettings();
++		trace("content folder set to " + kDataRoot + "/games");
++	}
++
++	trace("main loop");
++	try {
++		mainui_loop();
++	} catch (const std::exception& e) {
++		ERROR_LOG(BOOT, "mainui_loop error: %s", e.what());
++		trace(std::string("main loop error: ") + e.what());
++	} catch (...) {
++		ERROR_LOG(BOOT, "mainui_loop unknown exception");
++		trace("main loop: unknown exception");
++	}
++
++	trace("exiting");
++	flycast_term();
++	return 0;
++}
++
++void os_DoEvents()
++{
++}
++
++void os_RunInstance(int argc, const char *argv[])
++{
++	// Naomi multiboard needs a second emulator process: not on the PS4
++	WARN_LOG(BOOT, "os_RunInstance: not supported on PS4");
++}
++
++[[noreturn]] void os_DebugBreak()
++{
++	// the crash handler (port/ps4_crashlog.cpp) records where
++	__builtin_trap();
++}
++
++// The emulator's view of a crash (port/ps4_crashlog.cpp calls it after the host stacks): the
++// SH4's registers, appended to crash.log. No allocation, no locks.
++extern "C" void ps4_crash_guest_info()
++{
++	if (p_sh4rcb == nullptr)
++		return;
++	const int fd = open((kDataRoot + "/crash.log").c_str(), O_WRONLY | O_CREAT | O_APPEND, 0666);
++	if (fd < 0)
++		return;
++	const Sh4Context& ctx = p_sh4rcb->cntx;
++	char line[256];
++	int n = snprintf(line, sizeof(line), "\n== SH4 at the crash: pc %08x pr %08x sr %08x fpscr %08x game %s\n",
++			ctx.pc, ctx.pr, ctx.sr.getFull(), ctx.fpscr.full, settings.content.gameId.c_str());
++	write(fd, line, n);
++	for (int i = 0; i < 16; i += 4)
++	{
++		n = snprintf(line, sizeof(line), "r%-2d %08x  r%-2d %08x  r%-2d %08x  r%-2d %08x\n",
++				i, ctx.r[i], i + 1, ctx.r[i + 1], i + 2, ctx.r[i + 2], i + 3, ctx.r[i + 3]);
++		write(fd, line, n);
++	}
++	close(fd);
++}
++
++namespace hostfs
++{
++
++std::string getScreenshotsPath()
++{
++	const std::string path = kDataRoot + "/screenshots";
++	flycast::mkdir(path.c_str(), 0777);
++	return path;
++}
++
++}
+diff --git a/shell/ps4/ps4_stubs.c b/shell/ps4/ps4_stubs.c
+new file mode 100644
+index 000000000..4cad82eb3
+--- /dev/null
++++ b/shell/ps4/ps4_stubs.c
+@@ -0,0 +1,25 @@
++/*
++	DeCast-S4: definitions for weak references the PS4 loader can't leave unresolved
++	(create-fself refuses an executable with undefined weak symbols).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++
++// zstd's tracing hooks (zstd_trace.h): a context of 0 means "don't trace".
++unsigned long long ZSTD_trace_compress_begin(const void *cctx) { return 0; }
++void ZSTD_trace_compress_end(unsigned long long ctx, const void *trace) {}
++unsigned long long ZSTD_trace_decompress_begin(const void *dctx) { return 0; }
++void ZSTD_trace_decompress_end(unsigned long long ctx, const void *trace) {}
+diff --git a/shell/ps4/ps4_vmem.cpp b/shell/ps4/ps4_vmem.cpp
+new file mode 100644
+index 000000000..69364744a
+--- /dev/null
++++ b/shell/ps4/ps4_vmem.cpp
+@@ -0,0 +1,290 @@
++/*
++	DeCast-S4: virtual memory (fast memory) on the PS4.
++
++	The PS4 kernel can't reserve hundreds of MiB with mmap(PROT_NONE) and has no anonymous
++	shared memory to map at fixed addresses, so, like DolphinPS4's MemArenaPS4:
++	- the address space is a sceKernelReserveVirtualRange reservation,
++	- the emulated memory is one block of direct (physical) memory, mapped into the reservation
++	  as often as the Dreamcast mirrors it (direct memory aliasing, enabled for the process),
++	- the dynarec's block table (fpcb) is mapped page by page on first access, as on Linux.
++	Everything maps in 16 KiB pages. The JIT code goes into RWX memory near the eboot's code,
++	so generated calls reach it with 32-bit displacements.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "types.h"
++#include "hw/mem/addrspace.h"
++#include "hw/sh4/sh4_if.h"
++#include "oslib/virtmem.h"
++
++#include <sys/mman.h>
++#include <sys/types.h>
++#include <cerrno>
++#include <cstdarg>
++#include <cstdio>
++
++// Declared by hand: several OpenOrbis prototypes are wrong.
++extern "C" {
++size_t sceKernelGetDirectMemorySize();
++int32_t sceKernelAllocateDirectMemory(off_t searchStart, off_t searchEnd, size_t length, size_t alignment,
++		int32_t memoryType, off_t *physicalOut);
++int32_t sceKernelReleaseDirectMemory(off_t start, size_t length);
++int32_t sceKernelMapDirectMemory(void **address, size_t length, int32_t protection, int32_t flags,
++		off_t directMemoryStart, size_t alignment);
++int32_t sceKernelReserveVirtualRange(void **address, size_t length, int32_t flags, size_t alignment);
++int32_t sceKernelMunmap(void *address, size_t length);
++int32_t sceKernelMprotect(const void *address, size_t length, int32_t protection);
++int32_t sceKernelEnableDmemAliasing();
++int32_t sceKernelEnableDmemAliasing2();
++void ps4_boot_trace(const char *line);	// port/ps4_crashlog.cpp
++// the system's mmap (the runtime's --wrap=mmap version moves big mappings far away)
++void *__real_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
++extern char __text_start[];		// OpenOrbis link.x: start of .text
++}
++
++namespace virtmem
++{
++
++namespace
++{
++constexpr size_t kPage = 0x4000;
++constexpr size_t kReserveAlign = 0x10000;
++constexpr int32_t kWbOnion = 0;			// SCE_KERNEL_WB_ONION
++constexpr int32_t kMapFixed = 0x10;		// SCE_KERNEL_MAP_FIXED
++constexpr int32_t kProtRead = 0x1;		// SCE_KERNEL_PROT_CPU_READ
++constexpr int32_t kProtRW = 0x3;		// SCE_KERNEL_PROT_CPU_RW
++constexpr int32_t kProtRWX = 0x7;
++constexpr size_t kFpcbSize = sizeof(Sh4RCB::fpcb);
++
++// The direct memory block: [0, sizeof(Sh4RCB)) backs the Sh4RCB (fpcb pages + context), the
++// emulated memory follows.
++off_t dmem = -1;
++size_t dmemSize;
++u8 *reservedBase;
++size_t reservedSize;
++u8 *sh4rcbBase;		// 64 KiB aligned inside the reservation
++
++size_t alignUp(size_t v, size_t a) {
++	return (v + a - 1) & ~(a - 1);
++}
++
++void trace(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
++void trace(const char *fmt, ...)
++{
++	char line[256];
++	va_list args;
++	va_start(args, fmt);
++	vsnprintf(line, sizeof(line), fmt, args);
++	va_end(args);
++	ps4_boot_trace(line);
++	NOTICE_LOG(VMEM, "%s", line);
++}
++
++// Maps direct memory [offset, offset + size) at a fixed address inside the reservation.
++bool mapFixed(void *address, size_t size, off_t offset, bool writable)
++{
++	void *addr = address;
++	const int32_t r = sceKernelMapDirectMemory(&addr, alignUp(size, kPage), writable ? kProtRW : kProtRead,
++			kMapFixed, dmem + offset, kPage);
++	if (r != 0 || addr != address)
++	{
++		ERROR_LOG(VMEM, "PS4: mapping %zx bytes of direct memory +%llx at %p failed: %x",
++				size, (unsigned long long)offset, address, r);
++		return false;
++	}
++	return true;
++}
++
++// Unmaps a range of the reservation and reserves it again, so nothing else lands there.
++void unmapToReserved(void *address, size_t size)
++{
++	size = alignUp(size, kPage);
++	sceKernelMunmap(address, size);
++	void *addr = address;
++	const int32_t r = sceKernelReserveVirtualRange(&addr, size, kMapFixed, kPage);
++	if (r != 0 || addr != address)
++		ERROR_LOG(VMEM, "PS4: re-reserving %p failed: %x", address, r);
++}
++} // namespace
++
++bool region_lock(void *start, size_t len)
++{
++	const size_t inpage = (uintptr_t)start & PAGE_MASK;
++	const int32_t r = sceKernelMprotect((u8 *)start - inpage, alignUp(len + inpage, kPage), kProtRead);
++	if (r != 0)
++		die("sceKernelMprotect (lock) failed");
++	return true;
++}
++
++bool region_unlock(void *start, size_t len)
++{
++	const size_t inpage = (uintptr_t)start & PAGE_MASK;
++	const int32_t r = sceKernelMprotect((u8 *)start - inpage, alignUp(len + inpage, kPage), kProtRW);
++	if (r != 0)
++		die("sceKernelMprotect (unlock) failed");
++	return true;
++}
++
++bool region_set_exec(void *start, size_t len)
++{
++	const size_t inpage = (uintptr_t)start & PAGE_MASK;
++	return sceKernelMprotect((u8 *)start - inpage, alignUp(len + inpage, kPage), kProtRWX) == 0;
++}
++
++bool init(void **vmem_base_addr, void **sh4rcb_addr, size_t ramSize)
++{
++	static bool aliasingTried;
++	if (!aliasingTried)
++	{
++		// mapping the same direct memory twice (the Dreamcast's mirrors) fails with EBUSY until
++		// aliasing is enabled for the process
++		aliasingTried = true;
++		const int32_t r1 = sceKernelEnableDmemAliasing();
++		const int32_t r2 = r1 == 0 ? 0 : sceKernelEnableDmemAliasing2();
++		trace("vmem: direct memory aliasing %x, aliasing2 %x", r1, r2);
++	}
++
++	dmemSize = alignUp(sizeof(Sh4RCB) + ramSize, kReserveAlign);
++	off_t physical = 0;
++	int32_t r = sceKernelAllocateDirectMemory(0, (off_t)sceKernelGetDirectMemorySize(), dmemSize, kReserveAlign,
++			kWbOnion, &physical);
++	if (r != 0)
++	{
++		trace("vmem: allocating %zu MiB of direct memory failed: %x", dmemSize >> 20, r);
++		return false;
++	}
++	dmem = physical;
++
++	reservedSize = 512_MB + sizeof(Sh4RCB) + ARAM_SIZE_MAX + kReserveAlign;
++	// above the kernel's own allocations at 0x200000000 (DolphinPS4: they wrecked a heap there)
++	void *base = (void *)0x700000000ull;
++	r = sceKernelReserveVirtualRange(&base, reservedSize, 0, kReserveAlign);
++	if (r != 0)
++	{
++		trace("vmem: reserving %zu MiB of address space failed: %x", reservedSize >> 20, r);
++		sceKernelReleaseDirectMemory(dmem, dmemSize);
++		dmem = -1;
++		return false;
++	}
++	reservedBase = (u8 *)base;
++	sh4rcbBase = (u8 *)alignUp((uintptr_t)reservedBase, kReserveAlign);
++
++	// the SH4 context after the fpcb; the fpcb itself is mapped on demand (ondemand_page)
++	if (!mapFixed(sh4rcbBase + kFpcbSize, sizeof(Sh4RCB) - kFpcbSize, kFpcbSize, true))
++	{
++		destroy();
++		return false;
++	}
++	*sh4rcb_addr = sh4rcbBase;
++	*vmem_base_addr = sh4rcbBase + sizeof(Sh4RCB);
++	trace("vmem: %zu MiB of direct memory, address space at %p, sh4rcb %p, ram base %p",
++			dmemSize >> 20, reservedBase, sh4rcbBase, *vmem_base_addr);
++	return true;
++}
++
++void destroy()
++{
++	if (reservedBase != nullptr)
++	{
++		sceKernelMunmap(reservedBase, reservedSize);
++		reservedBase = nullptr;
++		sh4rcbBase = nullptr;
++	}
++	if (dmem >= 0)
++	{
++		sceKernelReleaseDirectMemory(dmem, dmemSize);
++		dmem = -1;
++	}
++}
++
++// The fpcb goes back to faulting on first access.
++void reset_mem(void *ptr, unsigned size_bytes)
++{
++	unmapToReserved(ptr, size_bytes);
++}
++
++// One fpcb page, at its own place in the direct memory block.
++void ondemand_page(void *address, unsigned size_bytes)
++{
++	const off_t offset = (u8 *)address - sh4rcbBase;
++	const bool ok = mapFixed(address, size_bytes, offset, true);
++	verify(ok);
++}
++
++void create_mappings(const Mapping *vmem_maps, unsigned nummaps)
++{
++	for (unsigned i = 0; i < nummaps; i++)
++	{
++		// unmapped areas stay reserved (they fault)
++		if (vmem_maps[i].memsize == 0)
++			continue;
++		const u64 rangeSize = vmem_maps[i].end_address - vmem_maps[i].start_address;
++		const unsigned mirrors = rangeSize / vmem_maps[i].memsize;
++		verify((rangeSize % vmem_maps[i].memsize) == 0 && mirrors >= 1);
++		for (unsigned j = 0; j < mirrors; j++)
++		{
++			const u64 offset = vmem_maps[i].start_address + j * vmem_maps[i].memsize;
++			u8 *address = &addrspace::ram_base[offset];
++			// a mapping from an earlier game (another memory size) may be in the way
++			unmapToReserved(address, vmem_maps[i].memsize);
++			const bool ok = mapFixed(address, vmem_maps[i].memsize, sizeof(Sh4RCB) + vmem_maps[i].memoffset,
++					vmem_maps[i].allow_writes);
++			verify(ok);
++		}
++	}
++}
++
++// RWX memory close to the eboot's code: the x64 dynarecs call into it, and it calls back, with
++// 32-bit displacements.
++bool prepare_jit_block(void *code_area, size_t size, void **code_area_rwx)
++{
++	const uintptr_t text = (uintptr_t)__text_start;
++	size = alignUp(size, kPage);
++	// FreeBSD looks for free space from the hint upwards
++	for (uintptr_t hint = alignUp(text + 64_MB, kReserveAlign); hint < text + 1536_MB; hint += 64_MB)
++	{
++		void *p = __real_mmap((void *)hint, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON, -1, 0);
++		if (p == MAP_FAILED)
++			continue;
++		const intptr_t distance = (intptr_t)p - (intptr_t)text;
++		if (distance > -(intptr_t)1800_MB && distance < (intptr_t)1800_MB)
++		{
++			trace("vmem: %zu KiB of JIT code at %p (text at %p)", size >> 10, p, __text_start);
++			*code_area_rwx = p;
++			return true;
++		}
++		munmap(p, size);
++	}
++	trace("vmem: no RWX memory near the code for %zu KiB of JIT code (errno %d)", size >> 10, errno);
++	return false;
++}
++
++void release_jit_block(void *code_area, size_t size)
++{
++	munmap(code_area, alignUp(size, kPage));
++}
++
++// Separate RW and RX views: not needed, the PS4 allows RWX.
++bool prepare_jit_block(void *code_area, size_t size, void **code_area_rw, ptrdiff_t *rx_offset)
++{
++	return false;
++}
++
++void release_jit_block(void *code_area1, void *code_area2, size_t size)
++{
++}
++
++} // namespace virtmem
+diff --git a/shell/ps4/ps4_wsi.cpp b/shell/ps4/ps4_wsi.cpp
+new file mode 100644
+index 000000000..0c5fddbf3
+--- /dev/null
++++ b/shell/ps4/ps4_wsi.cpp
+@@ -0,0 +1,550 @@
++/*
++	DeCast-S4: Vulkan window system integration on the PS4 (from Crema's PS4WSI.cpp).
++
++	RADV (DolphinPS4's GNM port) is linked into the executable and has no WSI. This file adds
++	VK_EXT_headless_surface and VK_KHR_swapchain on top of it the way DolphinPS4 presents: the
++	swapchain images are linear R8G8B8A8 images in host-visible memory (GPU address = CPU address
++	on the PS4), registered as VideoOut buffers, and presenting queues a VideoOut flip behind the
++	GPU work submitted so far (ac_ps4_submit_flip in the Mesa winsys). Flycast's Vulkan context
++	keeps using the standard surface/swapchain API through ps4_vk_get_instance_proc_addr().
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "types.h"
++#include "ps4_wsi.h"
++
++#include <vulkan/vulkan.h>
++#include <orbis/VideoOut.h>
++#include <orbis/libkernel.h>
++
++#include <algorithm>
++#include <chrono>
++#include <cstring>
++#include <mutex>
++#include <vector>
++
++extern "C" VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vk_icdGetInstanceProcAddr(VkInstance instance, const char *name);
++extern "C" VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vk_common_GetDeviceProcAddr(VkDevice device, const char *name);
++// port/mesa/ac_ps4_drm.c: queues a VideoOut flip behind the submitted GPU work (GPU-side flip)
++extern "C" int ac_ps4_submit_flip(int video, unsigned buffer, unsigned mode, int64_t arg);
++
++namespace
++{
++constexpr u32 kMaxImages = 4;
++constexpr VkDeviceSize kFramebufferAlign = 2 << 20;	// VideoOut buffer alignment
++
++struct PS4Surface
++{
++	u32 magic = 0x50533453;
++};
++
++struct PS4Swapchain
++{
++	VkDevice device;
++	u32 imageCount;
++	VkImage images[kMaxImages] {};
++	VkDeviceMemory memory[kMaxImages] {};
++	int bufferSet = -1;
++	int firstBuffer = 0;
++	u32 nextImage = 0;
++	u32 flipMode = ORBIS_VIDEO_OUT_FLIP_VSYNC;
++};
++
++VkInstance sInstance = VK_NULL_HANDLE;
++VkPhysicalDevice sPhysicalDevice = VK_NULL_HANDLE;
++int sVideo = -1;
++OrbisKernelEqueue sFlipQueue;
++u64 sFlipsSubmitted = 0;
++int sNextFirstBuffer = 0;
++std::mutex sMutex;
++
++template<typename T>
++T Device(VkDevice device, const char *name) {
++	return (T)vk_common_GetDeviceProcAddr(device, name);
++}
++
++template<typename T>
++T Instance(const char *name) {
++	return (T)vk_icdGetInstanceProcAddr(sInstance, name);
++}
++
++bool OpenVideoOut()
++{
++	if (sVideo >= 0)
++		return true;
++	sVideo = sceVideoOutOpen(0xFF, 0, 0, nullptr);
++	if (sVideo < 0)
++	{
++		ERROR_LOG(RENDERER, "PS4WSI: sceVideoOutOpen failed: %x", sVideo);
++		return false;
++	}
++	sceKernelCreateEqueue(&sFlipQueue, "decast flip");
++	sceVideoOutAddFlipEvent(sFlipQueue, sVideo, nullptr);
++	return true;
++}
++
++// appends one extension to an enumeration result (count/properties two-call idiom)
++VkResult AppendExtensions(std::vector<VkExtensionProperties>& list, std::initializer_list<std::pair<const char *, u32>> extra,
++		u32 *count, VkExtensionProperties *props)
++{
++	for (const auto& [name, specVersion] : extra)
++	{
++		VkExtensionProperties p {};
++		strncpy(p.extensionName, name, VK_MAX_EXTENSION_NAME_SIZE - 1);
++		p.specVersion = specVersion;
++		list.push_back(p);
++	}
++	if (props == nullptr)
++	{
++		*count = (u32)list.size();
++		return VK_SUCCESS;
++	}
++	const u32 n = std::min<u32>(*count, (u32)list.size());
++	memcpy(props, list.data(), n * sizeof(VkExtensionProperties));
++	*count = n;
++	return n < list.size() ? VK_INCOMPLETE : VK_SUCCESS;
++}
++
++std::vector<const char *> WithoutExtensions(u32 count, const char *const *names, std::initializer_list<const char *> drop)
++{
++	std::vector<const char *> result;
++	for (u32 i = 0; i < count; i++)
++		if (std::none_of(drop.begin(), drop.end(), [&](const char *d) { return strcmp(names[i], d) == 0; }))
++			result.push_back(names[i]);
++	return result;
++}
++
++// --- instance level ---
++
++VKAPI_ATTR VkResult VKAPI_CALL EnumerateInstanceExtensionProperties(const char *layer, u32 *count, VkExtensionProperties *props)
++{
++	auto real = (PFN_vkEnumerateInstanceExtensionProperties)vk_icdGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceExtensionProperties");
++	u32 n = 0;
++	real(layer, &n, nullptr);
++	std::vector<VkExtensionProperties> list(n);
++	real(layer, &n, list.data());
++	list.resize(n);
++	return AppendExtensions(list, { { VK_KHR_SURFACE_EXTENSION_NAME, 25 }, { VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME, 1 } }, count, props);
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *info, const VkAllocationCallbacks *alloc, VkInstance *instance)
++{
++	auto real = (PFN_vkCreateInstance)vk_icdGetInstanceProcAddr(VK_NULL_HANDLE, "vkCreateInstance");
++	VkInstanceCreateInfo copy = *info;
++	auto names = WithoutExtensions(info->enabledExtensionCount, info->ppEnabledExtensionNames,
++			{ VK_KHR_SURFACE_EXTENSION_NAME, VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME });
++	copy.enabledExtensionCount = (u32)names.size();
++	copy.ppEnabledExtensionNames = names.data();
++	VkResult r = real(&copy, alloc, instance);
++	if (r == VK_SUCCESS)
++		sInstance = *instance;
++	return r;
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL EnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, const char *layer, u32 *count, VkExtensionProperties *props)
++{
++	auto real = Instance<PFN_vkEnumerateDeviceExtensionProperties>("vkEnumerateDeviceExtensionProperties");
++	u32 n = 0;
++	real(physicalDevice, layer, &n, nullptr);
++	std::vector<VkExtensionProperties> list(n);
++	real(physicalDevice, layer, &n, list.data());
++	list.resize(n);
++	return AppendExtensions(list, { { VK_KHR_SWAPCHAIN_EXTENSION_NAME, 70 } }, count, props);
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *info, const VkAllocationCallbacks *alloc, VkDevice *device)
++{
++	auto real = Instance<PFN_vkCreateDevice>("vkCreateDevice");
++	VkDeviceCreateInfo copy = *info;
++	auto names = WithoutExtensions(info->enabledExtensionCount, info->ppEnabledExtensionNames, { VK_KHR_SWAPCHAIN_EXTENSION_NAME });
++	copy.enabledExtensionCount = (u32)names.size();
++	copy.ppEnabledExtensionNames = names.data();
++	sPhysicalDevice = physicalDevice;
++	return real(physicalDevice, &copy, alloc, device);
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL CreateHeadlessSurfaceEXT(VkInstance, const VkHeadlessSurfaceCreateInfoEXT *, const VkAllocationCallbacks *, VkSurfaceKHR *surface)
++{
++	*surface = (VkSurfaceKHR)new PS4Surface();
++	return VK_SUCCESS;
++}
++
++VKAPI_ATTR void VKAPI_CALL DestroySurfaceKHR(VkInstance, VkSurfaceKHR surface, const VkAllocationCallbacks *)
++{
++	delete (PS4Surface *)surface;
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice, u32 queueFamily, VkSurfaceKHR, VkBool32 *supported)
++{
++	*supported = queueFamily == 0 ? VK_TRUE : VK_FALSE;	// the graphics queue family
++	return VK_SUCCESS;
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice, VkSurfaceKHR, VkSurfaceCapabilitiesKHR *caps)
++{
++	*caps = {};
++	caps->minImageCount = 2;
++	caps->maxImageCount = 3;	// as DolphinPS4: render into one while one is shown and one is queued
++	caps->currentExtent = { ps4wsi::kWidth, ps4wsi::kHeight };
++	caps->minImageExtent = caps->currentExtent;
++	caps->maxImageExtent = caps->currentExtent;
++	caps->maxImageArrayLayers = 1;
++	caps->supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
++	caps->currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
++	caps->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
++	caps->supportedUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
++	return VK_SUCCESS;
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice, VkSurfaceKHR, u32 *count, VkSurfaceFormatKHR *formats)
++{
++	// VideoOut A8B8G8R8 = R8G8B8A8 in memory (verified by DolphinPS4)
++	if (formats == nullptr)
++	{
++		*count = 1;
++		return VK_SUCCESS;
++	}
++	if (*count < 1)
++		return VK_INCOMPLETE;
++	formats[0] = { VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
++	*count = 1;
++	return VK_SUCCESS;
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice, VkSurfaceKHR, u32 *count, VkPresentModeKHR *modes)
++{
++	const VkPresentModeKHR supported[] = { VK_PRESENT_MODE_FIFO_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR };
++	if (modes == nullptr)
++	{
++		*count = std::size(supported);
++		return VK_SUCCESS;
++	}
++	const u32 n = std::min<u32>(*count, std::size(supported));
++	memcpy(modes, supported, n * sizeof(VkPresentModeKHR));
++	*count = n;
++	return n < std::size(supported) ? VK_INCOMPLETE : VK_SUCCESS;
++}
++
++// --- device level ---
++
++u32 HostVisibleMemoryType(u32 typeBits)
++{
++	VkPhysicalDeviceMemoryProperties props;
++	Instance<PFN_vkGetPhysicalDeviceMemoryProperties>("vkGetPhysicalDeviceMemoryProperties")(sPhysicalDevice, &props);
++	const VkMemoryPropertyFlags want = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
++	for (u32 i = 0; i < props.memoryTypeCount; i++)
++		if ((typeBits & (1u << i)) && (props.memoryTypes[i].propertyFlags & want) == want)
++			return i;
++	return UINT32_MAX;
++}
++
++void FreeSwapchain(PS4Swapchain *sc)
++{
++	if (sc->bufferSet >= 0)
++		sceVideoOutUnregisterBuffers(sVideo, sc->bufferSet);
++	auto destroyImage = Device<PFN_vkDestroyImage>(sc->device, "vkDestroyImage");
++	auto freeMemory = Device<PFN_vkFreeMemory>(sc->device, "vkFreeMemory");
++	for (u32 i = 0; i < sc->imageCount; i++)
++	{
++		if (sc->images[i])
++			destroyImage(sc->device, sc->images[i], nullptr);
++		if (sc->memory[i])
++			freeMemory(sc->device, sc->memory[i], nullptr);
++	}
++	delete sc;
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *info, const VkAllocationCallbacks *, VkSwapchainKHR *swapchain)
++{
++	std::lock_guard<std::mutex> _(sMutex);
++	if (!OpenVideoOut())
++		return VK_ERROR_INITIALIZATION_FAILED;
++	auto sc = new PS4Swapchain();
++	sc->device = device;
++	sc->imageCount = std::clamp<u32>(info->minImageCount, 2, kMaxImages);
++	sc->flipMode = info->presentMode == VK_PRESENT_MODE_FIFO_KHR ? ORBIS_VIDEO_OUT_FLIP_VSYNC : ORBIS_VIDEO_OUT_FLIP_HSYNC;
++	auto createImage = Device<PFN_vkCreateImage>(device, "vkCreateImage");
++	auto getRequirements = Device<PFN_vkGetImageMemoryRequirements>(device, "vkGetImageMemoryRequirements");
++	auto allocateMemory = Device<PFN_vkAllocateMemory>(device, "vkAllocateMemory");
++	auto mapMemory = Device<PFN_vkMapMemory>(device, "vkMapMemory");
++	auto bindMemory = Device<PFN_vkBindImageMemory>(device, "vkBindImageMemory");
++	auto getLayout = Device<PFN_vkGetImageSubresourceLayout>(device, "vkGetImageSubresourceLayout");
++	void *addresses[kMaxImages] {};
++	u32 pitch = ps4wsi::kWidth;
++	for (u32 i = 0; i < sc->imageCount; i++)
++	{
++		VkImageCreateInfo ici { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
++		ici.imageType = VK_IMAGE_TYPE_2D;
++		ici.format = VK_FORMAT_R8G8B8A8_UNORM;
++		ici.extent = { ps4wsi::kWidth, ps4wsi::kHeight, 1 };
++		ici.mipLevels = 1;
++		ici.arrayLayers = 1;
++		ici.samples = VK_SAMPLE_COUNT_1_BIT;
++		ici.tiling = VK_IMAGE_TILING_LINEAR;
++		ici.usage = info->imageUsage | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
++		ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
++		VkResult r = createImage(device, &ici, nullptr, &sc->images[i]);
++		if (r != VK_SUCCESS)
++		{
++			ERROR_LOG(RENDERER, "PS4WSI: vkCreateImage failed: %d", r);
++			FreeSwapchain(sc);
++			return r;
++		}
++		VkMemoryRequirements req;
++		getRequirements(device, sc->images[i], &req);
++		// VideoOut wants 2 MiB aligned buffers: over-allocate, bind at an aligned offset
++		VkMemoryAllocateInfo mai { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
++		mai.allocationSize = req.size + kFramebufferAlign;
++		mai.memoryTypeIndex = HostVisibleMemoryType(req.memoryTypeBits);
++		u8 *base = nullptr;
++		r = allocateMemory(device, &mai, nullptr, &sc->memory[i]);
++		if (r == VK_SUCCESS)
++			r = mapMemory(device, sc->memory[i], 0, VK_WHOLE_SIZE, 0, (void **)&base);
++		if (r != VK_SUCCESS)
++		{
++			ERROR_LOG(RENDERER, "PS4WSI: swapchain memory failed: %d", r);
++			FreeSwapchain(sc);
++			return r;
++		}
++		const uintptr_t baseAddress = (uintptr_t)base;
++		VkDeviceSize offset = ((baseAddress + kFramebufferAlign - 1) & ~(kFramebufferAlign - 1)) - baseAddress;
++		offset = (offset + req.alignment - 1) & ~(req.alignment - 1);
++		bindMemory(device, sc->images[i], sc->memory[i], offset);
++		VkImageSubresource sub { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
++		VkSubresourceLayout layout;
++		getLayout(device, sc->images[i], &sub, &layout);
++		addresses[i] = base + offset + layout.offset;
++		pitch = (u32)(layout.rowPitch / 4);
++	}
++	OrbisVideoOutBufferAttribute attribute;
++	sceVideoOutSetBufferAttribute(&attribute, ORBIS_VIDEO_OUT_PIXEL_FORMAT_A8B8G8R8_SRGB, ORBIS_VIDEO_OUT_TILING_MODE_LINEAR, 0,
++			ps4wsi::kWidth, ps4wsi::kHeight, pitch);
++	// alternate between two buffer index ranges so a new swapchain can register while the old one is still on screen
++	sc->firstBuffer = sNextFirstBuffer;
++	sNextFirstBuffer = sNextFirstBuffer == 0 ? 8 : 0;
++	sc->bufferSet = sceVideoOutRegisterBuffers(sVideo, sc->firstBuffer, addresses, (int)sc->imageCount, &attribute);
++	if (sc->bufferSet < 0)
++	{
++		ERROR_LOG(RENDERER, "PS4WSI: sceVideoOutRegisterBuffers failed: %x", sc->bufferSet);
++		FreeSwapchain(sc);
++		return VK_ERROR_INITIALIZATION_FAILED;
++	}
++	NOTICE_LOG(RENDERER, "PS4WSI: swapchain of %u images %ux%u pitch %u, buffers %d+", sc->imageCount, ps4wsi::kWidth, ps4wsi::kHeight,
++			pitch, sc->firstBuffer);
++	*swapchain = (VkSwapchainKHR)sc;
++	return VK_SUCCESS;
++}
++
++VKAPI_ATTR void VKAPI_CALL DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks *)
++{
++	if (!swapchain)
++		return;
++	std::lock_guard<std::mutex> _(sMutex);
++	Device<PFN_vkDeviceWaitIdle>(device, "vkDeviceWaitIdle")(device);
++	FreeSwapchain((PS4Swapchain *)swapchain);
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL GetSwapchainImagesKHR(VkDevice, VkSwapchainKHR swapchain, u32 *count, VkImage *images)
++{
++	auto sc = (PS4Swapchain *)swapchain;
++	if (images == nullptr)
++	{
++		*count = sc->imageCount;
++		return VK_SUCCESS;
++	}
++	const u32 n = std::min(*count, sc->imageCount);
++	memcpy(images, sc->images, n * sizeof(VkImage));
++	*count = n;
++	return n < sc->imageCount ? VK_INCOMPLETE : VK_SUCCESS;
++}
++
++// present statistics, logged every 10 s
++struct
++{
++	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
++	u64 flips = 0;
++	u64 waitNs = 0;
++	u32 timeouts = 0;
++	s64 lastFlipArg = 0;
++} sStats;
++
++// The image about to be rendered into must be off screen: with N images in rotation it was
++// shown by flip n-N+1 and replaced on screen by flip n-N+2 (n = flips submitted).
++void WaitImageOffScreen(u32 imageCount)
++{
++	if (sFlipsSubmitted < imageCount - 1)
++		return;
++	const s64 needed = (s64)(sFlipsSubmitted - (imageCount - 2));
++	const auto t0 = std::chrono::steady_clock::now();
++	bool done = false;
++	for (int tries = 0; tries < 40 && !done; tries++)
++	{
++		OrbisVideoOutFlipStatus status {};
++		if (sceVideoOutGetFlipStatus(sVideo, &status) < 0)
++			break;
++		sStats.lastFlipArg = status.flipArg;
++		if (status.flipArg >= needed)
++		{
++			done = true;
++			break;
++		}
++		OrbisKernelEvent ev;
++		int got = 0;
++		OrbisKernelUseconds timeout = 5000;
++		sceKernelWaitEqueue(sFlipQueue, &ev, 1, &got, &timeout);
++	}
++	if (!done)
++		sStats.timeouts++;
++	sStats.waitNs += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - t0).count();
++}
++
++void CountPresent()
++{
++	sStats.flips++;
++	const auto now = std::chrono::steady_clock::now();
++	const double secs = std::chrono::duration<double>(now - sStats.start).count();
++	if (secs < 10.0)
++		return;
++	INFO_LOG(RENDERER, "PS4WSI: %.1f flips/s, acquire waits %.0f ms/s, %u timeouts, flipArg %lld of %llu submitted",
++			sStats.flips / secs, sStats.waitNs / 1e6 / secs, sStats.timeouts, (long long)sStats.lastFlipArg,
++			(unsigned long long)sFlipsSubmitted);
++	sStats.start = now;
++	sStats.flips = 0;
++	sStats.waitNs = 0;
++	sStats.timeouts = 0;
++}
++
++VkQueue GraphicsQueue(VkDevice device)
++{
++	VkQueue queue = VK_NULL_HANDLE;
++	Device<PFN_vkGetDeviceQueue>(device, "vkGetDeviceQueue")(device, 0, 0, &queue);
++	return queue;
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, u64, VkSemaphore semaphore, VkFence fence, u32 *index)
++{
++	auto sc = (PS4Swapchain *)swapchain;
++	WaitImageOffScreen(sc->imageCount);
++	*index = sc->nextImage;
++	sc->nextImage = (sc->nextImage + 1) % sc->imageCount;
++	if (semaphore || fence)
++	{
++		// signal the acquire semaphore/fence right away: the image is free
++		VkSubmitInfo si { VK_STRUCTURE_TYPE_SUBMIT_INFO };
++		si.signalSemaphoreCount = semaphore ? 1 : 0;
++		si.pSignalSemaphores = &semaphore;
++		const VkResult r = Device<PFN_vkQueueSubmit>(device, "vkQueueSubmit")(GraphicsQueue(device), 1, &si, fence);
++		if (r != VK_SUCCESS)
++			ERROR_LOG(RENDERER, "PS4WSI: acquire signal submit failed: %d", r);
++		return r;
++	}
++	return VK_SUCCESS;
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *info)
++{
++	VkResult result = VK_SUCCESS;
++	for (u32 i = 0; i < info->swapchainCount; i++)
++	{
++		auto sc = (PS4Swapchain *)info->pSwapchains[i];
++		auto queueSubmit = Device<PFN_vkQueueSubmit>(sc->device, "vkQueueSubmit");
++		// consume the wait semaphores (one queue, in order: the rendering was submitted before)
++		std::vector<VkPipelineStageFlags> stages(info->waitSemaphoreCount, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
++		VkSubmitInfo si { VK_STRUCTURE_TYPE_SUBMIT_INFO };
++		si.waitSemaphoreCount = i == 0 ? info->waitSemaphoreCount : 0;
++		si.pWaitSemaphores = info->pWaitSemaphores;
++		si.pWaitDstStageMask = stages.data();
++		const u32 buffer = (u32)sc->firstBuffer + info->pImageIndices[i];
++		const s64 arg = (s64)(sFlipsSubmitted + 1);
++		if (si.waitSemaphoreCount)
++		{
++			const VkResult sr = queueSubmit(queue, 1, &si, VK_NULL_HANDLE);
++			if (sr != VK_SUCCESS)
++				ERROR_LOG(RENDERER, "PS4WSI: present semaphore submit failed: %d", sr);
++		}
++		// the flip goes to the GPU behind the frame's commands: no CPU wait for the GPU or vblank
++		int r = ac_ps4_submit_flip(sVideo, buffer, sc->flipMode, arg);
++		const bool gpuFlip = r == 0;
++		if (!gpuFlip)
++		{
++			// fallback: wait for the GPU on the CPU, then flip
++			Device<PFN_vkQueueWaitIdle>(sc->device, "vkQueueWaitIdle")(queue);
++			r = sceVideoOutSubmitFlip(sVideo, (int)buffer, sc->flipMode, arg);
++		}
++		if (r < 0)
++		{
++			ERROR_LOG(RENDERER, "PS4WSI: flip failed: %x", r);
++			result = VK_ERROR_SURFACE_LOST_KHR;
++		}
++		else
++		{
++			sFlipsSubmitted++;
++			CountPresent();
++			if (sFlipsSubmitted <= 3)
++				NOTICE_LOG(RENDERER, "PS4WSI: flip %llu of buffer %u (%s)", (unsigned long long)sFlipsSubmitted, buffer,
++						gpuFlip ? "GPU-side" : "CPU wait");
++		}
++		if (info->pResults)
++			info->pResults[i] = r < 0 ? VK_ERROR_SURFACE_LOST_KHR : VK_SUCCESS;
++	}
++	return result;
++}
++
++PFN_vkVoidFunction Intercept(const char *name)
++{
++#define PS4WSI_ENTRY(fn) if (strcmp(name, "vk" #fn) == 0) return (PFN_vkVoidFunction)&fn
++	PS4WSI_ENTRY(EnumerateInstanceExtensionProperties);
++	PS4WSI_ENTRY(CreateInstance);
++	PS4WSI_ENTRY(EnumerateDeviceExtensionProperties);
++	PS4WSI_ENTRY(CreateDevice);
++	PS4WSI_ENTRY(CreateHeadlessSurfaceEXT);
++	PS4WSI_ENTRY(DestroySurfaceKHR);
++	PS4WSI_ENTRY(GetPhysicalDeviceSurfaceSupportKHR);
++	PS4WSI_ENTRY(GetPhysicalDeviceSurfaceCapabilitiesKHR);
++	PS4WSI_ENTRY(GetPhysicalDeviceSurfaceFormatsKHR);
++	PS4WSI_ENTRY(GetPhysicalDeviceSurfacePresentModesKHR);
++	PS4WSI_ENTRY(CreateSwapchainKHR);
++	PS4WSI_ENTRY(DestroySwapchainKHR);
++	PS4WSI_ENTRY(GetSwapchainImagesKHR);
++	PS4WSI_ENTRY(AcquireNextImageKHR);
++	PS4WSI_ENTRY(QueuePresentKHR);
++#undef PS4WSI_ENTRY
++	return nullptr;
++}
++
++VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetDeviceProcAddr(VkDevice device, const char *name)
++{
++	if (auto fn = Intercept(name))
++		return fn;
++	return vk_common_GetDeviceProcAddr(device, name);
++}
++
++VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetInstanceProcAddr(VkInstance instance, const char *name)
++{
++	if (strcmp(name, "vkGetInstanceProcAddr") == 0)
++		return (PFN_vkVoidFunction)&GetInstanceProcAddr;
++	if (strcmp(name, "vkGetDeviceProcAddr") == 0)
++		return (PFN_vkVoidFunction)&GetDeviceProcAddr;
++	if (auto fn = Intercept(name))
++		return fn;
++	return vk_icdGetInstanceProcAddr(instance, name);
++}
++
++} // namespace
++
++PFN_vkGetInstanceProcAddr ps4_vk_get_instance_proc_addr() {
++	return &GetInstanceProcAddr;
++}
+diff --git a/shell/ps4/ps4_wsi.h b/shell/ps4/ps4_wsi.h
+new file mode 100644
+index 000000000..010c50413
+--- /dev/null
++++ b/shell/ps4/ps4_wsi.h
+@@ -0,0 +1,31 @@
++/*
++	DeCast-S4: Vulkan window system integration on the PS4 (ps4_wsi.cpp).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#pragma once
++#include <vulkan/vulkan.h>
++
++namespace ps4wsi
++{
++// VideoOut's 1080p output (the system scales it for a 720p TV)
++constexpr unsigned kWidth = 1920;
++constexpr unsigned kHeight = 1080;
++}
++
++// vkGetInstanceProcAddr of the statically linked RADV, with the PS4 surface and swapchain
++// (VK_EXT_headless_surface + VK_KHR_swapchain on VideoOut) added.
++PFN_vkGetInstanceProcAddr ps4_vk_get_instance_proc_addr();

@@ -1,0 +1,3 @@
+Upstream Flycast the PS4 patch applies to (cloned with submodules by scripts/clone-flycast.sh):
+url: https://github.com/flyinghead/flycast
+base: 0d9853df9
