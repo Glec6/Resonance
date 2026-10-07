@@ -79,8 +79,45 @@ index c5ac6f6e8..488f1c238 100644
  endif()
  
  if(NOT LIBRETRO)
+diff --git a/core/hw/pvr/spg.cpp b/core/hw/pvr/spg.cpp
+index f2f0cca50..2cac65b91 100755
+--- a/core/hw/pvr/spg.cpp
++++ b/core/hw/pvr/spg.cpp
+@@ -1,4 +1,5 @@
+ #include "spg.h"
++#include <atomic>
+ #include "hw/holly/holly_intc.h"
+ #include "hw/holly/sb.h"
+ #include "hw/sh4/sh4_sched.h"
+@@ -19,6 +20,16 @@ static u32 clc_pvr_scanline;
+ static u32 pvr_numscanlines = 512;
+ static u32 prv_cur_scanline = -1;
+ 
++#ifdef __ORBIS__
++// DeCast-S4 speed meter (the FPS display and the performance monitor): emulated vblanks, and how
++// many a second full speed is
++std::atomic<u64> ps4_vblank_count;
++float ps4_vblank_rate()
++{
++	return SPG_CONTROL.isPAL() ? 50.f : SPG_CONTROL.isNTSC() ? 59.94f : 60.f;
++}
++#endif
++
+ #if !defined(NDEBUG) || defined(DEBUGFAST)
+ static u32 vblk_cnt;
+ static u64 last_fps;
+@@ -163,6 +174,9 @@ static int spg_line_sched(int tag, int cycles, int jitter, void *arg)
+ 				SPG_STATUS.fieldnum = 0;
+ 
+ 			rend_vblank();
++#ifdef __ORBIS__
++			ps4_vblank_count++;
++#endif
+ 
+ 			u64 now = getTimeMs();
+ 			cpu_time_idx = (cpu_time_idx + 1) % cpu_cycles.size();
 diff --git a/core/linux/common.cpp b/core/linux/common.cpp
-index 9e2078486..8ccf59518 100644
+index 9e2078486..7dc359328 100644
 --- a/core/linux/common.cpp
 +++ b/core/linux/common.cpp
 @@ -30,13 +30,17 @@ extern "C" char __start__;
@@ -88,7 +125,7 @@ index 9e2078486..8ccf59518 100644
  #endif // __SWITCH__
  
 +#ifdef __ORBIS__
-+extern "C" void ps4_watch_thread(const char *name);
++void ps4_name_thread(const char *name);	// shell/ps4/ps4_main.cpp
 +#endif
 +
  void context_from_segfault(host_context_t* hctx, void* segfault_ctx);
@@ -133,8 +170,8 @@ index 9e2078486..8ccf59518 100644
  	}
  	pthread_setname_np(pthread_self(), name);
 +#elif defined(__ORBIS__)
-+	// named threads appear in DeCast-S4's crash and hang reports (port/ps4_sampler.cpp)
-+	ps4_watch_thread(name);
++	// named threads appear in DeCast-S4's crash and hang reports and its profiler
++	ps4_name_thread(name);
  #endif
  }
  
@@ -383,6 +420,55 @@ index 2cb703a9c..4705d3fe6 100644
  					currentSemaphore = (currentSemaphore + 1) % renderCompleteSemaphores.size();
  					if (res == vk::Result::eSuboptimalKHR)
  					{
+diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
+index 614739abc..6e3cb774f 100644
+--- a/core/ui/gui.cpp
++++ b/core/ui/gui.cpp
+@@ -17,6 +17,7 @@
+     along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
+  */
+ #include "gui.h"
++#include <atomic>
+ #include "rend/osd.h"
+ #include "cfg/cfg.h"
+ #include "imgui.h"
+@@ -1408,6 +1409,10 @@ void gui_display_ui()
+ 		emu.start();
+ }
+ 
++#ifdef __ORBIS__
++extern std::atomic<u64> ps4_vblank_count;	// hw/pvr/spg.cpp
++float ps4_vblank_rate();
++#endif
+ static u64 LastFPSTime;
+ static int lastFrameCount = 0;
+ static float fps = -1;
+@@ -1422,6 +1427,25 @@ static std::string getFPSNotification()
+ 			LastFPSTime = now;
+ 			lastFrameCount = MainFrameCount;
+ 		}
++#ifdef __ORBIS__
++		// DeCast-S4: the emulation speed next to the frame rate (100% = the console's own speed)
++		static u64 lastVblanks;
++		static float speed = -1;
++		static u64 lastSpeedTime;
++		if (now - lastSpeedTime >= 1000)
++		{
++			const u64 vblanks = ps4_vblank_count;
++			if (lastSpeedTime != 0)
++				speed = (vblanks - lastVblanks) * 100000.f / (now - lastSpeedTime) / ps4_vblank_rate();
++			lastVblanks = vblanks;
++			lastSpeedTime = now;
++		}
++		if (fps >= 0.f && fps < 9999.f && speed >= 0.f) {
++			char text[48];
++			snprintf(text, sizeof(text), "FPS %4.1f  Speed %3.0f%%%s", fps, speed, settings.input.fastForwardMode ? " >>" : "");
++			return std::string(text);
++		}
++#endif
+ 		if (fps >= 0.f && fps < 9999.f) {
+ 			char text[32];
+ 			snprintf(text, sizeof(text), "F:%4.1f%s", fps, settings.input.fastForwardMode ? " >>" : "");
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
 index 000000000..1ba54b882
@@ -1088,10 +1174,10 @@ index 000000000..8946466f3
 +int ps4_first_pad_handle();
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..a0f7b9489
+index 000000000..5495be4cb
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,281 @@
 +/*
 +	DeCast-S4: Flycast's PS4 frontend.
 +
@@ -1120,6 +1206,7 @@ index 000000000..a0f7b9489
 +#include "types.h"
 +#include "stdclass.h"
 +#include "emulator.h"
++#include "cfg/cfg.h"
 +#include "cfg/option.h"
 +#include "log/LogManager.h"
 +#include "oslib/directory.h"
@@ -1136,12 +1223,23 @@ index 000000000..a0f7b9489
 +#include <unistd.h>
 +
 +#include <algorithm>
++#include <atomic>
++#include <chrono>
 +#include <cstdio>
++#include <thread>
 +#include <string>
 +#include <vector>
 +
 +extern "C" void ps4_boot_trace(const char *line);	// port/ps4_crashlog.cpp
++extern "C" void ps4_watch_thread(const char *name);	// port/ps4_sampler.cpp
++extern "C" void ps4_sampler_register_thread(const char *name);
++extern "C" void ps4_sampler_start();
++extern "C" void ps4_thread_busy_report(char *out, size_t size, int min_percent);
++extern "C" void ac_ps4_get_gpu_busy(uint64_t *busy_ticks, uint64_t *span_ticks);	// port/mesa/ac_ps4_drm.c
 +void common_linux_setup();	// core/linux/common.cpp
++extern u32 MainFrameCount;	// ui/mainui.cpp: frames shown
++extern std::atomic<u64> ps4_vblank_count;	// hw/pvr/spg.cpp: emulated vblanks
++float ps4_vblank_rate();
 +
 +namespace
 +{
@@ -1185,6 +1283,45 @@ index 000000000..a0f7b9489
 +	return v;
 +}
 +
++bool profiling;		// /data/DeCast-S4/profile.txt exists: the sampling profiler runs
++
++// Performance monitor: every 5 s a line in boot-trace.log with the frame rate, the emulation speed
++// (emulated vblanks against the console's rate), how busy the GPU was (GPU timestamps around each
++// submission) and each named thread at 10% or more (a thread near 100% limits the speed).
++void startPerfMonitor()
++{
++	std::thread([] {
++		ps4_watch_thread("PerfMonitor");
++		u32 lastFrames = MainFrameCount;
++		u64 lastVblanks = ps4_vblank_count;
++		u64 lastBusy = 0, lastSpan = 0;
++		ac_ps4_get_gpu_busy(&lastBusy, &lastSpan);
++		auto last = std::chrono::steady_clock::now();
++		for (;;)
++		{
++			std::this_thread::sleep_for(std::chrono::seconds(5));
++			const auto now = std::chrono::steady_clock::now();
++			const double secs = std::chrono::duration<double>(now - last).count();
++			last = now;
++			const u32 frames = MainFrameCount;
++			const u64 vblanks = ps4_vblank_count;
++			u64 busy, span;
++			ac_ps4_get_gpu_busy(&busy, &span);
++			char threads[640];
++			ps4_thread_busy_report(threads, sizeof(threads), 10);
++			char line[900];
++			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | %s",
++					(frames - lastFrames) / secs, (vblanks - lastVblanks) / secs / ps4_vblank_rate() * 100.0,
++					span > lastSpan ? (unsigned long long)((busy - lastBusy) * 100 / (span - lastSpan)) : 0ull, threads);
++			ps4_boot_trace(line);
++			lastFrames = frames;
++			lastVblanks = vblanks;
++			lastBusy = busy;
++			lastSpan = span;
++		}
++	}).detach();
++}
++
 +// Exceptions thrown for the first time take a slow path (unwinder setup); do it before the JIT.
 +void warmUpExceptions()
 +{
@@ -1215,6 +1352,9 @@ index 000000000..a0f7b9489
 +	settings.display.height = ps4wsi::kHeight;
 +	settings.display.dpi = 200.f;
 +
++	profiling = access((kDataRoot + "/profile.txt").c_str(), F_OK) == 0;
++	if (profiling)
++		ps4_sampler_start();
 +	LogManager::Init();
 +	i18n::init();
 +	warmUpExceptions();
@@ -1227,6 +1367,14 @@ index 000000000..a0f7b9489
 +		trace("flycast_init failed");
 +		return 1;
 +	}
++	// the frame rate and speed on screen, once (the user can turn it off in Video settings)
++	if (!config::loadBool("decast", "ShowFPSDefault", false))
++	{
++		config::ShowFPS.set(true);
++		config::saveBool("decast", "ShowFPSDefault", true);
++		SaveSettings();
++	}
++	startPerfMonitor();
 +	// first start: the games folder is the content folder
 +	if (config::ContentPath.get().empty())
 +	{
@@ -1249,6 +1397,16 @@ index 000000000..a0f7b9489
 +	trace("exiting");
 +	flycast_term();
 +	return 0;
++}
++
++// os_SetThreadName (core/linux/common.cpp): named threads appear in the crash and hang reports, and
++// in the profiler's samples when it runs
++void ps4_name_thread(const char *name)
++{
++	if (profiling)
++		ps4_sampler_register_thread(name);
++	else
++		ps4_watch_thread(name);
 +}
 +
 +void os_DoEvents()
