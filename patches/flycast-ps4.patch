@@ -79,6 +79,29 @@ index c5ac6f6e8..488f1c238 100644
  endif()
  
  if(NOT LIBRETRO)
+diff --git a/core/hw/pvr/Renderer_if.cpp b/core/hw/pvr/Renderer_if.cpp
+index 49c3f720f..aafef3abd 100644
+--- a/core/hw/pvr/Renderer_if.cpp
++++ b/core/hw/pvr/Renderer_if.cpp
+@@ -1,4 +1,7 @@
+ #include "Renderer_if.h"
++#ifdef __ORBIS__
++#include "ps4_stats.h"
++#endif
+ #include "spg.h"
+ #include "rend/texconv.h"
+ #include "rend/transform_matrix.h"
+@@ -544,6 +547,10 @@ void rend_start_render()
+ 	FillBGP(ctx);
+ 
+ 	ctx->rend.isRTT = (FB_W_SOF1 & 0x1000000) != 0;
++#ifdef __ORBIS__
++	if (ctx->rend.isRTT)
++		decast_fault_count[ps4fault::RttRender]++;	// DeCast-S4 perf monitor
++#endif
+ 	ctx->rend.fb_W_SOF1 = FB_W_SOF1;
+ 	ctx->rend.fb_W_CTRL.full = FB_W_CTRL.full;
+ 
 diff --git a/core/hw/pvr/spg.cpp b/core/hw/pvr/spg.cpp
 index f2f0cca50..2cac65b91 100755
 --- a/core/hw/pvr/spg.cpp
@@ -1313,7 +1336,7 @@ index 000000000..8946466f3
 +int ps4_first_pad_handle();
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..4be8bb269
+index 000000000..b7f094b0a
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
 @@ -0,0 +1,309 @@
@@ -1461,12 +1484,12 @@ index 000000000..4be8bb269
 +				lastFaults[i] = v;
 +			}
 +			char line[900];
-+			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | faults/s: memwatch %.0f code %.0f vram %.0f fpcb %.0f rewrite %.0f other %.0f, protect %.0f unprotect %.0f | %s",
++			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | faults/s: memwatch %.0f code %.0f vram %.0f fpcb %.0f rewrite %.0f other %.0f, protect %.0f unprotect %.0f, rtt %.0f/s | %s",
 +					(frames - lastFrames) / secs, (vblanks - lastVblanks) / secs / ps4_vblank_rate() * 100.0,
 +					span > lastSpan ? (unsigned long long)((busy - lastBusy) * 100 / (span - lastSpan)) : 0ull,
 +					faults[ps4fault::MemWatch] / secs, faults[ps4fault::CodePage] / secs, faults[ps4fault::Vram] / secs,
 +					faults[ps4fault::Fpcb] / secs, faults[ps4fault::Rewrite] / secs, faults[ps4fault::Unhandled] / secs,
-+					faults[ps4fault::Protect] / secs, faults[ps4fault::Unprotect] / secs, threads);
++					faults[ps4fault::Protect] / secs, faults[ps4fault::Unprotect] / secs, faults[ps4fault::RttRender] / secs, threads);
 +			ps4_boot_trace(line);
 +			// screens.txt: the emulated picture every 5 s (screenshots/frame-<seconds>.png)
 +			if (access((kDataRoot + "/screens.txt").c_str(), F_OK) == 0)
@@ -1628,10 +1651,10 @@ index 000000000..4be8bb269
 +}
 diff --git a/shell/ps4/ps4_stats.h b/shell/ps4/ps4_stats.h
 new file mode 100644
-index 000000000..57d13baee
+index 000000000..8dd170a63
 --- /dev/null
 +++ b/shell/ps4/ps4_stats.h
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,29 @@
 +/*
 +	DeCast-S4: counters for the performance monitor (shell/ps4/ps4_main.cpp).
 +
@@ -1657,7 +1680,8 @@ index 000000000..57d13baee
 +namespace ps4fault
 +{
 +// What a memory fault was (fault_handler) or a page protection change (virtmem::region_*)
-+enum : int { MemWatch, CodePage, Vram, Fpcb, Rewrite, Unhandled, Protect, Unprotect, Count };
++// RttRender: render-to-texture passes started (hw/pvr/Renderer_if.cpp)
++enum : int { MemWatch, CodePage, Vram, Fpcb, Rewrite, Unhandled, Protect, Unprotect, RttRender, Count };
 +}
 +extern std::atomic<u64> decast_fault_count[ps4fault::Count];
 diff --git a/shell/ps4/ps4_stubs.c b/shell/ps4/ps4_stubs.c
