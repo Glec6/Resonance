@@ -376,10 +376,41 @@ index 2a02ab625..a1d091484 100644
  #elif defined(__ANDROID__)
  #define DECLARE_CODE_CACHE(Name, Size) alignas(4096) static u8 Name[Size];
 diff --git a/core/rec-x64/rec_x64.cpp b/core/rec-x64/rec_x64.cpp
-index b78ffc9e4..cb4cef836 100644
+index b78ffc9e4..84c86f267 100644
 --- a/core/rec-x64/rec_x64.cpp
 +++ b/core/rec-x64/rec_x64.cpp
-@@ -700,7 +700,29 @@ public:
+@@ -536,6 +536,30 @@ public:
+ 
+ 		L(exit_block);
+ 		add(rsp, STACK_ALIGN);
++#ifdef __ORBIS__
++		// Tail dispatch: while the time slice lasts (and without the MMU), jump straight to the
++		// next block through the FPCB table instead of returning to the main loop. The stack is
++		// as the main loop's call left it, so the next block (or ngen_FailedToFindBlock) runs
++		// exactly as if called from there, and its ret goes back to the main loop. One indirect
++		// jump per block end predicts far better on the PS4's Jaguar cores than the main loop's
++		// single shared call.
++		{
++			Xbyak::Label toMainloop;
++			mov(rax, (uintptr_t)&sh4ctx.cycle_counter);
++			cmp(dword[rax], 0);
++			jle(toMainloop);
++			mov(rax, (size_t)&mmuOn);
++			cmp(byte[rax], 0);
++			jne(toMainloop);
++			mov(rax, (size_t)&sh4ctx.pc);
++			mov(edx, dword[rax]);
++			and_(edx, FPCB_MASK << 1);
++			mov(rax, (size_t)&p_sh4rcb);
++			mov(rax, qword[rax]);
++			jmp(qword[rax + rdx * 4]);
++			L(toMainloop);
++		}
++#endif
+ 		ret();
+ 
+ 		ready();
+@@ -700,7 +724,29 @@ public:
  		L(slice_loop);
  		mov(rax, (size_t)&sh4ctx.pc);
  		mov(call_regs[0], dword[rax]);
@@ -1627,10 +1658,10 @@ index 000000000..4cad82eb3
 +void ZSTD_trace_decompress_end(unsigned long long ctx, const void *trace) {}
 diff --git a/shell/ps4/ps4_vmem.cpp b/shell/ps4/ps4_vmem.cpp
 new file mode 100644
-index 000000000..8f36c28e1
+index 000000000..53612e149
 --- /dev/null
 +++ b/shell/ps4/ps4_vmem.cpp
-@@ -0,0 +1,301 @@
+@@ -0,0 +1,333 @@
 +/*
 +	DeCast-S4: virtual memory (fast memory) on the PS4.
 +
@@ -1662,6 +1693,7 @@ index 000000000..8f36c28e1
 +#include "hw/mem/addrspace.h"
 +#include "hw/sh4/sh4_if.h"
 +#include "oslib/virtmem.h"
++#include "hw/sh4/dyna/blockmanager.h"
 +#include "ps4_stats.h"
 +
 +#include <sys/mman.h>
@@ -1669,6 +1701,8 @@ index 000000000..8f36c28e1
 +#include <cerrno>
 +#include <cstdarg>
 +#include <cstdio>
++#include <algorithm>
++#include <vector>
 +
 +// Declared by hand: several OpenOrbis prototypes are wrong.
 +extern "C" {
@@ -1702,14 +1736,20 @@ index 000000000..8f36c28e1
 +constexpr int32_t kProtRW = 0x3;		// SCE_KERNEL_PROT_CPU_RW
 +constexpr int32_t kProtRWX = 0x7;
 +constexpr size_t kFpcbSize = sizeof(Sh4RCB::fpcb);
++constexpr size_t kLarge = 2_MB;	// large pages: virtual and physical address and size 2 MiB aligned
 +
-+// The direct memory block: [0, sizeof(Sh4RCB)) backs the Sh4RCB (fpcb pages + context), the
-+// emulated memory follows.
++// The direct memory block (2 MiB aligned): the Sh4RCB (fpcb + SH4 context) at physSh4rcb, the
++// emulated memory right after it. The Sh4RCB's virtual and physical addresses are equal modulo
++// 2 MiB, which puts the emulated memory (sizeof(Sh4RCB) after it) on 2 MiB boundaries in both,
++// and lets the fpcb be mapped in 2 MiB pieces that are aligned in both: the PS4 can then use
++// large pages, and the JIT's block lookups and memory accesses miss the TLB far less.
 +off_t dmem = -1;
 +size_t dmemSize;
++off_t physSh4rcb;
 +u8 *reservedBase;
 +size_t reservedSize;
 +u8 *sh4rcbBase;		// 64 KiB aligned inside the reservation
++std::vector<bool> fpcbChunkMapped;	// per 2 MiB piece of the fpcb
 +
 +size_t alignUp(size_t v, size_t a) {
 +	return (v + a - 1) & ~(a - 1);
@@ -1731,8 +1771,9 @@ index 000000000..8f36c28e1
 +bool mapFixed(void *address, size_t size, off_t offset, bool writable)
 +{
 +	void *addr = address;
++	const bool large = (((uintptr_t)address | (uintptr_t)(dmem + offset) | size) & (kLarge - 1)) == 0;
 +	const int32_t r = sceKernelMapDirectMemory(&addr, alignUp(size, kPage), writable ? kProtRW : kProtRead,
-+			kMapFixed, dmem + offset, kPage);
++			kMapFixed, dmem + offset, large ? kLarge : kPage);
 +	if (r != 0 || addr != address)
 +	{
 +		ERROR_LOG(VMEM, "PS4: mapping %zx bytes of direct memory +%llx at %p failed: %x",
@@ -1793,9 +1834,12 @@ index 000000000..8f36c28e1
 +		trace("vmem: direct memory aliasing %x, aliasing2 %x", r1, r2);
 +	}
 +
-+	dmemSize = alignUp(sizeof(Sh4RCB) + ramSize, kReserveAlign);
++	// the Sh4RCB starts this far below a 2 MiB boundary, in both address spaces
++	const size_t lead = (kLarge - sizeof(Sh4RCB) % kLarge) % kLarge;
++	physSh4rcb = lead;
++	dmemSize = alignUp(lead + sizeof(Sh4RCB) + ramSize, kLarge);
 +	off_t physical = 0;
-+	int32_t r = sceKernelAllocateDirectMemory(0, (off_t)sceKernelGetDirectMemorySize(), dmemSize, kReserveAlign,
++	int32_t r = sceKernelAllocateDirectMemory(0, (off_t)sceKernelGetDirectMemorySize(), dmemSize, kLarge,
 +			kWbOnion, &physical);
 +	if (r != 0)
 +	{
@@ -1804,14 +1848,14 @@ index 000000000..8f36c28e1
 +	}
 +	dmem = physical;
 +
-+	reservedSize = 512_MB + sizeof(Sh4RCB) + ARAM_SIZE_MAX + kReserveAlign;
++	reservedSize = 512_MB + sizeof(Sh4RCB) + ARAM_SIZE_MAX + 2 * kLarge;
 +	// above the kernel's own allocations at 0x200000000 (DolphinPS4: they wrecked a heap there).
 +	// A hint whose range isn't free fails (ENOMEM) instead of searching on: try a few.
 +	void *base = nullptr;
 +	for (uintptr_t hint : { 0x2000000000ull, 0x1800000000ull, 0x3000000000ull, 0x900000000ull, 0x0ull })
 +	{
 +		base = (void *)hint;
-+		r = sceKernelReserveVirtualRange(&base, reservedSize, 0, kReserveAlign);
++		r = sceKernelReserveVirtualRange(&base, reservedSize, 0, kLarge);
 +		if (r == 0)
 +			break;
 +		trace("vmem: reserving %zu MiB at %p failed: %x", reservedSize >> 20, (void *)hint, r);
@@ -1824,18 +1868,22 @@ index 000000000..8f36c28e1
 +		return false;
 +	}
 +	reservedBase = (u8 *)base;
-+	sh4rcbBase = (u8 *)alignUp((uintptr_t)reservedBase, kReserveAlign);
++	// same offset from a 2 MiB boundary as physSh4rcb: the emulated memory after it is aligned
++	sh4rcbBase = (u8 *)alignUp((uintptr_t)reservedBase, kLarge) + lead;
++	verify(((uintptr_t)(sh4rcbBase + sizeof(Sh4RCB)) & (kLarge - 1)) == 0
++			&& ((physSh4rcb + sizeof(Sh4RCB)) & (kLarge - 1)) == 0);
++	fpcbChunkMapped.assign(kFpcbSize / kLarge + 2, false);
 +
 +	// the SH4 context after the fpcb; the fpcb itself is mapped on demand (ondemand_page)
-+	if (!mapFixed(sh4rcbBase + kFpcbSize, sizeof(Sh4RCB) - kFpcbSize, kFpcbSize, true))
++	if (!mapFixed(sh4rcbBase + kFpcbSize, sizeof(Sh4RCB) - kFpcbSize, physSh4rcb + kFpcbSize, true))
 +	{
 +		destroy();
 +		return false;
 +	}
 +	*sh4rcb_addr = sh4rcbBase;
 +	*vmem_base_addr = sh4rcbBase + sizeof(Sh4RCB);
-+	trace("vmem: %zu MiB of direct memory, address space at %p, sh4rcb %p, ram base %p",
-+			dmemSize >> 20, reservedBase, sh4rcbBase, *vmem_base_addr);
++	trace("vmem: %zu MiB of direct memory at %llx, address space at %p, sh4rcb %p, ram base %p (2 MiB aligned)",
++			dmemSize >> 20, (unsigned long long)dmem, reservedBase, sh4rcbBase, *vmem_base_addr);
 +	return true;
 +}
 +
@@ -1858,14 +1906,29 @@ index 000000000..8f36c28e1
 +void reset_mem(void *ptr, unsigned size_bytes)
 +{
 +	unmapToReserved(ptr, size_bytes);
++	std::fill(fpcbChunkMapped.begin(), fpcbChunkMapped.end(), false);
 +}
 +
-+// One fpcb page, at its own place in the direct memory block.
++// The fpcb page holding `address`: maps the whole 2 MiB piece around it (clipped to the fpcb)
++// and fills it with "no block yet" (the caller, bm_lockedWrite, fills its own page again).
 +void ondemand_page(void *address, unsigned size_bytes)
 +{
-+	const off_t offset = (u8 *)address - sh4rcbBase;
-+	const bool ok = mapFixed(address, size_bytes, offset, true);
++	u8 *fpcbStart = sh4rcbBase;
++	u8 *fpcbEnd = sh4rcbBase + kFpcbSize;
++	u8 *start = std::max(fpcbStart, (u8 *)((uintptr_t)address & ~(uintptr_t)(kLarge - 1)));
++	u8 *end = std::min(fpcbEnd, (u8 *)(((uintptr_t)address & ~(uintptr_t)(kLarge - 1)) + kLarge));
++	// pieces numbered from the 2 MiB boundary at or below the fpcb's start
++	const size_t chunk = (((uintptr_t)address & ~(uintptr_t)(kLarge - 1)) - ((uintptr_t)fpcbStart & ~(uintptr_t)(kLarge - 1))) / kLarge;
++	if (chunk < fpcbChunkMapped.size() && fpcbChunkMapped[chunk])
++	{
++		// already mapped (a fault on a page mapped meanwhile by another thread): nothing to do
++		return;
++	}
++	const bool ok = mapFixed(start, end - start, physSh4rcb + (start - sh4rcbBase), true);
 +	verify(ok);
++	bm_vmem_pagefill((void **)start, (u32)(end - start));
++	if (chunk < fpcbChunkMapped.size())
++		fpcbChunkMapped[chunk] = true;
 +}
 +
 +void create_mappings(const Mapping *vmem_maps, unsigned nummaps)
@@ -1884,7 +1947,7 @@ index 000000000..8f36c28e1
 +			u8 *address = &addrspace::ram_base[offset];
 +			// a mapping from an earlier game (another memory size) may be in the way
 +			unmapToReserved(address, vmem_maps[i].memsize);
-+			const bool ok = mapFixed(address, vmem_maps[i].memsize, sizeof(Sh4RCB) + vmem_maps[i].memoffset,
++			const bool ok = mapFixed(address, vmem_maps[i].memsize, physSh4rcb + sizeof(Sh4RCB) + vmem_maps[i].memoffset,
 +					vmem_maps[i].allow_writes);
 +			verify(ok);
 +		}
