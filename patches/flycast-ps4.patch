@@ -534,7 +534,7 @@ index 2cb703a9c..4705d3fe6 100644
  					if (res == vk::Result::eSuboptimalKHR)
  					{
 diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
-index 614739abc..6e3cb774f 100644
+index 614739abc..da1fcee49 100644
 --- a/core/ui/gui.cpp
 +++ b/core/ui/gui.cpp
 @@ -17,6 +17,7 @@
@@ -582,6 +582,32 @@ index 614739abc..6e3cb774f 100644
  		if (fps >= 0.f && fps < 9999.f) {
  			char text[32];
  			snprintf(text, sizeof(text), "F:%4.1f%s", fps, settings.input.fastForwardMode ? " >>" : "");
+@@ -1669,6 +1693,25 @@ void gui_runOnUiThread(std::function<void()> function) {
+ 	uiThreadRunner.runOnThread(function);
+ }
+ 
++#ifdef __ORBIS__
++// DeCast-S4 diagnostics (shell/ps4/ps4_main.cpp, screens.txt): the emulated picture as a PNG,
++// without the "Screenshot saved" notification
++void gui_saveFrameQuiet(const std::string& name)
++{
++	if (!game_started)
++		return;
++	gui_runOnUiThread([name]() {
++		std::vector<u8> data;
++		getScreenshot(data, 640);
++		if (!data.empty())
++			try {
++				hostfs::saveScreenshot(name, data);
++			} catch (const FlycastException&) {
++			}
++	});
++}
++#endif
++
+ void gui_takeScreenshot()
+ {
+ 	if (!game_started)
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
 index 000000000..1ba54b882
@@ -1287,10 +1313,10 @@ index 000000000..8946466f3
 +int ps4_first_pad_handle();
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..b6c1d3386
+index 000000000..4be8bb269
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
-@@ -0,0 +1,300 @@
+@@ -0,0 +1,309 @@
 +/*
 +	DeCast-S4: Flycast's PS4 frontend.
 +
@@ -1355,6 +1381,7 @@ index 000000000..b6c1d3386
 +extern u32 MainFrameCount;	// ui/mainui.cpp: frames shown
 +extern std::atomic<u64> ps4_vblank_count;	// hw/pvr/spg.cpp: emulated vblanks
 +float ps4_vblank_rate();
++void gui_saveFrameQuiet(const std::string& name);	// ui/gui.cpp
 +
 +namespace
 +{
@@ -1441,6 +1468,14 @@ index 000000000..b6c1d3386
 +					faults[ps4fault::Fpcb] / secs, faults[ps4fault::Rewrite] / secs, faults[ps4fault::Unhandled] / secs,
 +					faults[ps4fault::Protect] / secs, faults[ps4fault::Unprotect] / secs, threads);
 +			ps4_boot_trace(line);
++			// screens.txt: the emulated picture every 5 s (screenshots/frame-<seconds>.png)
++			if (access((kDataRoot + "/screens.txt").c_str(), F_OK) == 0)
++			{
++				static int shot;
++				char name[48];
++				snprintf(name, sizeof(name), "frame-%04d.png", ++shot * 5);
++				gui_saveFrameQuiet(name);
++			}
 +			lastFrames = frames;
 +			lastVblanks = vblanks;
 +			lastBusy = busy;
