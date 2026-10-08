@@ -375,6 +375,40 @@ index 2a02ab625..a1d091484 100644
  #define DECLARE_CODE_CACHE(Name, Size) static u8 *Name;
  #elif defined(__ANDROID__)
  #define DECLARE_CODE_CACHE(Name, Size) alignas(4096) static u8 Name[Size];
+diff --git a/core/rec-x64/rec_x64.cpp b/core/rec-x64/rec_x64.cpp
+index b78ffc9e4..cb4cef836 100644
+--- a/core/rec-x64/rec_x64.cpp
++++ b/core/rec-x64/rec_x64.cpp
+@@ -700,7 +700,29 @@ public:
+ 		L(slice_loop);
+ 		mov(rax, (size_t)&sh4ctx.pc);
+ 		mov(call_regs[0], dword[rax]);
++#ifdef __ORBIS__
++		// The next block's code from the FPCB table, inline: without the MMU that is all
++		// bm_GetCodeByVAddr does, but as a call it saved and restored six registers around one
++		// load, and on the PS4's Jaguar cores the lookup cost ~30% of the emulation thread
++		// (DeCast-S4 profile). With the MMU on, the C++ lookup as before.
++		{
++			Xbyak::Label slowLookup, haveCode;
++			mov(rax, (size_t)&mmuOn);
++			cmp(byte[rax], 0);
++			jne(slowLookup, T_NEAR);
++			mov(rax, (size_t)&p_sh4rcb);
++			mov(rax, qword[rax]);		// fpcb is the first member of Sh4RCB
++			mov(edx, call_regs[0]);
++			and_(edx, FPCB_MASK << 1);
++			mov(rax, qword[rax + rdx * 4]);	// fpcb[(pc >> 1) & FPCB_MASK]
++			jmp(haveCode, T_NEAR);
++			L(slowLookup);
++			call(bm_GetCodeByVAddr);
++			L(haveCode);
++		}
++#else
+ 		call(bm_GetCodeByVAddr);
++#endif
+ 		call(rax);
+ 		mov(rax, (uintptr_t)&sh4ctx.cycle_counter);
+ 		mov(ecx, dword[rax]);
 diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_context.cpp
 index 2cb703a9c..4705d3fe6 100644
 --- a/core/rend/vulkan/vulkan_context.cpp
