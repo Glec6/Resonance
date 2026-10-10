@@ -463,8 +463,135 @@ index b78ffc9e4..84c86f267 100644
  		call(rax);
  		mov(rax, (uintptr_t)&sh4ctx.cycle_counter);
  		mov(ecx, dword[rax]);
+diff --git a/core/rend/vulkan/compiler.cpp b/core/rend/vulkan/compiler.cpp
+index a58394e53..0193b056e 100644
+--- a/core/rend/vulkan/compiler.cpp
++++ b/core/rend/vulkan/compiler.cpp
+@@ -20,6 +20,15 @@
+ */
+ #include "compiler.h"
+ #include "vulkan_context.h"
++#ifdef __ORBIS__
++#include "ps4_stats.h"
++#include "oslib/oslib.h"
++#include "oslib/directory.h"
++#include "stdclass.h"
++#include <xxhash.h>
++#include <nowide/cstdio.hpp>
++#include <cstdio>
++#endif
+ 
+ #include <glslang/Public/ResourceLimits.h>
+ #include <glslang/Public/ShaderLang.h>
+@@ -104,11 +113,82 @@ static bool GLSLtoSPV(const vk::ShaderStageFlagBits shaderType, std::string cons
+ 	return true;
+ }
+ 
++#ifdef __ORBIS__
++// DeCast-S4: glslang is slow on the PS4's Jaguar cores (tens of ms per shader), and every new
++// scene needs new shader variants, so the SPIR-V is kept on disk (data/shadercache/<hash>.spv,
++// keyed by the GLSL source and stage): each variant is compiled once, not once per session.
++namespace
++{
++constexpr u32 kSpvCacheMagic = 0x31565053;	// "SPV1"
++
++std::string spvCachePath(vk::ShaderStageFlagBits stage, const std::string& text)
++{
++	static bool dirMade;
++	if (!dirMade) {
++		flycast::mkdir(hostfs::getShaderCachePath("shadercache").c_str(), 0777);
++		dirMade = true;
++	}
++	const u64 h = XXH64(text.data(), text.size(), (u64)stage);
++	char name[64];
++	snprintf(name, sizeof(name), "shadercache/%016llx.spv", (unsigned long long)h);
++	return hostfs::getShaderCachePath(name);
++}
++
++bool loadSpv(const std::string& path, size_t textSize, std::vector<unsigned int>& spv)
++{
++	FILE *f = nowide::fopen(path.c_str(), "rb");
++	if (f == nullptr)
++		return false;
++	u32 header[3];
++	bool ok = std::fread(header, sizeof(header), 1, f) == 1 && header[0] == kSpvCacheMagic
++			&& header[1] == (u32)textSize && header[2] > 0 && header[2] < 4 * 1024 * 1024;
++	if (ok) {
++		spv.resize(header[2]);
++		ok = std::fread(spv.data(), sizeof(unsigned int), spv.size(), f) == spv.size();
++	}
++	std::fclose(f);
++	return ok;
++}
++
++void saveSpv(const std::string& path, size_t textSize, const std::vector<unsigned int>& spv)
++{
++	// written aside and renamed: a power cut never leaves a truncated entry
++	const std::string tmp = path + ".tmp";
++	FILE *f = nowide::fopen(tmp.c_str(), "wb");
++	if (f == nullptr)
++		return;
++	const u32 header[3] { kSpvCacheMagic, (u32)textSize, (u32)spv.size() };
++	bool ok = std::fwrite(header, sizeof(header), 1, f) == 1
++			&& std::fwrite(spv.data(), sizeof(unsigned int), spv.size(), f) == spv.size();
++	std::fclose(f);
++	if (ok)
++		ok = std::rename(tmp.c_str(), path.c_str()) == 0;
++	if (!ok)
++		std::remove(tmp.c_str());
++}
++}
++#endif
++
+ vk::UniqueShaderModule ShaderCompiler::Compile(vk::ShaderStageFlagBits shaderStage, std::string const& shaderText)
+ {
+ 	std::vector<unsigned int> shaderSPV;
++#ifdef __ORBIS__
++	const std::string cachePath = spvCachePath(shaderStage, shaderText);
++	if (loadSpv(cachePath, shaderText.size(), shaderSPV))
++		decast_fault_count[ps4fault::ShaderCacheHits]++;
++	else
++	{
++		{
++			PS4ScopedTimer _(ps4fault::ShaderCompiles, ps4fault::ShaderCompileUs);
++			bool ok = GLSLtoSPV(shaderStage, shaderText, shaderSPV);
++			verify(ok);
++		}
++		saveSpv(cachePath, shaderText.size(), shaderSPV);
++	}
++#else
+ 	bool ok = GLSLtoSPV(shaderStage, shaderText, shaderSPV);
+ 	verify(ok);
++#endif
+ 
+ 	return VulkanContext::Instance()->GetDevice().createShaderModuleUnique
+ 			(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV));
+diff --git a/core/rend/vulkan/pipeline.cpp b/core/rend/vulkan/pipeline.cpp
+index a113f3c4f..4122827b5 100644
+--- a/core/rend/vulkan/pipeline.cpp
++++ b/core/rend/vulkan/pipeline.cpp
+@@ -19,6 +19,9 @@
+     along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
+ */
+ #include "pipeline.h"
++#ifdef __ORBIS__
++#include "ps4_stats.h"
++#endif
+ #include "hw/pvr/Renderer_if.h"
+ 
+ void PipelineManager::CreateModVolPipeline(ModVolMode mode, int cullMode, bool naomi2)
+@@ -432,6 +435,9 @@ void PipelineManager::CreatePipeline(u32 listType, bool sortTriangles, const Pol
+ 	  renderPass                                  // renderPass
+ 	);
+ 
++#ifdef __ORBIS__
++	PS4ScopedTimer _(ps4fault::Pipelines, ps4fault::PipelineUs);	// DeCast-S4 perf monitor
++#endif
+ 	pipelines[hash(listType, sortTriangles, &pp, gpuPalette, dithering)] = GetContext()->GetDevice().createGraphicsPipelineUnique(GetContext()->GetPipelineCache(),
+ 			graphicsPipelineCreateInfo).value;
+ }
 diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_context.cpp
-index 2cb703a9c..4705d3fe6 100644
+index 2cb703a9c..1321ed802 100644
 --- a/core/rend/vulkan/vulkan_context.cpp
 +++ b/core/rend/vulkan/vulkan_context.cpp
 @@ -27,6 +27,9 @@
@@ -519,7 +646,14 @@ index 2cb703a9c..4705d3fe6 100644
  	if (res != vk::Result::eSuccess)
  		throw InvalidVulkanContext();
  	try {
-@@ -1032,7 +1048,12 @@ void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)
+@@ -1027,12 +1043,19 @@ void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)
+ 	vk::CommandBuffer commandBuffer = *commandBuffers[currentImage];
+ 	commandBuffer.endRenderPass();
+ 	commandBuffer.end();
++#ifndef __ORBIS__
+ 	vk::PipelineStageFlags wait_stage(vk::PipelineStageFlagBits::eColorAttachmentOutput);
++#endif
+ 	std::vector<vk::CommandBuffer> allCmdBuffers;
  	if (overlayCmdBuffer)
  		allCmdBuffers.push_back(overlayCmdBuffer);
  	allCmdBuffers.push_back(commandBuffer);
@@ -532,7 +666,7 @@ index 2cb703a9c..4705d3fe6 100644
  	device->resetFences(*drawFences[currentImage]);
  	graphicsQueue.submit(submitInfo, *drawFences[currentImage]);
  	assert(rendering);
-@@ -1046,7 +1067,11 @@ void VulkanContext::Present() noexcept
+@@ -1046,7 +1069,11 @@ void VulkanContext::Present() noexcept
  	{
  		try {
  			DoSwapAutomation();
@@ -544,7 +678,7 @@ index 2cb703a9c..4705d3fe6 100644
  #if defined(VK_USE_PLATFORM_METAL_EXT) || defined(__APPLE__)
  			// presentKHR lists eSuboptimalKHR as a success code so it is
  			// returned rather than thrown. Treat it as a request to
-@@ -1068,7 +1093,11 @@ void VulkanContext::Present() noexcept
+@@ -1068,7 +1095,11 @@ void VulkanContext::Present() noexcept
  				for (int i = 1; i < interval; i++)
  				{
  					PresentFrame(vk::Image(), lastFrameView, lastFrameExtent, lastFrameAR);
@@ -556,6 +690,81 @@ index 2cb703a9c..4705d3fe6 100644
  					currentSemaphore = (currentSemaphore + 1) % renderCompleteSemaphores.size();
  					if (res == vk::Result::eSuboptimalKHR)
  					{
+@@ -1216,6 +1247,39 @@ void VulkanContext::PresentLastFrame()
+ 		DrawFrame(lastFrameView, lastFrameExtent, lastFrameAR);
+ }
+ 
++void VulkanContext::SavePipelineCache()
++{
++	if (!device || !pipelineCache)
++		return;
++	std::vector<u8> cacheData = device->getPipelineCacheData(*pipelineCache);
++	if (cacheData.empty())
++		return;
++	std::string cachePath = hostfs::getShaderCachePath("vulkan_pipeline.cache");
++	// written aside and renamed: a power cut (or the app being closed) never leaves half a file
++	std::string tmpPath = cachePath + ".tmp";
++	FILE *f = nowide::fopen(tmpPath.c_str(), "wb");
++	if (f == nullptr)
++		return;
++	bool ok = std::fwrite(&cacheData[0], 1, cacheData.size(), f) == cacheData.size();
++	std::fclose(f);
++	if (ok)
++		ok = nowide::rename(tmpPath.c_str(), cachePath.c_str()) == 0;
++	if (!ok)
++		nowide::remove(tmpPath.c_str());
++	else
++		INFO_LOG(RENDERER, "Saved the pipeline cache (%zu bytes)", cacheData.size());
++}
++
++#ifdef __ORBIS__
++// DeCast-S4: the PS4 ends the app without term(), which used to be the only place the pipeline
++// cache was saved; the perf monitor calls this (on the UI thread) after new pipelines were built.
++void vulkan_save_pipeline_cache()
++{
++	if (VulkanContext::Instance() != nullptr)
++		VulkanContext::Instance()->SavePipelineCache();
++}
++#endif
++
+ void VulkanContext::term()
+ {
+ 	lastFrameView = nullptr;
+@@ -1233,20 +1297,7 @@ void VulkanContext::term()
+ 	}
+ 	inFlightObjects.clear();
+ 	imguiDriver.reset();
+-	if (device && pipelineCache)
+-	{
+-		std::vector<u8> cacheData = device->getPipelineCacheData(*pipelineCache);
+-		if (!cacheData.empty())
+-		{
+-			std::string cachePath = hostfs::getShaderCachePath("vulkan_pipeline.cache");
+-			FILE *f = nowide::fopen(cachePath.c_str(), "wb");
+-			if (f != nullptr)
+-			{
+-				(void)std::fwrite(&cacheData[0], 1, cacheData.size(), f);
+-				std::fclose(f);
+-			}
+-		}
+-	}
++	SavePipelineCache();
+ 	overlay.reset();
+ 	ShaderCompiler::Term();
+ 	swapChain.reset();
+diff --git a/core/rend/vulkan/vulkan_context.h b/core/rend/vulkan/vulkan_context.h
+index f2d8293e4..c99bb8329 100644
+--- a/core/rend/vulkan/vulkan_context.h
++++ b/core/rend/vulkan/vulkan_context.h
+@@ -152,6 +152,8 @@ public:
+ 	void setSwapInterval(int interval) override;
+ 	vk::Format GetDepthFormat() const { return depthFormat; }
+ 	static VulkanContext *Instance() { return static_cast<VulkanContext *>(GraphicsContext::Instance()); }
++	// writes the Vulkan pipeline cache to disk (DeCast-S4 calls it while running)
++	void SavePipelineCache();
+ 	bool SupportsSamplerAnisotropy() const { return samplerAnisotropy; }
+ 	float GetMaxSamplerAnisotropy() const { return samplerAnisotropy ? maxSamplerAnisotropy : 1.f; }
+ 	bool SupportsDedicatedAllocation() const { return dedicatedAllocationSupported; }
 diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
 index 614739abc..da1fcee49 100644
 --- a/core/ui/gui.cpp
@@ -1336,10 +1545,10 @@ index 000000000..8946466f3
 +int ps4_first_pad_handle();
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..b7f094b0a
+index 000000000..58d3226f6
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
-@@ -0,0 +1,309 @@
+@@ -0,0 +1,328 @@
 +/*
 +	DeCast-S4: Flycast's PS4 frontend.
 +
@@ -1390,6 +1599,7 @@ index 000000000..b7f094b0a
 +#include <chrono>
 +#include <cstdio>
 +#include <cstring>
++#include <functional>
 +#include <thread>
 +#include <string>
 +#include <vector>
@@ -1405,6 +1615,8 @@ index 000000000..b7f094b0a
 +extern std::atomic<u64> ps4_vblank_count;	// hw/pvr/spg.cpp: emulated vblanks
 +float ps4_vblank_rate();
 +void gui_saveFrameQuiet(const std::string& name);	// ui/gui.cpp
++void gui_runOnUiThread(std::function<void()> function);
++void vulkan_save_pipeline_cache();	// rend/vulkan/vulkan_context.cpp
 +
 +namespace
 +{
@@ -1461,6 +1673,7 @@ index 000000000..b7f094b0a
 +		u64 lastVblanks = ps4_vblank_count;
 +		u64 lastBusy = 0, lastSpan = 0;
 +		u64 lastFaults[ps4fault::Count] {};
++		u64 pipelinesSinceSave = 0;
 +		ac_ps4_get_gpu_busy(&lastBusy, &lastSpan);
 +		auto last = std::chrono::steady_clock::now();
 +		for (;;)
@@ -1483,13 +1696,28 @@ index 000000000..b7f094b0a
 +				faults[i] = v - lastFaults[i];
 +				lastFaults[i] = v;
 +			}
-+			char line[900];
-+			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | faults/s: memwatch %.0f code %.0f vram %.0f fpcb %.0f rewrite %.0f other %.0f, protect %.0f unprotect %.0f, rtt %.0f/s | %s",
++			// shaders and pipelines built in this window (the stutter when a scene needs new ones)
++			char compiles[160] = "";
++			if (faults[ps4fault::ShaderCompiles] || faults[ps4fault::ShaderCacheHits] || faults[ps4fault::Pipelines])
++				snprintf(compiles, sizeof(compiles), " | shaders: %llu compiled (%llu ms), %llu from cache; pipelines: %llu (%llu ms)",
++						(unsigned long long)faults[ps4fault::ShaderCompiles], (unsigned long long)faults[ps4fault::ShaderCompileUs] / 1000,
++						(unsigned long long)faults[ps4fault::ShaderCacheHits],
++						(unsigned long long)faults[ps4fault::Pipelines], (unsigned long long)faults[ps4fault::PipelineUs] / 1000);
++			// the Vulkan pipeline cache, once a burst of new pipelines is over (the PS4 never calls
++			// term(), which used to be the only place it was saved)
++			pipelinesSinceSave += faults[ps4fault::Pipelines];
++			if (pipelinesSinceSave > 0 && faults[ps4fault::Pipelines] == 0)
++			{
++				gui_runOnUiThread([] { vulkan_save_pipeline_cache(); });
++				pipelinesSinceSave = 0;
++			}
++			char line[1100];
++			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | faults/s: memwatch %.0f code %.0f vram %.0f fpcb %.0f rewrite %.0f other %.0f, protect %.0f unprotect %.0f, rtt %.0f/s%s | %s",
 +					(frames - lastFrames) / secs, (vblanks - lastVblanks) / secs / ps4_vblank_rate() * 100.0,
 +					span > lastSpan ? (unsigned long long)((busy - lastBusy) * 100 / (span - lastSpan)) : 0ull,
 +					faults[ps4fault::MemWatch] / secs, faults[ps4fault::CodePage] / secs, faults[ps4fault::Vram] / secs,
 +					faults[ps4fault::Fpcb] / secs, faults[ps4fault::Rewrite] / secs, faults[ps4fault::Unhandled] / secs,
-+					faults[ps4fault::Protect] / secs, faults[ps4fault::Unprotect] / secs, faults[ps4fault::RttRender] / secs, threads);
++					faults[ps4fault::Protect] / secs, faults[ps4fault::Unprotect] / secs, faults[ps4fault::RttRender] / secs, compiles, threads);
 +			ps4_boot_trace(line);
 +			// screens.txt: the emulated picture every 5 s (screenshots/frame-<seconds>.png)
 +			if (access((kDataRoot + "/screens.txt").c_str(), F_OK) == 0)
@@ -1651,10 +1879,10 @@ index 000000000..b7f094b0a
 +}
 diff --git a/shell/ps4/ps4_stats.h b/shell/ps4/ps4_stats.h
 new file mode 100644
-index 000000000..8dd170a63
+index 000000000..efaa5a0c5
 --- /dev/null
 +++ b/shell/ps4/ps4_stats.h
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,46 @@
 +/*
 +	DeCast-S4: counters for the performance monitor (shell/ps4/ps4_main.cpp).
 +
@@ -1681,9 +1909,26 @@ index 000000000..8dd170a63
 +{
 +// What a memory fault was (fault_handler) or a page protection change (virtmem::region_*)
 +// RttRender: render-to-texture passes started (hw/pvr/Renderer_if.cpp)
-+enum : int { MemWatch, CodePage, Vram, Fpcb, Rewrite, Unhandled, Protect, Unprotect, RttRender, Count };
++// Shader*: GLSL compiled by glslang / loaded from the SPIR-V disk cache (rend/vulkan/compiler.cpp)
++// Pipeline*: Vulkan pipelines built (rend/vulkan/pipeline.cpp); *Us: microseconds spent
++enum : int { MemWatch, CodePage, Vram, Fpcb, Rewrite, Unhandled, Protect, Unprotect, RttRender,
++	ShaderCompiles, ShaderCompileUs, ShaderCacheHits, Pipelines, PipelineUs, Count };
 +}
 +extern std::atomic<u64> decast_fault_count[ps4fault::Count];
++
++#include <chrono>
++// Counts one event and the time it took (until the end of the scope).
++struct PS4ScopedTimer
++{
++	int countIndex, usIndex;
++	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
++	PS4ScopedTimer(int countIndex, int usIndex) : countIndex(countIndex), usIndex(usIndex) {}
++	~PS4ScopedTimer() {
++		decast_fault_count[countIndex]++;
++		decast_fault_count[usIndex] += std::chrono::duration_cast<std::chrono::microseconds>(
++				std::chrono::steady_clock::now() - start).count();
++	}
++};
 diff --git a/shell/ps4/ps4_stubs.c b/shell/ps4/ps4_stubs.c
 new file mode 100644
 index 000000000..4cad82eb3
