@@ -19,6 +19,8 @@ mkdir -p "$STAGE/sce_sys"
 cp "$EBOOT" "$STAGE/eboot.bin"
 cp "$HERE/../sce_sys/icon0.png" "$STAGE/sce_sys/"
 echo "$VERSION" > "$STAGE/version.txt"
+# the home screen's font, menu sounds and CA bundle (launcher-assets/launcher, from Crema/DolphinPS4)
+cp -r "$HERE/../launcher-assets/launcher" "$STAGE/"
 # PkgTool's pkg_build crashes ("Sequence contains no elements") on empty folders.
 find "$STAGE" -type d -empty -delete
 # Vulkan (RADV on GNM) runs under the plain homebrew identity (4.5 GiB of direct memory).

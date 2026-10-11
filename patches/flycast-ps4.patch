@@ -315,6 +315,21 @@ index 0d5086b0d..f16043804 100644
  			std::string logPath = get_writable_data_path("flycast.log");
  #else
  			std::string logPath = "flycast.log";
+diff --git a/core/oslib/http_client.cpp b/core/oslib/http_client.cpp
+index 6a250597e..90b58ce25 100644
+--- a/core/oslib/http_client.cpp
++++ b/core/oslib/http_client.cpp
+@@ -362,6 +362,10 @@ static CURL *makeCurlEasy(const std::string& url)
+ 	curl_easy_setopt(curl, CURLOPT_AUTOREFERER, 1);
+ 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+ 	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30);	// default is 300 s so 5 min
++#ifdef __ORBIS__
++	// the PS4 has no system certificate store: DeCast-S4 ships Mozilla's (launcher/cacert.pem)
++	curl_easy_setopt(curl, CURLOPT_CAINFO, "/app0/launcher/cacert.pem");
++#endif
+ 
+ 	curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
+ 
 diff --git a/core/oslib/oslib.cpp b/core/oslib/oslib.cpp
 index 9d308dfd3..318d79d09 100644
 --- a/core/oslib/oslib.cpp
@@ -765,8 +780,50 @@ index f2d8293e4..c99bb8329 100644
  	bool SupportsSamplerAnisotropy() const { return samplerAnisotropy; }
  	float GetMaxSamplerAnisotropy() const { return samplerAnisotropy ? maxSamplerAnisotropy : 1.f; }
  	bool SupportsDedicatedAllocation() const { return dedicatedAllocationSupported; }
+diff --git a/core/ui/boxart/boxart.cpp b/core/ui/boxart/boxart.cpp
+index 36be5f1ef..81572f6b4 100644
+--- a/core/ui/boxart/boxart.cpp
++++ b/core/ui/boxart/boxart.cpp
+@@ -22,6 +22,9 @@
+ #include "oslib/oslib.h"
+ #include "cfg/option.h"
+ #include "arcade_scraper.h"
++#ifdef __ORBIS__
++#include "launcher/libretro_scraper.h"
++#endif
+ #include <chrono>
+ 
+ GameBoxart Boxart::getBoxart(const GameMedia& media)
+@@ -100,7 +103,12 @@ void Boxart::fetchBoxart()
+ 		{
+ 			if (scraper == nullptr)
+ 			{
++#ifdef __ORBIS__
++				// DeCast-S4: libretro thumbnails by disc serial
++				scraper = std::unique_ptr<Scraper>(new LibretroScraper());
++#else
+ 				scraper = std::unique_ptr<Scraper>(new TheGamesDb());
++#endif
+ 				if (!scraper->initialize(getSaveDirectory()))
+ 				{
+ 					ERROR_LOG(COMMON, "thegamesdb scraper initialization failed");
+diff --git a/core/ui/boxart/boxart.h b/core/ui/boxart/boxart.h
+index d2096c491..1666411f0 100644
+--- a/core/ui/boxart/boxart.h
++++ b/core/ui/boxart/boxart.h
+@@ -64,5 +64,10 @@ private:
+ 	std::vector<GameBoxart> toFetch;
+ 	std::future<void> fetching;
+ 
++#ifdef __ORBIS__
++	// DeCast-S4: its own file, so games TheGamesDB already marked as scraped get libretro covers
++	static constexpr char const *DB_NAME = "decast-gamedb.json";
++#else
+ 	static constexpr char const *DB_NAME = "flycast-gamedb.json";
++#endif
+ };
 diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
-index 614739abc..da1fcee49 100644
+index 614739abc..1ff446d12 100644
 --- a/core/ui/gui.cpp
 +++ b/core/ui/gui.cpp
 @@ -17,6 +17,7 @@
@@ -777,7 +834,81 @@ index 614739abc..da1fcee49 100644
  #include "rend/osd.h"
  #include "cfg/cfg.h"
  #include "imgui.h"
-@@ -1408,6 +1409,10 @@ void gui_display_ui()
+@@ -35,6 +36,9 @@
+ #include "implot.h"
+ #endif
+ #include "boxart/boxart.h"
++#ifdef __ORBIS__
++#include "launcher/launcher.h"
++#endif
+ #include "profiler/fc_profiler.h"
+ #include "hw/naomi/card_reader.h"
+ #include "oslib/resources.h"
+@@ -451,6 +455,41 @@ void gui_open_settings()
+ 	}
+ }
+ 
++#ifdef __ORBIS__
++// DeCast-S4 launcher (shell/ps4/launcher): the library as the scanner and box-art database see it
++void gui_ps4_list_games(std::vector<LauncherEntry>& out)
++{
++	out.clear();
++	scanner.fetch_game_list();
++	std::lock_guard<std::mutex> _(scanner.get_mutex());
++	for (const auto& game : scanner.get_game_list())
++	{
++		if (game.path.empty() || game.device)
++			continue;	// the BIOS entry, CD drives
++		GameBoxart art = boxart.getBoxartAndLoad(game);
++		LauncherEntry e;
++		e.path = game.path;
++		e.fileName = game.fileName;
++		e.title = art.name.empty() || art.name == game.fileName ? game.name : art.name;
++		e.productId = art.uniqueId;
++		e.region = art.region;
++		e.coverPath = art.boxartPath;
++		out.push_back(std::move(e));
++	}
++}
++
++void gui_ps4_start_game(const std::string& path, const std::string& title)
++{
++	settings.content.title = title;
++	gui_start_game(path);
++}
++
++void gui_ps4_open_settings()
++{
++	gui_setState(GuiState::Settings);
++}
++#endif
++
+ void gui_start_game(const std::string& path)
+ {
+ 	const LockGuard lock(guiMutex);
+@@ -1345,6 +1384,9 @@ void gui_display_ui()
+ 		}
+ 	}
+ 
++#ifdef __ORBIS__
++	launcher_pre_frame();
++#endif
+ 	gui_newFrame();
+ 	ImGui::NewFrame();
+ 	error_msg_shown = false;
+@@ -1364,6 +1406,11 @@ void gui_display_ui()
+ 		break;
+ 	case GuiState::Main:
+ 		//gui_display_demo();
++#ifdef __ORBIS__
++		// DeCast-S4's home screen (shell/ps4/launcher)
++		if (launcher_draw())
++			break;
++#endif
+ 		gui_display_content();
+ 		break;
+ 	case GuiState::Closed:
+@@ -1408,6 +1455,10 @@ void gui_display_ui()
  		emu.start();
  }
  
@@ -788,7 +919,7 @@ index 614739abc..da1fcee49 100644
  static u64 LastFPSTime;
  static int lastFrameCount = 0;
  static float fps = -1;
-@@ -1422,6 +1427,25 @@ static std::string getFPSNotification()
+@@ -1422,6 +1473,25 @@ static std::string getFPSNotification()
  			LastFPSTime = now;
  			lastFrameCount = MainFrameCount;
  		}
@@ -814,7 +945,7 @@ index 614739abc..da1fcee49 100644
  		if (fps >= 0.f && fps < 9999.f) {
  			char text[32];
  			snprintf(text, sizeof(text), "F:%4.1f%s", fps, settings.input.fastForwardMode ? " >>" : "");
-@@ -1669,6 +1693,25 @@ void gui_runOnUiThread(std::function<void()> function) {
+@@ -1669,6 +1739,25 @@ void gui_runOnUiThread(std::function<void()> function) {
  	uiThreadRunner.runOnThread(function);
  }
  
@@ -840,12 +971,26 @@ index 614739abc..da1fcee49 100644
  void gui_takeScreenshot()
  {
  	if (!game_started)
+diff --git a/core/ui/mainui.cpp b/core/ui/mainui.cpp
+index b79559cb1..d9bc9a46d 100644
+--- a/core/ui/mainui.cpp
++++ b/core/ui/mainui.cpp
+@@ -51,7 +51,8 @@ bool mainui_rend_frame()
+ 			forceReinit = true;
+ 			return false;
+ 		}
+-#ifndef TARGET_IPHONE
++#if !defined(TARGET_IPHONE) && !defined(__ORBIS__)
++		// (PS4: presenting waits for the TV's vblank already; the home screen animates at 60 fps)
+ 		std::this_thread::sleep_for(std::chrono::milliseconds(16));
+ #endif
+ 	}
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
-index 000000000..1ba54b882
+index 000000000..c8972c1fd
 --- /dev/null
 +++ b/shell/ps4/CMakeLists.txt
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,39 @@
 +# DeCast-S4: Flycast on PS4 homebrew. Built with the DeCast-S4 toolchain (toolchain/ps4-decast.cmake,
 +# ps4-love-style.cmake: PS4_RUNTIME_SOURCES, ps4_link_mesa, ps4_add_eboot).
 +target_sources(${PROJECT_NAME} PRIVATE
@@ -857,6 +1002,16 @@ index 000000000..1ba54b882
 +	ps4_wsi.cpp
 +	ps4_wsi.h
 +	audiobackend_ps4.cpp
++	launcher/launcher.cpp
++	launcher/launcher.h
++	launcher/launcher_internal.h
++	launcher/covers.cpp
++	launcher/libretro_scraper.h
++	launcher/sound.cpp
++	launcher/theme_orbit.cpp
++	launcher/theme_channel.cpp
++	launcher/theme_shelf.cpp
++	launcher/theme_xmb.cpp
 +	${PS4_RUNTIME_SOURCES})
 +target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 +# FreeBSD kernel without sockets for local IPC or serial ports
@@ -1077,12 +1232,2877 @@ index 000000000..8e3fc1978
 +	std::thread thread;
 +};
 +static PS4AudioBackend ps4AudioBackend;
+diff --git a/shell/ps4/launcher/covers.cpp b/shell/ps4/launcher/covers.cpp
+new file mode 100644
+index 000000000..26f3b7021
+--- /dev/null
++++ b/shell/ps4/launcher/covers.cpp
+@@ -0,0 +1,379 @@
++/*
++	DeCast-S4 launcher covers: the user's own covers, box art from libretro's thumbnail server
++	(LibretroScraper, used by the box-art database) and colours read from a cover.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "libretro_scraper.h"
++#include "oslib/http_client.h"
++#include "oslib/oslib.h"
++#include "stdclass.h"
++
++#include <stb_image.h>
++
++#include <algorithm>
++#include <chrono>
++#include <cstdio>
++#include <mutex>
++#include <stdexcept>
++#include <unordered_map>
++
++extern "C" void ps4_boot_trace(const char *line);
++
++namespace
++{
++const char *const kUserCovers = "/data/DeCast-S4/covers/";
++const char *const kDatUrl = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/redump/Sega%20-%20Dreamcast.dat";
++const char *const kThumbUrl = "https://thumbnails.libretro.com/Sega%20-%20Dreamcast/Named_Boxarts/";
++const char *const kDatFile = "libretro-dreamcast.dat";
++
++// Letters and digits only, upper case: "T-13002N" and "T13002N" are the same disc
++std::string normalizeSerial(const std::string& s)
++{
++	std::string out;
++	for (char c : s)
++		if (isalnum((unsigned char)c))
++			out += (char)toupper((unsigned char)c);
++	return out;
++}
++
++// The thumbnail server's file names: these characters become '_'
++std::string thumbnailName(std::string name)
++{
++	for (char& c : name)
++		if (strchr("&*/:`<>?\\|\"", c) != nullptr)
++			c = '_';
++	return name;
++}
++
++// Percent-encode what a URL path can't hold; the server wants ( ) , ' ! as they are
++std::string encodePath(const std::string& s)
++{
++	static const char hex[] = "0123456789ABCDEF";
++	std::string out;
++	for (char ch : s)
++	{
++		const unsigned char c = (unsigned char)ch;
++		if (isalnum(c) || strchr("-_.~()!,'+;=@", c) != nullptr)
++			out += ch;
++		else
++		{
++			out += '%';
++			out += hex[c >> 4];
++			out += hex[c & 15];
++		}
++	}
++	return out;
++}
++
++bool readFile(const std::string& path, std::string& out)
++{
++	FILE *f = nowide::fopen(path.c_str(), "rb");
++	if (f == nullptr)
++		return false;
++	char buf[16384];
++	size_t n;
++	out.clear();
++	while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
++		out.append(buf, n);
++	fclose(f);
++	return true;
++}
++
++// The quoted value after a key on a DAT line: `	serial "T-13002N"`
++bool datValue(const std::string& line, const char *key, std::string& value)
++{
++	size_t p = line.find_first_not_of(" \t");
++	const size_t keyLen = strlen(key);
++	if (p == std::string::npos || line.compare(p, keyLen, key) != 0 || line.size() <= p + keyLen
++			|| (line[p + keyLen] != ' ' && line[p + keyLen] != '\t'))
++		return false;
++	const size_t q1 = line.find('"', p + keyLen);
++	const size_t q2 = q1 == std::string::npos ? q1 : line.find('"', q1 + 1);
++	if (q2 == std::string::npos)
++		return false;
++	value = line.substr(q1 + 1, q2 - q1 - 1);
++	return true;
++}
++
++bool regionMatches(const std::string& datRegion, u32 region)
++{
++	return ((region & GameBoxart::USA) && datRegion.find("USA") != std::string::npos)
++		|| ((region & GameBoxart::JAPAN) && datRegion.find("Japan") != std::string::npos)
++		|| ((region & GameBoxart::EUROPE) && datRegion.find("Europe") != std::string::npos);
++}
++}
++
++// ---- LibretroScraper ----
++
++bool LibretroScraper::initialize(const std::string& saveDirectory)
++{
++	Scraper::initialize(saveDirectory);
++	directory = saveDirectory;
++	loadDat();		// no DAT yet (offline): scrape() retries
++	return true;
++}
++
++bool LibretroScraper::loadDat()
++{
++	if (!bySerial.empty())
++		return true;
++	const std::string path = directory + kDatFile;
++	std::string text;
++	if (readFile(path, text) && parseDat(text))
++		return true;
++	if (getTimeMs() < nextDatAttempt)
++		return false;
++	nextDatAttempt = getTimeMs() + 60 * 1000;
++	std::vector<u8> content;
++	std::string contentType;
++	const int status = http::get(kDatUrl, content, contentType);
++	if (!http::success(status) || content.empty())
++	{
++		WARN_LOG(COMMON, "libretro DAT download failed: %d", status);
++		return false;
++	}
++	text.assign((const char *)content.data(), content.size());
++	if (!parseDat(text))
++		return false;
++	FILE *f = nowide::fopen(path.c_str(), "wb");
++	if (f != nullptr)
++	{
++		fwrite(text.data(), 1, text.size(), f);
++		fclose(f);
++	}
++	ps4_boot_trace("covers: libretro DAT downloaded");
++	return true;
++}
++
++bool LibretroScraper::parseDat(const std::string& text)
++{
++	bySerial.clear();
++	DatGame game;
++	std::string serials, value;
++	bool inGame = false;
++	size_t pos = 0;
++	while (pos < text.size())
++	{
++		size_t end = text.find('\n', pos);
++		if (end == std::string::npos)
++			end = text.size();
++		const std::string line = text.substr(pos, end - pos);
++		pos = end + 1;
++		if (line.compare(0, 6, "game (") == 0)
++		{
++			inGame = true;
++			game = DatGame();
++			serials.clear();
++		}
++		else if (!inGame)
++			continue;
++		else if (line.size() >= 1 && line[0] == ')')
++		{
++			inGame = false;
++			if (game.name.empty())
++				continue;
++			// a few entries list several serials
++			size_t s = 0;
++			while (s <= serials.size())
++			{
++				size_t comma = serials.find(',', s);
++				if (comma == std::string::npos)
++					comma = serials.size();
++				const std::string key = normalizeSerial(serials.substr(s, comma - s));
++				if (!key.empty())
++					bySerial[key].push_back(game);
++				s = comma + 1;
++			}
++		}
++		else if (game.name.empty() && datValue(line, "name", value))
++			game.name = value;
++		else if (datValue(line, "region", value))
++			game.region = value;
++		else if (serials.empty() && datValue(line, "serial", value))
++			serials = value;
++	}
++	INFO_LOG(COMMON, "libretro DAT: %d serials", (int)bySerial.size());
++	return !bySerial.empty();
++}
++
++const LibretroScraper::DatGame *LibretroScraper::find(const std::string& serial, u32 region) const
++{
++	std::string key = normalizeSerial(serial);
++	auto it = bySerial.find(key);
++	// Sega's own discs say MK-51117 where Redump has 51117 (USA)
++	if (it == bySerial.end() && key.compare(0, 2, "MK") == 0)
++		it = bySerial.find(key.substr(2));
++	if (it == bySerial.end())
++		return nullptr;
++	for (const DatGame& g : it->second)
++		if (regionMatches(g.region, region))
++			return &g;
++	return &it->second.front();
++}
++
++void LibretroScraper::scrape(GameBoxart& item)
++{
++	if (item.scraped)
++		return;
++	if (item.arcade || item.uniqueId.empty())
++	{
++		item.scraped = true;
++		return;
++	}
++	if (!loadDat())
++		throw std::runtime_error("");	// offline: keep the item for later
++	const DatGame *game = find(item.uniqueId, item.region);
++	if (game == nullptr)
++	{
++		item.scraped = true;	// not in Redump: the disc's own image stays
++		return;
++	}
++	// the title without Redump's tags: "Sonic Adventure 2"
++	const size_t paren = game->name.find(" (");
++	item.name = game->name.substr(0, paren);
++
++	// the full Redump name, then title and region only ("... (USA) (Rev A)" is often "... (USA)")
++	std::vector<std::string> names { game->name };
++	if (paren != std::string::npos)
++	{
++		const size_t close = game->name.find(')', paren);
++		if (close != std::string::npos && close + 1 < game->name.size())
++			names.push_back(game->name.substr(0, close + 1));
++	}
++	for (const std::string& name : names)
++	{
++		const std::string url = kThumbUrl + encodePath(thumbnailName(name)) + ".png";
++		std::vector<u8> content;
++		std::string contentType;
++		const int status = http::get(url, content, contentType);
++		if (status == 404)
++			continue;
++		if (!http::success(status))
++			throw std::runtime_error("thumbnail server: HTTP " + std::to_string(status));
++		if (content.empty() || contentType.compare(0, 6, "image/") != 0)
++			continue;
++		const std::string local = makeUniqueFilename("cover.png");
++		FILE *f = nowide::fopen(local.c_str(), "wb");
++		if (f == nullptr)
++			break;
++		fwrite(content.data(), 1, content.size(), f);
++		fclose(f);
++		item.setBoxartPath(local);
++		item.boxartUrl = url;
++		break;
++	}
++	item.scraped = true;
++}
++
++namespace launcher
++{
++
++// /data/DeCast-S4/covers/<file name>.png (or .jpg), <serial>.png or <title>.png
++std::string userCover(const LauncherEntry& e)
++{
++	struct Cached { std::string path; u64 at; };
++	static std::unordered_map<std::string, Cached> cache;
++	const u64 now = getTimeMs();
++	auto it = cache.find(e.path);
++	if (it != cache.end() && now - it->second.at < 5000)
++		return it->second.path;
++
++	std::string stem = e.fileName;
++	const size_t dot = stem.find_last_of('.');
++	if (dot != std::string::npos)
++		stem = stem.substr(0, dot);
++	std::string found;
++	for (const std::string& base : { stem, e.productId, e.title })
++	{
++		if (base.empty())
++			continue;
++		for (const char *ext : { ".png", ".jpg", ".jpeg" })
++		{
++			const std::string path = kUserCovers + base + ext;
++			if (file_exists(path))
++			{
++				found = path;
++				break;
++			}
++		}
++		if (!found.empty())
++			break;
++	}
++	cache[e.path] = { found, now };
++	return found;
++}
++
++// The cover's strongest colour (by hue, weighted by saturation and brightness) as the bright
++// colour, and a deep shade of it as the dark one.
++bool paletteFromImage(const std::string& path, Color& c1, Color& c2)
++{
++	FILE *f = nowide::fopen(path.c_str(), "rb");
++	if (f == nullptr)
++		return false;
++	int w, h, n;
++	u8 *data = stbi_load_from_file(f, &w, &h, &n, 3);
++	fclose(f);
++	if (data == nullptr)
++		return false;
++	constexpr int BINS = 24;
++	float weight[BINS] {}, sr[BINS] {}, sg[BINS] {}, sb[BINS] {};
++	const int step = std::max(1, std::min(w, h) / 64);
++	for (int y = 0; y < h; y += step)
++		for (int x = 0; x < w; x += step)
++		{
++			const u8 *p = &data[(y * w + x) * 3];
++			const float r = p[0] / 255.f, g = p[1] / 255.f, b = p[2] / 255.f;
++			const float mx = std::max({ r, g, b }), mn = std::min({ r, g, b });
++			const float s = mx > 0 ? (mx - mn) / mx : 0;
++			if (s < .2f || mx < .2f)
++				continue;
++			float hue;
++			const float d = mx - mn;
++			if (mx == r) hue = std::fmod((g - b) / d, 6.f);
++			else if (mx == g) hue = (b - r) / d + 2;
++			else hue = (r - g) / d + 4;
++			hue /= 6.f;
++			if (hue < 0) hue += 1;
++			const int bin = std::min(BINS - 1, (int)(hue * BINS));
++			const float wt = s * s * mx;
++			weight[bin] += wt;
++			sr[bin] += r * wt; sg[bin] += g * wt; sb[bin] += b * wt;
++		}
++	stbi_image_free(data);
++	int best = 0;
++	for (int i = 1; i < BINS; i++)
++		if (weight[i] + .5f * (weight[(i + 1) % BINS] + weight[(i + BINS - 1) % BINS])
++				> weight[best] + .5f * (weight[(best + 1) % BINS] + weight[(best + BINS - 1) % BINS]))
++			best = i;
++	if (weight[best] <= 0.f)
++	{
++		// a grey cover: cool silver
++		c1 = { .75f, .8f, .9f };
++		c2 = { .08f, .09f, .12f };
++		return true;
++	}
++	Color c { sr[best] / weight[best], sg[best] / weight[best], sb[best] / weight[best] };
++	// bright and saturated for light, deep for the background
++	const float mx = std::max({ c.r, c.g, c.b });
++	c1 = { c.r / mx, c.g / mx, c.b / mx };
++	c1 = mix(c1, { 1, 1, 1 }, .08f);
++	c2 = { c1.r * .2f, c1.g * .2f, c1.b * .2f };
++	return true;
++}
++
++} // namespace launcher
+diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
+new file mode 100644
+index 000000000..5c95a5550
+--- /dev/null
++++ b/shell/ps4/launcher/launcher.cpp
+@@ -0,0 +1,724 @@
++/*
++	DeCast-S4 launcher core: the library, covers and colours, DualShock 4 input, theme switching
++	and starting games. The themes draw; this file decides what they draw.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "ps4_gamepad.h"
++#include "cfg/cfg.h"
++#include "emulator.h"
++#include "oslib/oslib.h"
++#include "stdclass.h"
++#include "ui/imgui_driver.h"
++#include "imgui_internal.h"
++
++#include <stb_image.h>
++
++#include <algorithm>
++#include <chrono>
++#include <condition_variable>
++#include <cstdio>
++#include <deque>
++#include <mutex>
++#include <thread>
++#include <unordered_map>
++
++extern "C" void ps4_boot_trace(const char *line);
++
++namespace launcher
++{
++
++namespace
++{
++const char *const kFontPath = "/app0/launcher/Michroma-Regular.ttf";
++
++ImFont *gDisplayFont;
++bool gFontFailed;
++
++std::vector<Game> gGames;
++std::unique_ptr<Theme> gTheme;
++int gThemeIndex = -1;
++int gSel, gGoal;
++float gSelectedAt = -10.f, gLaunchAt = -1.f;
++float gTime;
++std::chrono::steady_clock::time_point gLast;
++float gNextRefresh;
++std::string gSelectedPath;
++
++// theme switch: fade out, swap, fade in
++int gPendingTheme = -1;
++float gFadeAt = -10.f;
++// "Theme: Orbit" and the like
++std::string gToast;
++float gToastAt = -10.f;
++
++// input: edges and key repeat
++u32 gPrevButtons;
++int gHeldDir;			// last direction held (stick or d-pad), 0 none
++float gRepeatAt;
++
++// palettes read from covers, off the UI thread
++std::mutex gPaletteMutex;
++std::unordered_map<std::string, std::pair<Color, Color>> gPalettes;
++std::deque<std::string> gPaletteQueue;
++std::condition_variable gPaletteCv;
++bool gPaletteThread;
++
++Theme *makeTheme(int index)
++{
++	switch (index)
++	{
++	case 1: return makeChannel().release();
++	case 2: return makeShelf().release();
++	case 3: return makeCrossBar().release();
++	default: return makeOrbit().release();
++	}
++}
++
++std::string upper(std::string s)
++{
++	for (char& c : s)
++		c = (char)toupper((unsigned char)c);
++	return s;
++}
++
++void paletteWorker()
++{
++	ThreadName _("LauncherCovers");
++	for (;;)
++	{
++		std::string path;
++		{
++			std::unique_lock<std::mutex> lock(gPaletteMutex);
++			gPaletteCv.wait_for(lock, std::chrono::milliseconds(500), [] { return !gPaletteQueue.empty(); });
++			if (gPaletteQueue.empty())
++				continue;
++			path = gPaletteQueue.front();
++			gPaletteQueue.pop_front();
++		}
++		Color a, b;
++		if (paletteFromImage(path, a, b))
++		{
++			std::lock_guard<std::mutex> lock(gPaletteMutex);
++			gPalettes[path] = { a, b };
++		}
++	}
++}
++
++// Colours from the title until (or unless) the cover has been read.
++void titlePalette(Game& g)
++{
++	u32 h = 2166136261u;
++	for (char c : g.e.title)
++		h = (h ^ (u8)c) * 16777619u;
++	const float hue = (h % 360) / 360.f;
++	g.c1 = hsv(hue, .62f, .98f);
++	g.c2 = hsv(hue, .72f, .2f);
++}
++
++void refreshLibrary()
++{
++	std::vector<LauncherEntry> entries;
++	gui_ps4_list_games(entries);
++	std::unordered_map<std::string, Game> old;
++	for (auto& g : gGames)
++		old.emplace(g.e.path, g);
++	std::vector<Game> games;
++	games.reserve(entries.size());
++	for (auto& e : entries)
++	{
++		Game g;
++		auto it = old.find(e.path);
++		if (it != old.end())
++			g = it->second;
++		g.e = e;
++		const std::string own = userCover(e);
++		g.cover = own.empty() ? e.coverPath : own;
++		g.format = upper(get_file_extension(e.fileName));
++		g.regionName = (e.region & 4) && !(e.region & 3) ? "Europe" : (e.region & 1) && !(e.region & 6) ? "Japan"
++				: (e.region & 2) ? "USA" : "";
++		if (it == old.end())
++			titlePalette(g);
++		if (!g.cover.empty())
++		{
++			std::lock_guard<std::mutex> lock(gPaletteMutex);
++			auto p = gPalettes.find(g.cover);
++			if (p != gPalettes.end())
++			{
++				g.c1 = p->second.first;
++				g.c2 = p->second.second;
++				g.paletteFromCover = true;
++			}
++			else if (std::find(gPaletteQueue.begin(), gPaletteQueue.end(), g.cover) == gPaletteQueue.end())
++			{
++				gPaletteQueue.push_back(g.cover);
++				gPaletteCv.notify_one();
++			}
++		}
++		games.push_back(std::move(g));
++	}
++	std::sort(games.begin(), games.end(), [](const Game& a, const Game& b) {
++		return strcasecmp(a.e.title.c_str(), b.e.title.c_str()) < 0;
++	});
++	gGames = std::move(games);
++	// keep the same game selected when the list changes
++	int found = -1;
++	for (int i = 0; i < (int)gGames.size(); i++)
++		if (gGames[i].e.path == gSelectedPath)
++			found = i;
++	if (found >= 0 && found != gSel)
++	{
++		gGoal += found - gSel;
++		gSel = found;
++	}
++	if (gGames.empty())
++		gSel = gGoal = 0;
++	else
++		gSel = std::clamp(gSel, 0, (int)gGames.size() - 1);
++}
++
++void setTheme(int index)
++{
++	index = ((index % THEME_COUNT) + THEME_COUNT) % THEME_COUNT;
++	gTheme.reset(makeTheme(index));
++	gThemeIndex = index;
++	config::saveInt("decast", "LauncherTheme", index);
++}
++
++Frame makeFrame()
++{
++	ImGuiIO& io = ImGui::GetIO();
++	Frame f;
++	f.dl = ImGui::GetBackgroundDrawList();
++	f.w = io.DisplaySize.x;
++	f.h = io.DisplaySize.y;
++	f.t = gTime;
++	f.dt = std::min(.05f, io.DeltaTime);
++	f.games = &gGames;
++	f.sel = gSel;
++	f.goal = gGoal;
++	f.selectedAt = gSelectedAt;
++	f.launchAt = gLaunchAt;
++	return f;
++}
++
++void handleInput(Frame& f)
++{
++	u32 buttons = 0;
++	float lx = 0, ly = 0;
++	ps4_pad_state(buttons, lx, ly);
++	// back from Settings or a game: buttons still held from there aren't new presses here
++	static int lastFrame = -10;
++	const int frame = ImGui::GetFrameCount();
++	if (frame != lastFrame + 1)
++	{
++		gPrevButtons = buttons;
++		gHeldDir = -1;
++	}
++	lastFrame = frame;
++	const u32 pressed = buttons & ~gPrevButtons;
++	gPrevButtons = buttons;
++	if (gLaunchAt >= 0 || gPendingTheme >= 0)
++		return;
++
++	// direction: d-pad or the left stick, with key repeat
++	int dir = 0;	// 1 left, 2 right, 3 up, 4 down
++	if ((buttons & ORBIS_PAD_BUTTON_LEFT) || lx < -.55f) dir = 1;
++	else if ((buttons & ORBIS_PAD_BUTTON_RIGHT) || lx > .55f) dir = 2;
++	else if ((buttons & ORBIS_PAD_BUTTON_UP) || ly < -.55f) dir = 3;
++	else if ((buttons & ORBIS_PAD_BUTTON_DOWN) || ly > .55f) dir = 4;
++	bool fire = false;
++	// a direction held across the return waits for its release
++	if (gHeldDir == -1 && dir != 0)
++		return;
++	if (dir != gHeldDir)
++	{
++		gHeldDir = dir;
++		fire = dir != 0;
++		gRepeatAt = gTime + .38f;
++	}
++	else if (dir != 0 && gTime >= gRepeatAt)
++	{
++		fire = true;
++		gRepeatAt = gTime + .085f;
++	}
++	if (fire)
++	{
++		const int dx = dir == 1 ? -1 : dir == 2 ? 1 : 0;
++		const int dy = dir == 3 ? -1 : dir == 4 ? 1 : 0;
++		if (!gTheme->navigate(f, dx, dy))
++			moveSelection(dx != 0 ? dx : dy);
++	}
++	if (pressed & ORBIS_PAD_BUTTON_L1)
++		moveSelection(-5);
++	if (pressed & ORBIS_PAD_BUTTON_R1)
++		moveSelection(5);
++
++	if (pressed & ORBIS_PAD_BUTTON_CROSS)
++	{
++		if (!gTheme->activate(f))
++		{
++			if (gGames.empty())
++				playSound(Sound::Error);
++			else
++			{
++				gLaunchAt = gTime;
++				playSound(Sound::Launch);
++			}
++		}
++	}
++	if (pressed & ORBIS_PAD_BUTTON_SQUARE)
++		requestTheme(gThemeIndex + 1);
++	if (pressed & (ORBIS_PAD_BUTTON_TRIANGLE | ORBIS_PAD_BUTTON_OPTIONS | ORBIS_PAD_BUTTON_TOUCH_PAD))
++		openSettings();
++}
++} // namespace
++
++// ---- requests from themes ----
++
++void requestTheme(int index)
++{
++	if (gPendingTheme >= 0 || index == gThemeIndex)
++		return;
++	gPendingTheme = ((index % THEME_COUNT) + THEME_COUNT) % THEME_COUNT;
++	gFadeAt = gTime;
++	playSound(Sound::Category);
++}
++
++int currentTheme() {
++	return gThemeIndex;
++}
++
++void openSettings()
++{
++	playSound(Sound::Confirm);
++	gui_ps4_open_settings();
++}
++
++void moveSelection(int delta)
++{
++	if (gGames.empty() || delta == 0)
++		return;
++	const int n = (int)gGames.size();
++	gGoal += delta;
++	gSel = ((gGoal % n) + n) % n;
++	gSelectedPath = gGames[gSel].e.path;
++	gSelectedAt = gTime;
++	playSound(Sound::Move);
++}
++
++const char *themeName(int index)
++{
++	static const char *const names[] = { "Orbit", "Channel", "Shelf", "Cross bar" };
++	return names[((index % THEME_COUNT) + THEME_COUNT) % THEME_COUNT];
++}
++
++// ---- colours and maths ----
++
++Color mix(const Color& a, const Color& b, float t) {
++	return { a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t };
++}
++
++Color hsv(float h, float s, float v)
++{
++	h = (h - std::floor(h)) * 6.f;
++	const int i = (int)h;
++	const float f = h - i, p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
++	switch (i % 6)
++	{
++	case 0: return { v, t, p };
++	case 1: return { q, v, p };
++	case 2: return { p, v, t };
++	case 3: return { p, q, v };
++	case 4: return { t, p, v };
++	default: return { v, p, q };
++	}
++}
++
++void approach(Color& c, const Color& target, float rate, float dt) {
++	c = mix(c, target, 1.f - std::exp(-rate * dt));
++}
++
++float clamp01(float t) {
++	return std::fmin(1.f, std::fmax(0.f, t));
++}
++
++float easeOut(float t)
++{
++	t = clamp01(t);
++	return 1.f - (1.f - t) * (1.f - t) * (1.f - t);
++}
++
++bool reducedMotion() {
++	return false;	// the PS4 has no such setting; kept for the themes' structure
++}
++
++void spring(float& pos, float& vel, float goal, float stiffness, float damping, float dt)
++{
++	// a few sub-steps keep stiff springs stable at low frame rates
++	for (int i = 0; i < 4; i++)
++	{
++		const float h = dt / 4;
++		vel += (stiffness * (goal - pos) - damping * vel) * h;
++		pos += vel * h;
++	}
++}
++
++// ---- fonts, textures, drawing ----
++
++ImFont *displayFont() {
++	return gDisplayFont != nullptr ? gDisplayFont : bodyFont();
++}
++
++ImFont *bodyFont()
++{
++	ImGuiIO& io = ImGui::GetIO();
++	return io.FontDefault != nullptr ? io.FontDefault : io.Fonts->Fonts[0];
++}
++
++ImTextureID coverTexture(const Game& g)
++{
++	static int loadsThisFrame;
++	static float frameTime = -1;
++	if (frameTime != gTime) {
++		frameTime = gTime;
++		loadsThisFrame = 0;
++	}
++	if (g.cover.empty() || imguiDriver == nullptr)
++		return {};
++	ImTextureID id = imguiDriver->getTexture(g.cover);
++	if (id != ImTextureID() || loadsThisFrame >= 2)
++		return id;
++	loadsThisFrame++;
++	FILE *f = nowide::fopen(g.cover.c_str(), "rb");
++	if (f == nullptr)
++		return {};
++	int w, h, n;
++	u8 *data = stbi_load_from_file(f, &w, &h, &n, 4);
++	fclose(f);
++	if (data == nullptr)
++		return {};
++	try {
++		id = imguiDriver->updateTexture(g.cover, data, w, h, false);
++	} catch (...) {
++	}
++	stbi_image_free(data);
++	return id;
++}
++
++namespace
++{
++ImTextureID makeTexture(const char *name, int w, int h, const std::vector<u8>& rgba)
++{
++	if (imguiDriver == nullptr)
++		return {};
++	ImTextureID id = imguiDriver->getTexture(name);
++	if (id == ImTextureID())
++		id = imguiDriver->updateTexture(name, rgba.data(), w, h, false);
++	return id;
++}
++}
++
++ImTextureID blobTexture()
++{
++	static std::vector<u8> pixels;
++	constexpr int S = 128;
++	if (pixels.empty())
++	{
++		pixels.resize(S * S * 4);
++		for (int y = 0; y < S; y++)
++			for (int x = 0; x < S; x++)
++			{
++				const float dx = (x + .5f) / S * 2 - 1, dy = (y + .5f) / S * 2 - 1;
++				const float d = clamp01(1 - std::sqrt(dx * dx + dy * dy));
++				u8 *p = &pixels[(y * S + x) * 4];
++				p[0] = p[1] = p[2] = 255;
++				p[3] = (u8)std::lround(d * d * (3 - 2 * d) * 255);
++			}
++	}
++	return makeTexture("decast.blob", S, S, pixels);
++}
++
++ImTextureID discTexture()
++{
++	static std::vector<u8> pixels;
++	constexpr int S = 256;
++	if (pixels.empty())
++	{
++		pixels.resize(S * S * 4);
++		for (int y = 0; y < S; y++)
++			for (int x = 0; x < S; x++)
++			{
++				const float dx = (x + .5f) / S * 2 - 1, dy = (y + .5f) / S * 2 - 1;
++				const float r = std::sqrt(dx * dx + dy * dy), a = std::atan2(dy, dx);
++				// pressed-in silver: bright and dark bands around the disc, faint rings, a
++				// rainbow sheen like the data side
++				float v = .72f + .2f * std::cos(a * 2) + .06f * std::cos(a * 6 + 1.1f);
++				v += .03f * std::sin(r * 140);
++				const Color rainbow = hsv(a / (2 * PI) + r * .35f, .35f, 1.f);
++				Color c = mix({ v, v, v * 1.03f }, rainbow, .16f + .1f * std::cos(a * 2 + .6f));
++				u8 *p = &pixels[(y * S + x) * 4];
++				p[0] = (u8)std::lround(clamp01(c.r) * 255);
++				p[1] = (u8)std::lround(clamp01(c.g) * 255);
++				p[2] = (u8)std::lround(clamp01(c.b) * 255);
++				p[3] = 255;
++			}
++	}
++	return makeTexture("decast.disc", S, S, pixels);
++}
++
++ImTextureID noiseTexture()
++{
++	static std::vector<u8> pixels;
++	constexpr int W = 256, H = 144;
++	if (pixels.empty())
++	{
++		pixels.resize(W * H * 4);
++		u32 x = 0x9e3779b9;
++		for (int i = 0; i < W * H; i++)
++		{
++			x ^= x << 13; x ^= x >> 17; x ^= x << 5;
++			const u8 v = (u8)(x & 0xff);
++			pixels[i * 4] = pixels[i * 4 + 1] = pixels[i * 4 + 2] = v;
++			pixels[i * 4 + 3] = 255;
++		}
++	}
++	return makeTexture("decast.noise", W, H, pixels);
++}
++
++ImVec2 whiteUV(ImDrawList *dl) {
++	return dl->_Data->TexUvWhitePixel;
++}
++
++void drawBlob(ImDrawList *dl, ImVec2 c, float r, ImU32 col)
++{
++	ImTextureID tex = blobTexture();
++	if (tex != ImTextureID())
++		dl->AddImage(tex, ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), ImVec2(0, 0), ImVec2(1, 1), col);
++}
++
++void drawQuad(ImDrawList *dl, ImTextureID tex, const ImVec2 p[4], const ImVec2 uv[4], const ImU32 col[4])
++{
++	const bool textured = tex != ImTextureID();
++	if (textured)
++		dl->PushTexture(tex);
++	const ImVec2 w = whiteUV(dl);
++	dl->PrimReserve(6, 4);
++	const ImDrawIdx base = (ImDrawIdx)dl->_VtxCurrentIdx;
++	for (int i = 0; i < 4; i++)
++		dl->PrimWriteVtx(p[i], textured ? uv[i] : w, col[i]);
++	dl->PrimWriteIdx(base); dl->PrimWriteIdx(base + 1); dl->PrimWriteIdx(base + 2);
++	dl->PrimWriteIdx(base); dl->PrimWriteIdx(base + 2); dl->PrimWriteIdx(base + 3);
++	if (textured)
++		dl->PopTexture();
++}
++
++float textWidth(ImFont *font, float size, const std::string& text) {
++	return font->CalcTextSizeA(size, FLT_MAX, 0.f, text.c_str()).x;
++}
++
++float drawText(ImDrawList *dl, ImFont *font, float size, ImVec2 pos, ImU32 col, const std::string& text,
++		float align, float maxWidth)
++{
++	std::string s = text;
++	float width = textWidth(font, size, s);
++	if (maxWidth > 0 && width > maxWidth)
++	{
++		const std::string dots = "...";
++		while (!s.empty() && textWidth(font, size, s + dots) > maxWidth)
++		{
++			s.pop_back();
++			while (!s.empty() && ((u8)s.back() & 0xC0) == 0x80)	// whole UTF-8 characters
++				s.pop_back();
++		}
++		s += dots;
++		width = textWidth(font, size, s);
++	}
++	dl->AddText(font, size, ImVec2(std::round(pos.x - width * align), std::round(pos.y)), col, s.c_str());
++	return width;
++}
++
++void drawButton(ImDrawList *dl, char which, ImVec2 c, float size, float alpha)
++{
++	const float r = size * .5f, t = std::fmax(1.5f, size * .1f);
++	dl->AddCircleFilled(c, r, IM_COL32(20, 24, 34, (int)(200 * alpha)));
++	const float k = r * .48f;
++	switch (which)
++	{
++	case 'x': {
++		const ImU32 col = IM_COL32(120, 170, 255, (int)(255 * alpha));
++		dl->AddLine(ImVec2(c.x - k, c.y - k), ImVec2(c.x + k, c.y + k), col, t);
++		dl->AddLine(ImVec2(c.x - k, c.y + k), ImVec2(c.x + k, c.y - k), col, t);
++		break;
++	}
++	case 'o':
++		dl->AddCircle(c, k * 1.05f, IM_COL32(255, 100, 110, (int)(255 * alpha)), 24, t);
++		break;
++	case 's':
++		dl->AddRect(ImVec2(c.x - k * .9f, c.y - k * .9f), ImVec2(c.x + k * .9f, c.y + k * .9f),
++				IM_COL32(240, 140, 220, (int)(255 * alpha)), 0, 0, t);
++		break;
++	case 't':
++		dl->AddTriangle(ImVec2(c.x, c.y - k * 1.05f), ImVec2(c.x + k * 1.05f, c.y + k * .75f), ImVec2(c.x - k * 1.05f, c.y + k * .75f),
++				IM_COL32(90, 220, 180, (int)(255 * alpha)), t);
++		break;
++	}
++}
++
++void drawHints(Frame& f, float alpha)
++{
++	if (alpha <= 0.f)
++		return;
++	const float size = f.h * .028f, y = f.h * .935f, gap = size * .55f;
++	struct Hint { char b; std::string label; };
++	const Hint hints[] = {
++		{ 'x', "Start" }, { 's', std::string("Theme: ") + themeName(gThemeIndex) }, { 't', "Settings" },
++	};
++	ImFont *font = bodyFont();
++	const float fs = f.h * .022f;
++	float total = 0;
++	for (const Hint& h : hints)
++		total += size + gap + textWidth(font, fs, h.label) + size * 1.4f;
++	float x = f.w * .95f - total;
++	for (const Hint& h : hints)
++	{
++		drawButton(f.dl, h.b, ImVec2(x + size / 2, y), size, alpha);
++		x += size + gap;
++		x += drawText(f.dl, font, fs, ImVec2(x, y - fs * .62f), IM_COL32(220, 226, 238, (int)(230 * alpha)), h.label);
++		x += size * 1.4f;
++	}
++}
++
++void drawEmptyLibrary(Frame& f)
++{
++	drawText(f.dl, displayFont(), f.h * .045f, ImVec2(f.w / 2, f.h * .42f), IM_COL32(240, 242, 248, 255),
++			"Your library is empty", .5f);
++	drawText(f.dl, bodyFont(), f.h * .026f, ImVec2(f.w / 2, f.h * .51f), IM_COL32(170, 178, 196, 255),
++			"Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here.", .5f);
++}
++
++} // namespace launcher
++
++using namespace launcher;
++
++void launcher_pre_frame()
++{
++	ImGuiIO& io = ImGui::GetIO();
++	// Flycast rebuilds its font atlas when the UI scale or language changes: add Michroma back
++	if (gDisplayFont != nullptr && !io.Fonts->Fonts.contains(gDisplayFont))
++		gDisplayFont = nullptr;
++	if (gDisplayFont == nullptr && !gFontFailed)
++	{
++		FILE *f = fopen(kFontPath, "rb");
++		if (f != nullptr)
++		{
++			fclose(f);
++			ImFontConfig cfg;
++			cfg.MergeMode = false;
++			gDisplayFont = io.Fonts->AddFontFromFileTTF(kFontPath, 32.f, &cfg);
++		}
++		if (gDisplayFont == nullptr)
++		{
++			gFontFailed = true;
++			ps4_boot_trace("launcher: display font missing, using Flycast's");
++		}
++	}
++}
++
++bool launcher_draw()
++{
++	if (imguiDriver == nullptr)
++		return false;
++	const auto now = std::chrono::steady_clock::now();
++	static bool started;
++	if (!started)
++	{
++		started = true;
++		gLast = now;
++		setTheme(config::loadInt("decast", "LauncherTheme", 0));
++		if (!gPaletteThread)
++		{
++			gPaletteThread = true;
++			std::thread(paletteWorker).detach();
++		}
++		ps4_boot_trace("launcher: home screen up");
++	}
++	gTime += std::min(.05f, std::chrono::duration<float>(now - gLast).count());
++	gLast = now;
++	soundStart();
++
++	if (gTime >= gNextRefresh)
++	{
++		refreshLibrary();
++		gNextRefresh = gTime + .5f;
++	}
++
++	Frame f = makeFrame();
++	handleInput(f);
++	f = makeFrame();
++
++	// theme switch: 0.22 s fade out, swap, 0.22 s fade in
++	float fade = 0.f;
++	if (gPendingTheme >= 0)
++	{
++		const float p = (gTime - gFadeAt) / .22f;
++		if (p >= 1.f)
++		{
++			setTheme(gPendingTheme);
++			gPendingTheme = -1;
++			gFadeAt = gTime;
++			gToast = std::string("Theme: ") + themeName(gThemeIndex);
++			gToastAt = gTime;
++			f = makeFrame();
++		}
++		else
++			fade = p;
++	}
++	else if (gTime - gFadeAt < .22f)
++		fade = 1.f - (gTime - gFadeAt) / .22f;
++
++	gTheme->draw(f);
++
++	if (fade > 0.f)
++		f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * clamp01(fade))));
++	const float toastAge = gTime - gToastAt;
++	if (toastAge < 1.6f)
++	{
++		const float a = clamp01(std::fmin(toastAge / .15f, (1.6f - toastAge) / .3f));
++		const float fs = f.h * .03f, tw = textWidth(bodyFont(), fs, gToast);
++		const ImVec2 c(f.w / 2, f.h * .06f);
++		f.dl->AddRectFilled(ImVec2(c.x - tw / 2 - fs, c.y - fs * .2f), ImVec2(c.x + tw / 2 + fs, c.y + fs * 1.5f),
++				IM_COL32(10, 12, 18, (int)(200 * a)), fs * .4f);
++		drawText(f.dl, bodyFont(), fs, ImVec2(c.x, c.y + fs * .08f), IM_COL32(255, 255, 255, (int)(255 * a)), gToast, .5f);
++	}
++
++	// the start animation is over: boot the game (Flycast shows its loading screen)
++	if (gLaunchAt >= 0 && gTime - gLaunchAt >= gTheme->launchSeconds())
++	{
++		gLaunchAt = -1;
++		if (!gGames.empty())
++		{
++			const Game& g = gGames[gSel];
++			char line[600];
++			snprintf(line, sizeof(line), "launcher: starting %s", g.e.path.c_str());
++			ps4_boot_trace(line);
++			soundStop();
++			gui_ps4_start_game(g.e.path, g.e.title);
++		}
++	}
++	return true;
++}
+diff --git a/shell/ps4/launcher/launcher.h b/shell/ps4/launcher/launcher.h
+new file mode 100644
+index 000000000..82268f8f0
+--- /dev/null
++++ b/shell/ps4/launcher/launcher.h
+@@ -0,0 +1,46 @@
++/*
++	DeCast-S4: the PS4 home screen (launcher) that replaces Flycast's game list.
++
++	Four themes share one library, cover and input layer: Orbit (discs on a ring), Channel (a TV
++	set), Shelf (box art in 3D) and Cross bar. Square cycles them; the choice is saved.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#pragma once
++#include "types.h"
++#include <string>
++#include <vector>
++
++// One game in the library, as the GUI's scanner and box-art database know it (ui/gui.cpp).
++struct LauncherEntry
++{
++	std::string path;		// what gui_start_game() takes
++	std::string fileName;	// last path component
++	std::string title;		// from the disc header, else the file name
++	std::string productId;	// e.g. T13002N, MK-51117 (empty until the disc has been read)
++	u32 region = 0;			// GameBoxart::Region bits
++	std::string coverPath;	// box art on disk, if any
++};
++
++// ui/gui.cpp, PS4 only
++void gui_ps4_list_games(std::vector<LauncherEntry>& out);
++void gui_ps4_start_game(const std::string& path, const std::string& title);
++void gui_ps4_open_settings();
++
++// Called before ImGui::NewFrame (fonts can only be added between frames).
++void launcher_pre_frame();
++// Draws the home screen for this frame; false when it can't (then Flycast's list is shown).
++bool launcher_draw();
+diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
+new file mode 100644
+index 000000000..5b633160a
+--- /dev/null
++++ b/shell/ps4/launcher/launcher_internal.h
+@@ -0,0 +1,136 @@
++/*
++	DeCast-S4 launcher internals: what the core (launcher.cpp) shares with the themes
++	(theme_*.cpp), covers (covers.cpp) and sounds (sound.cpp).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#pragma once
++#include "launcher.h"
++#include "imgui.h"
++
++#include <cmath>
++#include <memory>
++#include <string>
++#include <vector>
++
++namespace launcher
++{
++
++constexpr float PI = 3.14159265f;
++
++struct Color
++{
++	float r = 0, g = 0, b = 0;
++	ImU32 u32(float a = 1.f) const {
++		auto c = [](float v) { return (int)std::lround(std::fmin(1.f, std::fmax(0.f, v)) * 255.f); };
++		return IM_COL32(c(r), c(g), c(b), c(a));
++	}
++};
++Color mix(const Color& a, const Color& b, float t);
++Color hsv(float h, float s, float v);
++// Moves a colour toward a target at a rate (frame-rate independent)
++void approach(Color& c, const Color& target, float rate, float dt);
++
++struct Game
++{
++	LauncherEntry e;
++	std::string cover;		// cover image to show (user's, downloaded, from the disc), or empty
++	std::string format;		// GDI, CHD, CDI
++	std::string regionName;	// USA, Japan, Europe
++	Color c1, c2;			// bright and dark colour of the game (from its cover once read)
++	bool paletteFromCover = false;
++};
++
++// Everything a theme needs for one frame.
++struct Frame
++{
++	ImDrawList *dl;
++	float w, h;				// screen size
++	float t, dt;			// seconds since the launcher started, frame time
++	std::vector<Game> *games;
++	int sel;				// selected game
++	int goal;				// selection without wrapping (themes ride springs toward it)
++	float selectedAt;		// when the selection last changed
++	float launchAt;			// when Start was pressed, or < 0
++};
++
++class Theme
++{
++public:
++	virtual ~Theme() = default;
++	virtual const char *name() const = 0;
++	virtual void draw(Frame& f) = 0;
++	// Seconds the start animation takes before the game is booted.
++	virtual float launchSeconds() const { return 1.4f; }
++	// Directional input: true when the theme used it (the Cross bar has two axes).
++	virtual bool navigate(Frame& f, int dx, int dy) { return false; }
++	// Cross: true when the theme handled it itself (Cross bar menus other than Games).
++	virtual bool activate(Frame& f) { return false; }
++};
++std::unique_ptr<Theme> makeOrbit();
++std::unique_ptr<Theme> makeChannel();
++std::unique_ptr<Theme> makeShelf();
++std::unique_ptr<Theme> makeCrossBar();
++constexpr int THEME_COUNT = 4;
++const char *themeName(int index);
++
++// Requests from themes to the core
++void requestTheme(int index);
++int currentTheme();
++void openSettings();
++void moveSelection(int delta);
++
++// Drawing helpers (launcher.cpp)
++ImFont *displayFont();	// Michroma
++ImFont *bodyFont();		// Flycast's UI font (Roboto, with Font Awesome icons)
++ImTextureID coverTexture(const Game& g);	// 0 while loading or without a cover
++ImTextureID blobTexture();		// soft round light, white
++ImTextureID discTexture();		// silver disc surface
++ImTextureID noiseTexture();		// TV static
++ImVec2 whiteUV(ImDrawList *dl);
++void drawBlob(ImDrawList *dl, ImVec2 c, float r, ImU32 col);
++// Text: align 0 = left, .5 = centre, 1 = right; clipped with an ellipsis at maxWidth (0 = none)
++float drawText(ImDrawList *dl, ImFont *font, float size, ImVec2 pos, ImU32 col, const std::string& text,
++		float align = 0.f, float maxWidth = 0.f);
++float textWidth(ImFont *font, float size, const std::string& text);
++// The PS button symbols: 'x' cross, 'o' circle, 's' square, 't' triangle
++void drawButton(ImDrawList *dl, char which, ImVec2 c, float size, float alpha = 1.f);
++// The control hints along the bottom of the screen
++void drawHints(Frame& f, float alpha = 1.f);
++// A textured (or plain, tex = 0) quad with per-corner uv and colour: p0..p3 clockwise from top left
++void drawQuad(ImDrawList *dl, ImTextureID tex, const ImVec2 p[4], const ImVec2 uv[4], const ImU32 col[4]);
++// Library empty: the message in the middle of the screen
++void drawEmptyLibrary(Frame& f);
++float easeOut(float t);
++float clamp01(float t);
++// Spring toward goal (critically damped-ish); returns the new position
++void spring(float& pos, float& vel, float goal, float stiffness, float damping, float dt);
++bool reducedMotion();
++
++// covers.cpp
++// The cover to show for a game: the user's own file in /data/DeCast-S4/covers wins, else the
++// box-art database's (downloaded from libretro, or the disc's own 0GDTEX image).
++std::string userCover(const LauncherEntry& e);
++// Bright/dark colours from a cover image (false when it can't be read)
++bool paletteFromImage(const std::string& path, Color& c1, Color& c2);
++
++// sound.cpp
++enum class Sound { Move, Category, Confirm, Launch, Back, Error };
++void soundStart();
++void soundStop();
++void playSound(Sound s);
++
++} // namespace launcher
+diff --git a/shell/ps4/launcher/libretro_scraper.h b/shell/ps4/launcher/libretro_scraper.h
+new file mode 100644
+index 000000000..e1c273f8e
+--- /dev/null
++++ b/shell/ps4/launcher/libretro_scraper.h
+@@ -0,0 +1,51 @@
++/*
++	DeCast-S4: box art from the libretro thumbnail server, matched by the disc's serial.
++
++	The serial (the IP.BIN product number Flycast's offline scraper reads, e.g. T13002N, MK-51117)
++	is looked up in libretro-database's Redump DAT for the Dreamcast, which gives the Redump name;
++	the thumbnail server names its box art after it. The DAT is downloaded once and kept with the
++	box art. Used on PS4 instead of TheGamesDB (core/ui/boxart/boxart.cpp).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#pragma once
++#include "ui/boxart/scraper.h"
++
++#include <string>
++#include <unordered_map>
++#include <vector>
++
++class LibretroScraper : public Scraper
++{
++public:
++	bool initialize(const std::string& saveDirectory) override;
++	// Throws std::runtime_error on network errors (the box-art thread retries those later).
++	void scrape(GameBoxart& item) override;
++
++private:
++	struct DatGame
++	{
++		std::string name;		// Redump name, e.g. "Sonic Adventure 2 (USA) (En,Ja,Fr,De,Es)"
++		std::string region;		// "USA", "Japan", "Europe", "USA, Europe", ...
++	};
++	bool loadDat();
++	bool parseDat(const std::string& text);
++	const DatGame *find(const std::string& serial, u32 region) const;
++
++	std::string directory;
++	std::unordered_map<std::string, std::vector<DatGame>> bySerial;	// normalized serial
++	u64 nextDatAttempt = 0;
++};
+diff --git a/shell/ps4/launcher/sound.cpp b/shell/ps4/launcher/sound.cpp
+new file mode 100644
+index 000000000..dd665471f
+--- /dev/null
++++ b/shell/ps4/launcher/sound.cpp
+@@ -0,0 +1,193 @@
++/*
++	DeCast-S4 launcher sounds: short WAVs (48 kHz stereo 16-bit, /app0/launcher/sounds) mixed on
++	an audio-out port of their own while the home screen is up. The port closes when a game starts,
++	so the game's audio backend has the output to itself.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "oslib/oslib.h"
++
++#include <orbis/AudioOut.h>
++
++#include <algorithm>
++#include <atomic>
++#include <cstdio>
++#include <cstring>
++#include <mutex>
++#include <thread>
++#include <vector>
++
++namespace launcher
++{
++namespace
++{
++constexpr int32_t kSystemUser = 0xFF;
++constexpr u32 kGrain = 256;
++constexpr int SOUND_COUNT = 6;
++constexpr int VOICES = 6;
++const char *const kNames[SOUND_COUNT] = { "move", "category", "confirm", "launch", "back", "error" };
++const float kGain[SOUND_COUNT] = { .45f, .55f, .6f, .7f, .5f, .55f };
++
++std::vector<s16> gClips[SOUND_COUNT];	// interleaved stereo
++bool gLoaded;
++
++struct Voice { int clip = -1; size_t pos = 0; };
++std::mutex gMutex;
++Voice gVoices[VOICES];
++
++std::atomic<bool> gRunning;
++std::thread gThread;
++int32_t gPort = -1;
++
++u32 le32(const u8 *p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((u32)p[3] << 24); }
++u16 le16(const u8 *p) { return p[0] | (p[1] << 8); }
++
++// PCM 16-bit WAV, mono or stereo, into interleaved stereo
++bool loadWav(const std::string& path, std::vector<s16>& out)
++{
++	FILE *f = fopen(path.c_str(), "rb");
++	if (f == nullptr)
++		return false;
++	std::vector<u8> file;
++	u8 buf[8192];
++	size_t n;
++	while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
++		file.insert(file.end(), buf, buf + n);
++	fclose(f);
++	if (file.size() < 12 || memcmp(&file[0], "RIFF", 4) || memcmp(&file[8], "WAVE", 4))
++		return false;
++	int channels = 0, bits = 0;
++	size_t p = 12;
++	while (p + 8 <= file.size())
++	{
++		const u32 size = le32(&file[p + 4]);
++		const size_t body = p + 8;
++		if (body + size > file.size())
++			break;
++		if (!memcmp(&file[p], "fmt ", 4) && size >= 16)
++		{
++			channels = le16(&file[body + 2]);
++			bits = le16(&file[body + 14]);
++		}
++		else if (!memcmp(&file[p], "data", 4) && bits == 16 && (channels == 1 || channels == 2))
++		{
++			const size_t frames = size / (2 * channels);
++			out.resize(frames * 2);
++			for (size_t i = 0; i < frames; i++)
++			{
++				const s16 l = (s16)le16(&file[body + i * 2 * channels]);
++				out[i * 2] = l;
++				out[i * 2 + 1] = channels == 2 ? (s16)le16(&file[body + i * 4 + 2]) : l;
++			}
++			return true;
++		}
++		p = body + size + (size & 1);
++	}
++	return false;
++}
++
++void outputLoop()
++{
++	ThreadName _("LauncherSound");
++	alignas(64) s16 out[kGrain * 2];
++	float mixBuf[kGrain * 2];
++	while (gRunning)
++	{
++		std::fill(std::begin(mixBuf), std::end(mixBuf), 0.f);
++		{
++			std::lock_guard<std::mutex> lock(gMutex);
++			for (Voice& v : gVoices)
++			{
++				if (v.clip < 0)
++					continue;
++				const std::vector<s16>& clip = gClips[v.clip];
++				const float gain = kGain[v.clip];
++				const size_t n = std::min<size_t>(kGrain * 2, clip.size() - v.pos);
++				for (size_t i = 0; i < n; i++)
++					mixBuf[i] += clip[v.pos + i] * gain;
++				v.pos += n;
++				if (v.pos >= clip.size())
++					v.clip = -1;
++			}
++		}
++		for (u32 i = 0; i < kGrain * 2; i++)
++			out[i] = (s16)std::clamp(mixBuf[i], -32768.f, 32767.f);
++		sceAudioOutOutput(gPort, out);	// blocks for one grain
++	}
++	sceAudioOutOutput(gPort, nullptr);	// wait for the last grain
++}
++} // namespace
++
++void soundStart()
++{
++	if (gRunning)
++		return;
++	if (!gLoaded)
++	{
++		gLoaded = true;
++		for (int i = 0; i < SOUND_COUNT; i++)
++			loadWav(std::string("/app0/launcher/sounds/") + kNames[i] + ".wav", gClips[i]);
++	}
++	const int32_t init = sceAudioOutInit();
++	if (init != 0 && init != (int32_t)0x8026000E)	// already initialized
++		return;
++	gPort = sceAudioOutOpen(kSystemUser, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0, kGrain, 48000,
++			ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
++	if (gPort < 0)
++		return;
++	int32_t volume[2] = { 32768, 32768 };
++	sceAudioOutSetVolume(gPort, 0x3, volume);
++	gRunning = true;
++	gThread = std::thread(outputLoop);
++}
++
++void soundStop()
++{
++	if (!gRunning)
++		return;
++	gRunning = false;
++	if (gThread.joinable())
++		gThread.join();
++	sceAudioOutClose(gPort);
++	gPort = -1;
++	std::lock_guard<std::mutex> lock(gMutex);
++	for (Voice& v : gVoices)
++		v.clip = -1;
++}
++
++void playSound(Sound s)
++{
++	const int clip = (int)s;
++	if (!gRunning || clip < 0 || clip >= SOUND_COUNT || gClips[clip].empty())
++		return;
++	std::lock_guard<std::mutex> lock(gMutex);
++	// a free voice, else the one closest to its end
++	Voice *best = &gVoices[0];
++	for (Voice& v : gVoices)
++	{
++		if (v.clip < 0) {
++			best = &v;
++			break;
++		}
++		if (v.pos > best->pos)
++			best = &v;
++	}
++	best->clip = clip;
++	best->pos = 0;
++}
++
++} // namespace launcher
+diff --git a/shell/ps4/launcher/theme_channel.cpp b/shell/ps4/launcher/theme_channel.cpp
+new file mode 100644
+index 000000000..627a4ed56
+--- /dev/null
++++ b/shell/ps4/launcher/theme_channel.cpp
+@@ -0,0 +1,326 @@
++/*
++	DeCast-S4 launcher, theme "Channel": every game is a TV channel. The cover fills the screen
++	like a broadcast with a slow camera drift (a synthwave scene in the game's colours when there
++	is no cover); changing channel rolls the picture through static. Starting a game switches the
++	set off.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++
++#include <algorithm>
++#include <ctime>
++
++namespace launcher
++{
++namespace
++{
++
++class Channel : public Theme
++{
++public:
++	const char *name() const override { return "Channel"; }
++	float launchSeconds() const override { return 1.1f; }
++
++	void draw(Frame& f) override
++	{
++		std::vector<Game>& games = *f.games;
++		const int n = (int)games.size();
++		ImDrawList *dl = f.dl;
++		dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 255));
++		if (n == 0)
++		{
++			drawStatic(f, .35f);
++			drawEmptyLibrary(f);
++			drawHints(f);
++			return;
++		}
++		if (!started)
++		{
++			started = true;
++			guidePos = (float)f.goal;
++		}
++		spring(guidePos, guideVel, (float)f.goal, 120.f, 22.f, f.dt);
++		const Game& g = games[f.sel];
++		const float age = f.t - f.selectedAt;
++		const float launch = f.launchAt >= 0 ? clamp01((f.t - f.launchAt) / launchSeconds()) : 0.f;
++
++		if (launch > 0)
++		{
++			drawPowerOff(f, g, launch);
++			return;
++		}
++
++		// the picture rolls down into place after a change
++		const float roll = age < .5f ? (1 - easeOut(age / .5f)) * f.h * .35f : 0.f;
++		drawPicture(f, g, ImVec4(0, roll, f.w, f.h + roll), 1.f, 0.f);
++		if (roll > 0)
++		{
++			drawPicture(f, g, ImVec4(0, roll - f.h, f.w, roll), 1.f, 0.f);
++			// the blanking bar between frames
++			dl->AddRectFilled(ImVec2(0, roll - f.h * .03f), ImVec2(f.w, roll + f.h * .015f), IM_COL32(0, 0, 0, 230));
++		}
++		// static: a burst on change, a whisper otherwise
++		drawStatic(f, std::max(.035f, 1.f - age / .32f));
++
++		drawLowerThird(f, g, age);
++		drawGuide(f);
++		drawChannelNumber(f, age);
++		drawTube(f);
++		drawHints(f);
++	}
++
++private:
++	// The broadcast: the cover with a slow drift, or a synthwave scene in the game's colours
++	void drawPicture(Frame& f, const Game& g, ImVec4 r, float alpha, float whiten)
++	{
++		ImDrawList *dl = f.dl;
++		const ImTextureID tex = coverTexture(g);
++		const float phase = (float)(std::hash<std::string>()(g.e.path) % 1000) * .01f;
++		if (tex != ImTextureID())
++		{
++			const float zoom = 1.18f + .07f * std::sin(f.t * .09f + phase);
++			const float aspect = (r.w - r.y) / (r.z - r.x);		// screen height / width
++			const float uw = 1.f / zoom, uh = aspect / zoom;
++			const float cu = .5f + (.5f - uw * .5f) * std::sin(f.t * .061f + phase);
++			const float cv = .5f + (.5f - uh * .5f) * .8f * std::cos(f.t * .047f + phase * 1.3f);
++			dl->AddImage(tex, ImVec2(r.x, r.y), ImVec2(r.z, r.w), ImVec2(cu - uw / 2, cv - uh / 2), ImVec2(cu + uw / 2, cv + uh / 2),
++					IM_COL32(255, 255, 255, (int)(255 * alpha)));
++			// the set's colour: a wash of the game's dark tone
++			dl->AddRectFilled(ImVec2(r.x, r.y), ImVec2(r.z, r.w), g.c2.u32(.28f * alpha * (1 - whiten)));
++		}
++		else
++			drawSynthwave(f, g, r, alpha);
++		if (whiten > 0)
++			dl->AddRectFilled(ImVec2(r.x, r.y), ImVec2(r.z, r.w), IM_COL32(255, 255, 255, (int)(255 * whiten * alpha)));
++	}
++
++	void drawSynthwave(Frame& f, const Game& g, ImVec4 r, float alpha)
++	{
++		ImDrawList *dl = f.dl;
++		const float w = r.z - r.x, h = r.w - r.y;
++		const float horizon = r.y + h * .58f;
++		const Color sky1 = mix(g.c2, { 0, 0, 0 }, .3f), sky2 = mix(g.c1, { 1, .2f, .6f }, .35f);
++		dl->AddRectFilledMultiColor(ImVec2(r.x, r.y), ImVec2(r.z, horizon), sky1.u32(alpha), sky1.u32(alpha), sky2.u32(alpha), sky2.u32(alpha));
++		// the sun, cut by bars that thicken toward the horizon
++		const ImVec2 sun(r.x + w * .5f, horizon - h * .14f);
++		const float sr = h * .2f;
++		dl->AddCircleFilled(sun, sr, mix(g.c1, { 1, .9f, .4f }, .5f).u32(alpha), 64);
++		for (int i = 0; i < 7; i++)
++		{
++			const float y = sun.y + sr * (.05f + i * .14f) + std::fmod(f.t * 6.f, sr * .14f);
++			const float th = 1.5f + i * 1.6f;
++			if (y > horizon)
++				break;
++			const Color c = mix(sky1, sky2, clamp01((y - r.y) / (horizon - r.y)));
++			dl->AddRectFilled(ImVec2(sun.x - sr - 2, y), ImVec2(sun.x + sr + 2, std::min(horizon, y + th)), c.u32(alpha));
++		}
++		// mountains
++		ImVec2 ridge[24];
++		for (int i = 0; i < 24; i++)
++		{
++			const float x = (float)i / 23;
++			const float m = .5f + .5f * std::sin(x * 13.f + 1.7f) * std::sin(x * 5.3f + .3f);
++			ridge[i] = ImVec2(r.x + x * w, horizon - h * .03f - m * h * .09f * (std::fabs(x - .5f) * 1.6f + .2f));
++		}
++		for (int i = 0; i < 23; i++)
++		{
++			const ImVec2 q[4] = { ridge[i], ridge[i + 1], ImVec2(ridge[i + 1].x, horizon), ImVec2(ridge[i].x, horizon) };
++			const ImVec2 uv[4] {};
++			const ImU32 c[4] = { IM_COL32(10, 4, 24, (int)(255 * alpha)), IM_COL32(10, 4, 24, (int)(255 * alpha)),
++				IM_COL32(20, 8, 40, (int)(255 * alpha)), IM_COL32(20, 8, 40, (int)(255 * alpha)) };
++			drawQuad(dl, ImTextureID(), q, uv, c);
++		}
++		// the grid running toward us
++		dl->AddRectFilledMultiColor(ImVec2(r.x, horizon), ImVec2(r.z, r.w), IM_COL32(12, 2, 30, (int)(255 * alpha)),
++				IM_COL32(12, 2, 30, (int)(255 * alpha)), IM_COL32(2, 0, 8, (int)(255 * alpha)), IM_COL32(2, 0, 8, (int)(255 * alpha)));
++		const ImU32 line = mix(g.c1, { 1, .3f, .9f }, .4f).u32(.8f * alpha);
++		for (int i = -14; i <= 14; i++)
++			dl->AddLine(ImVec2(r.x + w * .5f + i * w * .012f, horizon), ImVec2(r.x + w * .5f + i * w * .16f, r.w), line, 1.5f);
++		for (int i = 0; i < 14; i++)
++		{
++			const float z = std::fmod(i / 14.f + f.t * .12f, 1.f);
++			const float y = horizon + (r.w - horizon) * z * z;
++			dl->AddLine(ImVec2(r.x, y), ImVec2(r.z, y), mix(g.c1, { 1, .3f, .9f }, .4f).u32(alpha * (.2f + .8f * z)), 1.f + z * 1.5f);
++		}
++		drawBlob(dl, ImVec2(r.x + w * .5f, horizon), w * .3f, mix(g.c1, { 1, .3f, .9f }, .4f).u32(.35f * alpha));
++	}
++
++	void drawStatic(Frame& f, float amount)
++	{
++		const ImTextureID tex = noiseTexture();
++		if (tex == ImTextureID() || amount <= 0)
++			return;
++		// a new pattern every frame: jump around the texture (and flip it) by frame count
++		frame++;
++		// (the sampler clamps: stay inside 0..1)
++		const float u = ((frame * 0.618034f) - std::floor(frame * 0.618034f)) * .4f;
++		const float v = ((frame * 0.414214f) - std::floor(frame * 0.414214f)) * .45f;
++		const bool flip = frame & 1;
++		f.dl->AddImage(tex, ImVec2(0, 0), ImVec2(f.w, f.h), ImVec2(flip ? u + .6f : u, v), ImVec2(flip ? u : u + .6f, v + .55f),
++				IM_COL32(255, 255, 255, (int)(255 * clamp01(amount))));
++	}
++
++	void drawLowerThird(Frame& f, const Game& g, float age)
++	{
++		ImDrawList *dl = f.dl;
++		const float in = easeOut((age - .18f) / .45f);
++		const float top = f.h * .66f, bottom = f.h * .88f;
++		dl->AddRectFilledMultiColor(ImVec2(0, top - f.h * .08f), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0),
++				IM_COL32(0, 0, 0, 235), IM_COL32(0, 0, 0, 235));
++		const float slide = (1 - in) * -f.w * .08f;
++		const float x = f.w * .06f + slide;
++		// "now playing" card
++		const float card = bottom - top;
++		const ImTextureID tex = coverTexture(g);
++		const ImVec2 c0(x, top), c1(x + card, bottom);
++		dl->AddRectFilled(ImVec2(c0.x + 6, c0.y + 8), ImVec2(c1.x + 6, c1.y + 8), IM_COL32(0, 0, 0, (int)(140 * in)), 6.f);
++		if (tex != ImTextureID())
++			dl->AddImageRounded(tex, c0, c1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, (int)(255 * in)), 6.f);
++		else
++			dl->AddRectFilledMultiColor(c0, c1, g.c1.u32(in), g.c2.u32(in), g.c2.u32(in), g.c1.u32(in));
++		dl->AddRect(c0, c1, IM_COL32(255, 255, 255, (int)(90 * in)), 6.f, 0, 1.5f);
++
++		const float tx = c1.x + f.w * .025f;
++		// LIVE tag and an accent bar in the game's colour
++		dl->AddRectFilled(ImVec2(tx, top), ImVec2(tx + f.h * .075f, top + f.h * .03f), IM_COL32(220, 30, 40, (int)(255 * in)), 3.f);
++		drawText(dl, displayFont(), f.h * .017f, ImVec2(tx + f.h * .0375f, top + f.h * .006f), IM_COL32(255, 255, 255, (int)(255 * in)), "LIVE", .5f);
++		const float blink = .5f + .5f * std::sin(f.t * 5.f);
++		dl->AddCircleFilled(ImVec2(tx + f.h * .09f, top + f.h * .015f), f.h * .006f, IM_COL32(255, 60, 60, (int)(255 * in * blink)));
++		const float titleSize = f.h * .055f;
++		// RGB split that settles after the change
++		const float split = (1 - easeOut(age / .6f)) * f.h * .008f + 1.2f;
++		const float maxW = f.w * .94f - tx;
++		const ImVec2 tp(tx, top + f.h * .045f);
++		drawText(dl, displayFont(), titleSize, ImVec2(tp.x - split, tp.y), IM_COL32(255, 40, 60, (int)(150 * in)), g.e.title, 0, maxW);
++		drawText(dl, displayFont(), titleSize, ImVec2(tp.x + split, tp.y), IM_COL32(40, 200, 255, (int)(150 * in)), g.e.title, 0, maxW);
++		drawText(dl, displayFont(), titleSize, tp, IM_COL32(255, 255, 255, (int)(255 * in)), g.e.title, 0, maxW);
++		std::string info = g.format;
++		if (!g.regionName.empty())
++			info += "   \xC2\xB7   " + g.regionName;
++		if (!g.e.productId.empty())
++			info += "   \xC2\xB7   " + g.e.productId;
++		drawText(dl, bodyFont(), f.h * .026f, ImVec2(tx, top + f.h * .125f), mix(g.c1, { 1, 1, 1 }, .5f).u32(in), info);
++		// the accent line, drawn across
++		const float lineW = (f.w * .94f - tx) * easeOut((age - .3f) / .6f);
++		dl->AddRectFilled(ImVec2(tx, bottom - 3), ImVec2(tx + lineW, bottom), g.c1.u32(in));
++	}
++
++	// The channel guide: neighbouring channels at the top, riding a spring
++	void drawGuide(Frame& f)
++	{
++		std::vector<Game>& games = *f.games;
++		const int n = (int)games.size();
++		ImDrawList *dl = f.dl;
++		const float y = f.h * .05f, hgt = f.h * .1f, step = hgt * 1.25f;
++		const float cx = f.w * .5f;
++		dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(f.w, y + hgt * 1.6f), IM_COL32(0, 0, 0, 200), IM_COL32(0, 0, 0, 200),
++				IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0));
++		const int span = std::min(5, n - 1);
++		for (int i = (int)std::floor(guidePos) - span - 1; i <= (int)std::ceil(guidePos) + span + 1; i++)
++		{
++			const float k = i - guidePos;
++			if (std::fabs(k) > span + .5f && n > 1)
++				continue;
++			if (n == 1 && i != f.goal)
++				continue;
++			const int idx = ((i % n) + n) % n;
++			const float near = clamp01(1 - std::fabs(k));
++			const float s = hgt * (.72f + .28f * near);
++			const float x = cx + k * step;
++			const float a = clamp01(1.2f - std::fabs(k) / (span + .5f)) * (.45f + .55f * near);
++			const ImVec2 p0(x - s / 2, y + (hgt - s) / 2), p1(x + s / 2, y + (hgt + s) / 2);
++			const ImTextureID tex = coverTexture(games[idx]);
++			if (tex != ImTextureID())
++				dl->AddImageRounded(tex, p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, (int)(255 * a)), 4.f);
++			else
++				dl->AddRectFilledMultiColor(p0, p1, games[idx].c1.u32(a), games[idx].c2.u32(a), games[idx].c2.u32(a), games[idx].c1.u32(a));
++			if (near > .01f)
++				dl->AddRect(ImVec2(p0.x - 3, p0.y - 3), ImVec2(p1.x + 3, p1.y + 3), IM_COL32(255, 255, 255, (int)(230 * near)), 6.f, 0, 2.f);
++			char num[8];
++			snprintf(num, sizeof(num), "%02d", idx + 1);
++			drawText(dl, displayFont(), f.h * .016f, ImVec2(x, p1.y + f.h * .008f), IM_COL32(255, 255, 255, (int)(200 * a)), num, .5f);
++		}
++	}
++
++	void drawChannelNumber(Frame& f, float age)
++	{
++		char text[16];
++		snprintf(text, sizeof(text), "CH %02d", f.sel + 1);
++		const float size = f.h * .07f;
++		const ImVec2 p(f.w * .94f, f.h * .2f);
++		// on screen for a while after a change, like a real set; then faint
++		const float a = age < 2.5f ? 1.f : std::max(.25f, 1.f - (age - 2.5f) / .6f);
++		const float jitter = age < .3f ? (std::sin(f.t * 90.f) * f.h * .004f) : 0.f;
++		drawText(f.dl, displayFont(), size, ImVec2(p.x - 3 + jitter, p.y), IM_COL32(255, 0, 60, (int)(120 * a)), text, 1.f);
++		drawText(f.dl, displayFont(), size, ImVec2(p.x + 3 + jitter, p.y), IM_COL32(0, 220, 255, (int)(120 * a)), text, 1.f);
++		drawText(f.dl, displayFont(), size, ImVec2(p.x + jitter, p.y), IM_COL32(120, 255, 140, (int)(235 * a)), text, 1.f);
++	}
++
++	// Scanlines and the curved tube's dark corners
++	void drawTube(Frame& f)
++	{
++		ImDrawList *dl = f.dl;
++		for (float y = 0; y < f.h; y += 4.f)
++			dl->AddRectFilled(ImVec2(0, y), ImVec2(f.w, y + 1.5f), IM_COL32(0, 0, 0, 46));
++		// a bright band drifting down the tube
++		const float band = std::fmod(f.t * .12f, 1.3f) * f.h - f.h * .15f;
++		dl->AddRectFilledMultiColor(ImVec2(0, band), ImVec2(f.w, band + f.h * .12f), IM_COL32(255, 255, 255, 0), IM_COL32(255, 255, 255, 0),
++				IM_COL32(255, 255, 255, 10), IM_COL32(255, 255, 255, 10));
++		const float e = f.h * .22f;
++		const ImU32 dark = IM_COL32(0, 0, 0, 170), clear = IM_COL32(0, 0, 0, 0);
++		dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(e, f.h), dark, clear, clear, dark);
++		dl->AddRectFilledMultiColor(ImVec2(f.w - e, 0), ImVec2(f.w, f.h), clear, dark, dark, clear);
++		dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(f.w, e * .6f), dark, dark, clear, clear);
++		dl->AddRectFilledMultiColor(ImVec2(0, f.h - e * .5f), ImVec2(f.w, f.h), clear, clear, dark, dark);
++	}
++
++	// The set switching off: the picture folds into a bright line, the line into a dot, the dot fades
++	void drawPowerOff(Frame& f, const Game& g, float p)
++	{
++		const ImVec2 c(f.w / 2, f.h / 2);
++		if (p < .45f)
++		{
++			const float q = easeOut(p / .45f);
++			const float hh = std::max(2.f, f.h / 2 * (1 - q));
++			drawPicture(f, g, ImVec4(0, c.y - hh, f.w, c.y + hh), 1.f, q);
++		}
++		else if (p < .75f)
++		{
++			const float q = easeOut((p - .45f) / .3f);
++			const float hw = std::max(3.f, f.w / 2 * (1 - q));
++			f.dl->AddRectFilled(ImVec2(c.x - hw, c.y - 2), ImVec2(c.x + hw, c.y + 2), IM_COL32(255, 255, 255, 255));
++			drawBlob(f.dl, c, hw * .6f + 20, IM_COL32(200, 220, 255, 90));
++		}
++		else
++		{
++			const float q = (p - .75f) / .25f;
++			drawBlob(f.dl, c, 26.f * (1 - q) + 4, IM_COL32(255, 255, 255, (int)(255 * (1 - q))));
++		}
++	}
++
++	bool started = false;
++	float guidePos = 0, guideVel = 0;
++	u32 frame = 0;
++};
++
++} // namespace
++
++std::unique_ptr<Theme> makeChannel() {
++	return std::make_unique<Channel>();
++}
++
++} // namespace launcher
+diff --git a/shell/ps4/launcher/theme_orbit.cpp b/shell/ps4/launcher/theme_orbit.cpp
+new file mode 100644
+index 000000000..0f8ce811b
+--- /dev/null
++++ b/shell/ps4/launcher/theme_orbit.cpp
+@@ -0,0 +1,315 @@
++/*
++	DeCast-S4 launcher, theme "Orbit": the library as discs on a slowly turning ring. Each disc
++	has its cover printed on the label and a silver rim that catches a fixed light as it spins;
++	the room takes on the selected game's colours.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "imgui_internal.h"
++
++#include <algorithm>
++#include <ctime>
++
++namespace launcher
++{
++namespace
++{
++
++// A ring of the disc (fractions f0..f1 of the radius) as one triangle strip; uv and colour per vertex.
++// sy squashes (or, negative, mirrors) the disc vertically.
++template<typename UV, typename COL>
++void annulus(ImDrawList *dl, ImTextureID tex, ImVec2 c, float r, float sy, float f0, float f1, int segments,
++		UV uv, COL col)
++{
++	const bool textured = tex != ImTextureID();
++	if (textured)
++		dl->PushTexture(tex);
++	const ImVec2 white = whiteUV(dl);
++	dl->PrimReserve(segments * 6, (segments + 1) * 2);
++	const u32 base = dl->_VtxCurrentIdx;
++	for (int i = 0; i <= segments; i++)
++	{
++		const float a = 2 * PI * i / segments, ca = std::cos(a), sa = std::sin(a);
++		for (int j = 0; j < 2; j++)
++		{
++			const float fr = j == 0 ? f0 : f1;
++			const ImVec2 p(c.x + ca * fr * r, c.y + sa * fr * r * sy);
++			dl->PrimWriteVtx(p, textured ? uv(a, fr) : white, col(a, fr, p));
++		}
++	}
++	for (int i = 0; i < segments; i++)
++	{
++		const ImDrawIdx v = (ImDrawIdx)(base + i * 2);
++		dl->PrimWriteIdx(v); dl->PrimWriteIdx(v + 1); dl->PrimWriteIdx(v + 3);
++		dl->PrimWriteIdx(v); dl->PrimWriteIdx(v + 3); dl->PrimWriteIdx(v + 2);
++	}
++	if (textured)
++		dl->PopTexture();
++}
++
++class Orbit : public Theme
++{
++public:
++	const char *name() const override { return "Orbit"; }
++	float launchSeconds() const override { return 1.5f; }
++
++	void draw(Frame& f) override
++	{
++		std::vector<Game>& games = *f.games;
++		const int n = (int)games.size();
++		if (!started)
++		{
++			started = true;
++			pos = (float)f.goal;
++			if (n > 0)
++			{
++				bg1 = games[f.sel].c1;
++				bg2 = games[f.sel].c2;
++			}
++		}
++		spring(pos, vel, (float)f.goal, 90.f, 19.f, f.dt);
++		const float launch = f.launchAt >= 0 ? clamp01((f.t - f.launchAt) / launchSeconds()) : 0.f;
++		spin += f.dt * (.35f + 14.f * launch * launch);
++		if (n > 0)
++		{
++			approach(bg1, games[f.sel].c1, 3.f, f.dt);
++			approach(bg2, games[f.sel].c2, 3.f, f.dt);
++		}
++		drawRoom(f);
++		if (n == 0)
++		{
++			drawEmptyLibrary(f);
++			drawHints(f);
++			return;
++		}
++
++		// the ring: an ellipse seen from above, the selected disc in front
++		const float cx = f.w * .5f, cy = f.h * .43f;
++		const float rx = f.w * .40f * (1 + launch * launch * 1.2f), ry = f.h * .13f;
++		f.dl->AddEllipse(ImVec2(cx, cy - ry), ImVec2(rx, ry), bg1.u32(.16f * (1 - launch)), 0, 96, 1.5f);
++
++		struct Slot { int game; float k, z; ImVec2 c; float r, alpha; };
++		std::vector<Slot> slots;
++		const float half = std::min(4.f, (n - 1) * .5f);
++		for (int i = (int)std::floor(pos) - 5; i <= (int)std::ceil(pos) + 5; i++)
++		{
++			const float k = i - pos;
++			const float alpha = clamp01(half + 1.f - std::fabs(k));
++			if (alpha <= 0.f)
++				continue;
++			const float th = k * .42f;
++			Slot s;
++			s.game = ((i % n) + n) % n;
++			s.k = k;
++			s.z = std::cos(th);
++			s.c = ImVec2(cx + std::sin(th) * rx, cy - (1 - s.z) * ry);
++			const float depth = .45f + .55f * (s.z + 1) * .5f;
++			const float near = clamp01(1 - std::fabs(k));
++			s.r = f.h * .2f * depth * (.66f + .34f * near);
++			s.alpha = alpha * (std::fabs(k) < .5f ? 1.f : 1.f - launch);
++			if (std::fabs(k) < .5f)
++				s.r *= 1 + .35f * easeOut(launch);
++			slots.push_back(s);
++		}
++		std::sort(slots.begin(), slots.end(), [](const Slot& a, const Slot& b) { return a.z < b.z; });
++
++		// reflections first (the floor), then the discs
++		for (const Slot& s : slots)
++		{
++			const float floorY = s.c.y + s.r * 1.04f;
++			drawDisc(f, games[s.game], ImVec2(s.c.x, floorY + s.r * .55f), s.r, -.55f, spin + s.game * 1.7f,
++					s.alpha * .22f, floorY, s.r * 1.1f);
++		}
++		for (const Slot& s : slots)
++		{
++			// a soft coloured light under each disc
++			drawBlob(f.dl, s.c, s.r * 1.9f, games[s.game].c1.u32(.20f * s.alpha));
++			drawDisc(f, games[s.game], s.c, s.r, 1.f, spin * (std::fabs(s.k) < .5f ? 1.6f : 1.f) + s.game * 1.7f,
++					s.alpha, 0, 0);
++		}
++
++		// launch: a shock ring from the disc, then a flash and black
++		if (launch > 0)
++		{
++			const ImVec2 c(cx, cy);
++			for (int i = 0; i < 2; i++)
++			{
++				const float p = clamp01(launch * 1.6f - i * .25f);
++				if (p > 0 && p < 1)
++					f.dl->AddCircle(c, f.h * .2f + p * f.w * .55f, bg1.u32((1 - p) * .7f), 128, 3.f + 8.f * (1 - p));
++			}
++			const float flash = clamp01((launch - .62f) / .12f) * clamp01((1.f - launch) / .2f + .3f);
++			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(255, 255, 255, (int)(140 * flash)));
++		}
++
++		drawInfo(f, games[f.sel], 1.f - launch);
++		drawHints(f, 1.f - launch);
++		if (launch > .75f)
++			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * clamp01((launch - .75f) / .25f))));
++	}
++
++private:
++	void drawRoom(Frame& f)
++	{
++		ImDrawList *dl = f.dl;
++		const Color top = mix(bg2, { 0, 0, 0 }, .35f), bottom = { .01f, .01f, .02f };
++		dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(f.w, f.h), top.u32(), top.u32(), bottom.u32(), bottom.u32());
++		// slow coloured light drifting behind the ring
++		for (int i = 0; i < 3; i++)
++		{
++			const float a = f.t * (.05f + .02f * i) + i * 2.1f;
++			const ImVec2 c(f.w * (.5f + .32f * std::cos(a)), f.h * (.38f + .2f * std::sin(a * 1.3f)));
++			drawBlob(dl, c, f.h * (.75f + .15f * i), mix(bg1, bg2, .3f * i).u32(.10f));
++		}
++		// stars that drift with the ring
++		u32 x = 2463534242u;
++		for (int i = 0; i < 140; i++)
++		{
++			x ^= x << 13; x ^= x >> 17; x ^= x << 5;
++			const float sx = (x & 0xffff) / 65535.f, sy = (x >> 16) / 65535.f;
++			const float depth = .3f + .7f * ((i * 37) % 100) / 100.f;
++			float px = std::fmod(sx * f.w - pos * 14.f * depth, f.w);
++			if (px < 0)
++				px += f.w;
++			const float tw = .5f + .5f * std::sin(f.t * (1.f + depth * 2) + i);
++			dl->AddCircleFilled(ImVec2(px, sy * f.h * .8f), 1.f + depth * 1.4f, IM_COL32(220, 230, 255, (int)(40 + 110 * tw * depth)), 6);
++		}
++		// floor: a dark glossy plane
++		const float floorY = f.h * .62f;
++		dl->AddRectFilledMultiColor(ImVec2(0, floorY), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0),
++				IM_COL32(0, 0, 0, 200), IM_COL32(0, 0, 0, 200));
++		dl->AddLine(ImVec2(0, floorY), ImVec2(f.w, floorY), bg1.u32(.08f), 1.f);
++	}
++
++	// One disc. fadeTop/fadeLen > 0: a reflection, fading out below fadeTop.
++	void drawDisc(Frame& f, const Game& g, ImVec2 c, float r, float sy, float rot, float alpha, float fadeTop, float fadeLen)
++	{
++		if (alpha <= .003f)
++			return;
++		ImDrawList *dl = f.dl;
++		const float light = -2.3f;		// the light is up and to the left
++		auto fade = [&](const ImVec2& p) {
++			return fadeLen > 0 ? alpha * clamp01(1 - (p.y - fadeTop) / fadeLen) : alpha;
++		};
++		const ImTextureID cover = coverTexture(g);
++		const float labelR = .74f, hubR = .3f;
++		// silver rim: bands of light fixed to the room while the pressing spins under them
++		annulus(dl, discTexture(), c, r, sy, labelR, 1.f, 72,
++			[&](float a, float fr) { return ImVec2(.5f + .5f * fr * std::cos(a), .5f + .5f * fr * std::sin(a)); },
++			[&](float a, float fr, const ImVec2& p) {
++				const float glint = std::pow(std::fmax(0.f, std::cos(a - light)), 6.f) + .6f * std::pow(std::fmax(0.f, std::cos(a - light - PI)), 10.f);
++				const float v = .78f + .5f * glint;
++				return Color { v, v, v * 1.02f }.u32(fade(p));
++			});
++		// the label: the cover, printed on the disc and turning with it
++		if (cover != ImTextureID())
++			annulus(dl, cover, c, r, sy, hubR, labelR, 72,
++				[&](float a, float fr) {
++					const float u = fr / labelR * .5f;
++					return ImVec2(.5f + u * std::cos(a - rot), .5f + u * std::sin(a - rot));
++				},
++				[&](float a, float fr, const ImVec2& p) {
++					const float sheen = .9f + .18f * std::pow(std::fmax(0.f, std::cos(a - light)), 4.f);
++					return Color { sheen, sheen, sheen }.u32(fade(p));
++				});
++		else
++			// no cover: the game's colours in turning stripes
++			annulus(dl, ImTextureID(), c, r, sy, hubR, labelR, 72,
++				[](float, float) { return ImVec2(); },
++				[&](float a, float fr, const ImVec2& p) {
++					const float stripe = .5f + .5f * std::sin((a - rot) * 3 + fr * 9);
++					return mix(g.c2, g.c1, .35f + .55f * stripe * fr).u32(fade(p));
++				});
++		// clear hub and the hole
++		annulus(dl, ImTextureID(), c, r, sy, .12f, hubR, 48, [](float, float) { return ImVec2(); },
++			[&](float a, float fr, const ImVec2& p) {
++				return Color { .75f, .8f, .88f }.u32(fade(p) * (.28f + .25f * (fr - .12f) / (hubR - .12f)));
++			});
++		annulus(dl, ImTextureID(), c, r, sy, labelR - .012f, labelR + .006f, 72, [](float, float) { return ImVec2(); },
++			[&](float, float, const ImVec2& p) { return IM_COL32(20, 22, 28, (int)(120 * fade(p))); });
++		// edge highlight
++		annulus(dl, ImTextureID(), c, r, sy, .985f, 1.f, 72, [](float, float) { return ImVec2(); },
++			[&](float a, float, const ImVec2& p) {
++				return IM_COL32(255, 255, 255, (int)(255 * fade(p) * (.25f + .6f * std::fmax(0.f, std::cos(a - light)))));
++			});
++	}
++
++	void drawInfo(Frame& f, const Game& g, float alpha)
++	{
++		if (alpha <= 0)
++			return;
++		ImDrawList *dl = f.dl;
++		ImFont *display = displayFont();
++		// brand and clock
++		drawText(dl, display, f.h * .022f, ImVec2(f.w * .05f, f.h * .055f), IM_COL32(255, 255, 255, (int)(200 * alpha)), "DECAST-S4");
++		char clock[16];
++		const time_t now = time(nullptr);
++		strftime(clock, sizeof(clock), "%H:%M", localtime(&now));
++		drawText(dl, display, f.h * .026f, ImVec2(f.w * .95f, f.h * .05f), IM_COL32(255, 255, 255, (int)(220 * alpha)), clock, 1.f);
++
++		// the title, letter by letter after each move
++		const float size = f.h * .058f;
++		const float x0 = f.w * .5f, y0 = f.h * .73f;
++		const float age = f.t - f.selectedAt;
++		const std::string& title = g.e.title;
++		const float total = textWidth(display, size, title);
++		const float scale = total > f.w * .86f ? f.w * .86f / total : 1.f;
++		const float fs = size * scale;
++		float x = x0 - total * scale * .5f;
++		const char *s = title.c_str(), *end = s + title.size();
++		int index = 0;
++		while (s < end)
++		{
++			unsigned int ch;
++			const int len = ImTextCharFromUtf8(&ch, s, end);
++			if (len <= 0)
++				break;
++			const std::string glyph(s, len);
++			const float e = easeOut((age - index * .018f) / .35f);
++			const float w = textWidth(display, fs, glyph);
++			dl->AddText(display, fs, ImVec2(x, y0 + (1 - e) * f.h * .025f), IM_COL32(255, 255, 255, (int)(255 * e * alpha)), glyph.c_str());
++			x += w;
++			s += len;
++			index++;
++		}
++		// details: format, region, serial
++		std::string info = g.format;
++		if (!g.regionName.empty())
++			info += "   \xC2\xB7   " + g.regionName;
++		if (!g.e.productId.empty())
++			info += "   \xC2\xB7   " + g.e.productId;
++		const float ia = alpha * easeOut((age - .15f) / .4f);
++		drawText(dl, bodyFont(), f.h * .026f, ImVec2(x0, y0 + size * 1.25f), mix(g.c1, { 1, 1, 1 }, .45f).u32(.9f * ia), info, .5f);
++
++		// position in the library
++		char count[32];
++		snprintf(count, sizeof(count), "%02d / %02d", f.sel + 1, (int)f.games->size());
++		drawText(dl, display, f.h * .02f, ImVec2(f.w * .05f, f.h * .935f - f.h * .012f), IM_COL32(200, 205, 220, (int)(170 * alpha)), count);
++	}
++
++	bool started = false;
++	float pos = 0, vel = 0, spin = 0;
++	Color bg1 { .4f, .5f, 1.f }, bg2 { .05f, .06f, .14f };
++};
++
++} // namespace
++
++std::unique_ptr<Theme> makeOrbit() {
++	return std::make_unique<Orbit>();
++}
++
++} // namespace launcher
+diff --git a/shell/ps4/launcher/theme_shelf.cpp b/shell/ps4/launcher/theme_shelf.cpp
+new file mode 100644
+index 000000000..b12517d63
+--- /dev/null
++++ b/shell/ps4/launcher/theme_shelf.cpp
+@@ -0,0 +1,267 @@
++/*
++	DeCast-S4 launcher, theme "Shelf": box art standing on a glossy shelf in perspective. The
++	selected box faces you and the others turn away on either side; starting a game turns the box
++	around to its back.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++
++#include <algorithm>
++#include <ctime>
++
++namespace launcher
++{
++namespace
++{
++
++class Shelf : public Theme
++{
++public:
++	const char *name() const override { return "Shelf"; }
++	float launchSeconds() const override { return 1.6f; }
++
++	void draw(Frame& f) override
++	{
++		std::vector<Game>& games = *f.games;
++		const int n = (int)games.size();
++		if (!started)
++		{
++			started = true;
++			pos = (float)f.goal;
++			if (n > 0)
++				light = games[f.sel].c1;
++		}
++		spring(pos, vel, (float)f.goal, 140.f, 24.f, f.dt);
++		if (n > 0)
++			approach(light, games[f.sel].c1, 2.5f, f.dt);
++		const float launch = f.launchAt >= 0 ? clamp01((f.t - f.launchAt) / launchSeconds()) : 0.f;
++
++		cx = f.w * .5f;
++		cy = f.h * .42f;
++		size = f.h * .42f;
++		dist = size * 2.6f;
++		drawRoom(f);
++		if (n == 0)
++		{
++			drawEmptyLibrary(f);
++			drawHints(f);
++			return;
++		}
++
++		struct Item { int game; float k; };
++		std::vector<Item> items;
++		const int span = std::min(7, n - 1);
++		for (int i = (int)std::floor(pos) - span - 1; i <= (int)std::ceil(pos) + span + 1; i++)
++		{
++			const float k = i - pos;
++			if (std::fabs(k) > span + .5f || (n == 1 && i != f.goal))
++				continue;
++			items.push_back({ ((i % n) + n) % n, k });
++		}
++		// far boxes first
++		std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return std::fabs(a.k) > std::fabs(b.k); });
++		const float out = easeOut(launch / .5f);
++		for (const Item& it : items)
++		{
++			const bool front = std::fabs(it.k) < .5f;
++			Pose p = poseFor(it.k);
++			float alpha = clamp01(span + .5f - std::fabs(it.k));
++			if (front)
++			{
++				// turn around and come forward
++				const float q = clamp01(launch / .55f);
++				p.angle += PI * q * q * (3 - 2 * q);
++				p.z -= size * .9f * out;
++			}
++			else
++			{
++				p.x += (it.k < 0 ? -1 : 1) * f.w * .6f * out;
++				alpha *= 1 - out;
++			}
++			drawBox(f, games[it.game], p, alpha, true);
++			drawBox(f, games[it.game], p, alpha, false);
++		}
++
++		const float uiAlpha = 1 - easeOut(launch / .3f);
++		drawInfo(f, games[f.sel], uiAlpha);
++		drawHints(f, uiAlpha);
++		if (launch > .78f)
++			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * clamp01((launch - .78f) / .22f))));
++	}
++
++private:
++	struct Pose { float x, z, angle; };
++
++	// Where a box k places from the selection stands, and how far it is turned
++	Pose poseFor(float k) const
++	{
++		const float s = std::fmax(-1.f, std::fmin(1.f, k));
++		const float a = std::fabs(k);
++		Pose p;
++		p.angle = -s * 1.2f;		// ~70 degrees, facing the middle
++		p.x = a < 1 ? k * size * .8f : (k < 0 ? -1 : 1) * (size * .8f + (a - 1) * size * .26f);
++		p.z = std::fabs(s) * size * .6f;
++		return p;
++	}
++
++	ImVec2 project(float x, float y, float z) const
++	{
++		const float s = dist / (dist + z);
++		return ImVec2(cx + x * s, cy + y * s);
++	}
++
++	// The box (or its reflection in the shelf) as vertical strips, so the perspective holds
++	void drawBox(Frame& f, const Game& g, const Pose& p, float alpha, bool reflection)
++	{
++		if (alpha <= .003f)
++			return;
++		const float ca = std::cos(p.angle), sa = std::sin(p.angle);
++		const bool back = ca < 0;
++		const ImTextureID tex = back ? ImTextureID() : coverTexture(g);
++		const float half = size * .5f;
++		constexpr int STRIPS = 12;
++		// facing light: boxes turned away are darker
++		const float shade = .45f + .55f * std::fabs(ca);
++		for (int i = 0; i < STRIPS; i++)
++		{
++			const float u0 = (float)i / STRIPS, u1 = (float)(i + 1) / STRIPS;
++			const float lx0 = -half + u0 * size, lx1 = -half + u1 * size;
++			const float x0 = p.x + lx0 * ca, z0 = p.z + lx0 * sa, x1 = p.x + lx1 * ca, z1 = p.z + lx1 * sa;
++			// from the back the picture reads mirrored
++			const float tu0 = back ? 1 - u0 : u0, tu1 = back ? 1 - u1 : u1;
++			ImVec2 q[4], uv[4];
++			ImU32 col[4];
++			if (!reflection)
++			{
++				q[0] = project(x0, -half, z0); q[1] = project(x1, -half, z1);
++				q[2] = project(x1, half, z1); q[3] = project(x0, half, z0);
++				uv[0] = ImVec2(tu0, 0); uv[1] = ImVec2(tu1, 0); uv[2] = ImVec2(tu1, 1); uv[3] = ImVec2(tu0, 1);
++				// a sheen sweeping across the front box
++				for (int c = 0; c < 4; c++)
++				{
++					const float u = (c == 0 || c == 3) ? u0 : u1;
++					const float sweep = std::exp(-std::pow((u - std::fmod(f.t * .18f, 1.6f) + .3f) * 5.f, 2.f)) * .25f * std::fabs(ca);
++					const float v = std::fmin(1.f, shade + sweep);
++					col[c] = tex != ImTextureID() ? Color { v, v, v }.u32(alpha)
++							: mix(back ? g.c2 : g.c1, g.c2, c >= 2 ? .8f : .1f + .3f * u).u32(alpha * shade);
++				}
++			}
++			else
++			{
++				// mirrored below the shelf, fading out
++				const float depth = size * .55f;
++				q[0] = project(x0, half, z0); q[1] = project(x1, half, z1);
++				q[2] = project(x1, half + depth, z1); q[3] = project(x0, half + depth, z0);
++				uv[0] = ImVec2(tu0, 1); uv[1] = ImVec2(tu1, 1); uv[2] = ImVec2(tu1, 1 - depth / size); uv[3] = ImVec2(tu0, 1 - depth / size);
++				const Color base = tex != ImTextureID() ? Color { shade, shade, shade } : mix(g.c1, g.c2, .5f);
++				col[0] = col[1] = base.u32(alpha * .28f);
++				col[2] = col[3] = base.u32(0.f);
++			}
++			drawQuad(f.dl, tex, q, uv, col);
++		}
++		if (reflection)
++			return;
++		// edges: a thin bright rim on the front, the back panel's text once it faces us
++		const ImVec2 tl = project(p.x - half * ca, -half, p.z - half * sa), tr = project(p.x + half * ca, -half, p.z + half * sa);
++		const ImVec2 br = project(p.x + half * ca, half, p.z + half * sa), bl = project(p.x - half * ca, half, p.z - half * sa);
++		f.dl->AddQuad(tl, tr, br, bl, IM_COL32(255, 255, 255, (int)(60 * alpha * std::fabs(ca))), 1.5f);
++		if (back && ca < -.85f)
++		{
++			const float a = alpha * clamp01((-ca - .85f) / .15f);
++			const ImVec2 c((tl.x + br.x) / 2, (tl.y + br.y) / 2);
++			const float w = std::fabs(tr.x - tl.x);
++			drawText(f.dl, displayFont(), w * .07f, ImVec2(c.x, c.y - w * .12f), IM_COL32(255, 255, 255, (int)(255 * a)), g.e.title, .5f, w * .86f);
++			drawText(f.dl, bodyFont(), w * .045f, ImVec2(c.x, c.y), IM_COL32(220, 225, 235, (int)(220 * a)), "Starting...", .5f);
++			drawText(f.dl, bodyFont(), w * .035f, ImVec2(c.x, c.y + w * .3f), IM_COL32(200, 205, 220, (int)(180 * a)),
++					g.format + (g.e.productId.empty() ? "" : "   " + g.e.productId), .5f);
++		}
++	}
++
++	void drawRoom(Frame& f)
++	{
++		ImDrawList *dl = f.dl;
++		const float shelfY = cy + size * .5f;
++		const Color top = mix(light, { 0, 0, 0 }, .88f);
++		dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(f.w, shelfY), top.u32(), top.u32(), IM_COL32(6, 6, 9, 255), IM_COL32(6, 6, 9, 255));
++		dl->AddRectFilledMultiColor(ImVec2(0, shelfY), ImVec2(f.w, f.h), IM_COL32(14, 14, 18, 255), IM_COL32(14, 14, 18, 255),
++				IM_COL32(2, 2, 3, 255), IM_COL32(2, 2, 3, 255));
++		// spot lights from above, swaying a little
++		for (int i = 0; i < 3; i++)
++		{
++			const float x = f.w * (.5f + (i - 1) * .34f) + std::sin(f.t * .3f + i * 2) * f.w * .02f;
++			drawBlob(dl, ImVec2(x, cy - size * .2f), size * (i == 1 ? 1.5f : 1.f), light.u32(i == 1 ? .2f : .09f));
++		}
++		// the shelf's front edge catching the light
++		dl->AddRectFilledMultiColor(ImVec2(0, shelfY - 1), ImVec2(f.w, shelfY + 2), IM_COL32(255, 255, 255, 0), light.u32(.35f),
++				light.u32(.35f), IM_COL32(255, 255, 255, 0));
++		dl->AddRectFilledMultiColor(ImVec2(f.w * .5f, shelfY - 1), ImVec2(f.w, shelfY + 2), light.u32(.35f), IM_COL32(255, 255, 255, 0),
++				IM_COL32(255, 255, 255, 0), light.u32(.35f));
++		// dust in the light
++		u32 x = 88172645u;
++		for (int i = 0; i < 50; i++)
++		{
++			x ^= x << 13; x ^= x >> 17; x ^= x << 5;
++			const float px = (x & 0xffff) / 65535.f * f.w, base = (x >> 16) / 65535.f;
++			const float py = std::fmod(base * f.h * .8f - f.t * (6.f + i % 5), f.h * .8f);
++			const float a = .5f + .5f * std::sin(f.t * .7f + i);
++			dl->AddCircleFilled(ImVec2(px + std::sin(f.t * .4f + i) * 10.f, py < 0 ? py + f.h * .8f : py), 1.4f, light.u32(.25f * a), 6);
++		}
++	}
++
++	void drawInfo(Frame& f, const Game& g, float alpha)
++	{
++		if (alpha <= 0)
++			return;
++		ImDrawList *dl = f.dl;
++		const float age = f.t - f.selectedAt;
++		const float in = alpha * easeOut(age / .35f);
++		const float y = f.h * .8f;
++		drawText(dl, displayFont(), f.h * .045f, ImVec2(f.w / 2, y + (1 - in) * 8), IM_COL32(255, 255, 255, (int)(255 * in)), g.e.title, .5f, f.w * .8f);
++		std::string info = g.format;
++		if (!g.regionName.empty())
++			info += "   \xC2\xB7   " + g.regionName;
++		if (!g.e.productId.empty())
++			info += "   \xC2\xB7   " + g.e.productId;
++		drawText(dl, bodyFont(), f.h * .025f, ImVec2(f.w / 2, y + f.h * .06f), mix(g.c1, { 1, 1, 1 }, .5f).u32(.85f * in), info, .5f);
++		// where you are on the shelf
++		const int n = (int)f.games->size();
++		if (n > 1)
++		{
++			const float x0 = f.w * .35f, x1 = f.w * .65f, ly = f.h * .055f;
++			dl->AddLine(ImVec2(x0, ly), ImVec2(x1, ly), IM_COL32(255, 255, 255, (int)(50 * alpha)), 2.f);
++			const float p = ((std::fmod(pos, (float)n) + n) / n) - std::floor((std::fmod(pos, (float)n) + n) / n);
++			dl->AddCircleFilled(ImVec2(x0 + (x1 - x0) * p, ly), 5.f, light.u32(alpha));
++		}
++		char clock[16];
++		const time_t now = time(nullptr);
++		strftime(clock, sizeof(clock), "%H:%M", localtime(&now));
++		drawText(dl, displayFont(), f.h * .026f, ImVec2(f.w * .95f, f.h * .04f), IM_COL32(255, 255, 255, (int)(220 * alpha)), clock, 1.f);
++	}
++
++	bool started = false;
++	float pos = 0, vel = 0;
++	float cx = 0, cy = 0, size = 0, dist = 1;
++	Color light { .5f, .6f, 1.f };
++};
++
++} // namespace
++
++std::unique_ptr<Theme> makeShelf() {
++	return std::make_unique<Shelf>();
++}
++
++} // namespace launcher
+diff --git a/shell/ps4/launcher/theme_xmb.cpp b/shell/ps4/launcher/theme_xmb.cpp
+new file mode 100644
+index 000000000..4aa3a060d
+--- /dev/null
++++ b/shell/ps4/launcher/theme_xmb.cpp
+@@ -0,0 +1,368 @@
++/*
++	DeCast-S4 launcher, theme "Cross bar": categories across, items down, over slow light ribbons
++	that take the selected game's colour. Settings and the theme choice live in the bar too.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "ui/IconsFontAwesome6.h"
++
++#include <algorithm>
++#include <ctime>
++
++namespace launcher
++{
++namespace
++{
++
++enum Category { SETTINGS, THEMES, GAMES, CATEGORY_COUNT };
++const char *const kCategoryIcon[CATEGORY_COUNT] = { ICON_FA_GEAR, ICON_FA_PALETTE, ICON_FA_GAMEPAD };
++const char *const kCategoryName[CATEGORY_COUNT] = { "Settings", "Themes", "Games" };
++const char *const kThemeBlurb[THEME_COUNT] = {
++	"Discs on a turning ring", "Every game is a TV channel", "Box art on a glossy shelf", "This menu",
++};
++
++class CrossBar : public Theme
++{
++public:
++	const char *name() const override { return "Cross bar"; }
++	float launchSeconds() const override { return 1.2f; }
++
++	bool navigate(Frame& f, int dx, int dy) override
++	{
++		if (dx != 0)
++		{
++			const int next = std::clamp(cat + dx, 0, CATEGORY_COUNT - 1);
++			if (next != cat)
++			{
++				cat = next;
++				catChangedAt = f.t;
++				playSound(Sound::Category);
++			}
++			return true;
++		}
++		if (cat == GAMES)
++		{
++			moveSelection(dy);
++			return true;
++		}
++		const int count = itemCount(f);
++		const int next = std::clamp(item[cat] + dy, 0, count - 1);
++		if (next != item[cat])
++		{
++			item[cat] = next;
++			itemChangedAt = f.t;
++			playSound(Sound::Move);
++		}
++		return true;
++	}
++
++	bool activate(Frame& f) override
++	{
++		switch (cat)
++		{
++		case GAMES:
++			return false;	// the core starts the game
++		case THEMES:
++			if (item[THEMES] == currentTheme())
++				playSound(Sound::Confirm);
++			else
++				requestTheme(item[THEMES]);
++			return true;
++		default:
++			if (item[SETTINGS] == 0)
++				openSettings();
++			else
++				playSound(Sound::Error);	// the covers folder: information only
++			return true;
++		}
++	}
++
++	void draw(Frame& f) override
++	{
++		std::vector<Game>& games = *f.games;
++		const int n = (int)games.size();
++		if (!started)
++		{
++			started = true;
++			catPos = (float)cat;
++			item[THEMES] = currentTheme();
++			for (int c = 0; c < CATEGORY_COUNT; c++)
++				itemPos[c] = c == GAMES ? (float)f.goal : (float)item[c];
++		}
++		const float launch = f.launchAt >= 0 ? clamp01((f.t - f.launchAt) / launchSeconds()) : 0.f;
++		spring(catPos, catVel, (float)cat, 110.f, 21.f, f.dt);
++		for (int c = 0; c < CATEGORY_COUNT; c++)
++			spring(itemPos[c], itemVel[c], c == GAMES ? (float)f.goal : (float)item[c], 130.f, 23.f, f.dt);
++
++		// the colour of the moment: the selected game's on the Games row, deep blue elsewhere
++		const Color want1 = cat == GAMES && n > 0 ? games[f.sel].c1 : Color { .3f, .5f, 1.f };
++		const Color want2 = cat == GAMES && n > 0 ? games[f.sel].c2 : Color { .03f, .06f, .16f };
++		approach(tone1, want1, 2.2f, f.dt);
++		approach(tone2, want2, 2.2f, f.dt);
++
++		drawBackdrop(f);
++		const float ui = 1 - easeOut(launch / .35f);
++		drawCategories(f, ui);
++		drawItems(f, ui, launch);
++		drawClock(f, ui);
++		drawHints(f, ui);
++		if (launch > .7f)
++			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * clamp01((launch - .7f) / .3f))));
++	}
++
++private:
++	int itemCount(const Frame& f) const
++	{
++		switch (cat)
++		{
++		case GAMES: return std::max(1, (int)f.games->size());
++		case THEMES: return THEME_COUNT;
++		default: return 2;
++		}
++	}
++
++	// Gradient sky and three ribbons of light, each a soft-edged strip that breathes
++	void drawBackdrop(Frame& f)
++	{
++		ImDrawList *dl = f.dl;
++		const Color top = mix(tone2, { 0, 0, 0 }, .15f), bottom = mix(tone2, tone1, .22f);
++		dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(f.w, f.h), top.u32(), top.u32(), bottom.u32(), bottom.u32());
++		drawBlob(dl, ImVec2(f.w * .8f, f.h * .2f), f.h * .9f, tone1.u32(.10f));
++
++		constexpr int COLS = 96;
++		for (int r = 0; r < 3; r++)
++		{
++			const float base = f.h * (.6f + .06f * r);
++			const float amp = f.h * (.07f - .015f * r), speed = .22f + .09f * r, freq = 1.6f + .5f * r;
++			const float thick = f.h * (.05f + .025f * std::sin(f.t * .3f + r));
++			const Color c = mix(tone1, { 1, 1, 1 }, .35f + .15f * r);
++			const float peak = .20f - .045f * r;
++			ImVec2 mid[COLS + 1];
++			float width[COLS + 1];
++			for (int i = 0; i <= COLS; i++)
++			{
++				const float x = (float)i / COLS;
++				const float y = base + amp * std::sin(x * freq * PI + f.t * speed + r * 1.7f)
++						+ amp * .45f * std::sin(x * freq * 2.3f * PI - f.t * speed * 1.4f + r);
++				mid[i] = ImVec2(x * f.w, y);
++				// the ribbon twists: thin where it turns over
++				width[i] = thick * (.25f + .75f * std::fabs(std::cos(x * 2.4f * PI + f.t * speed * .8f + r * 2.2f)));
++			}
++			const ImVec2 white = whiteUV(dl);
++			// two halves: clear at the edges, bright along the middle
++			dl->PrimReserve(COLS * 12, (COLS + 1) * 3);
++			const u32 v0 = dl->_VtxCurrentIdx;
++			for (int i = 0; i <= COLS; i++)
++			{
++				const float edgeFade = clamp01(std::min(i, COLS - i) / 10.f);
++				dl->PrimWriteVtx(ImVec2(mid[i].x, mid[i].y - width[i]), white, c.u32(0));
++				dl->PrimWriteVtx(mid[i], white, c.u32(peak * edgeFade * (.6f + .4f * width[i] / thick)));
++				dl->PrimWriteVtx(ImVec2(mid[i].x, mid[i].y + width[i] * .6f), white, c.u32(0));
++			}
++			for (int i = 0; i < COLS; i++)
++			{
++				const ImDrawIdx a = (ImDrawIdx)(v0 + i * 3), b = (ImDrawIdx)(v0 + (i + 1) * 3);
++				dl->PrimWriteIdx(a); dl->PrimWriteIdx(b); dl->PrimWriteIdx(b + 1);
++				dl->PrimWriteIdx(a); dl->PrimWriteIdx(b + 1); dl->PrimWriteIdx(a + 1);
++				dl->PrimWriteIdx(a + 1); dl->PrimWriteIdx(b + 1); dl->PrimWriteIdx(b + 2);
++				dl->PrimWriteIdx(a + 1); dl->PrimWriteIdx(b + 2); dl->PrimWriteIdx(a + 2);
++			}
++			// sparks riding the ribbon
++			for (int s = 0; s < 6; s++)
++			{
++				const float u = std::fmod(s / 6.f + f.t * (.012f + .004f * s) + r * .13f, 1.f);
++				const int i = (int)(u * COLS);
++				const float tw = .5f + .5f * std::sin(f.t * 2.f + s * 1.3f + r);
++				drawBlob(dl, mid[i], f.h * .012f * (1 + tw), IM_COL32(255, 255, 255, (int)(90 * tw)));
++			}
++		}
++	}
++
++	ImVec2 barOrigin(const Frame& f) const {
++		return ImVec2(f.w * .26f, f.h * .26f);
++	}
++
++	void drawCategories(Frame& f, float alpha)
++	{
++		const ImVec2 o = barOrigin(f);
++		const float step = f.w * .13f;
++		ImFont *icons = bodyFont();
++		for (int c = 0; c < CATEGORY_COUNT; c++)
++		{
++			const float k = c - catPos;
++			const float near = clamp01(1 - std::fabs(k));
++			const float x = o.x + k * step;
++			const float size = f.h * (.055f + .025f * near);
++			const float a = alpha * (.45f + .55f * near);
++			// glow under the current category
++			if (near > .01f)
++				drawBlob(f.dl, ImVec2(x, o.y), size * 1.6f, tone1.u32(.35f * near * alpha));
++			drawText(f.dl, icons, size, ImVec2(x, o.y - size * .55f), IM_COL32(255, 255, 255, (int)(255 * a)), kCategoryIcon[c], .5f);
++			if (near > .01f)
++			{
++				const float e = easeOut((f.t - catChangedAt) / .3f);
++				drawText(f.dl, displayFont(), f.h * .022f, ImVec2(x, o.y + size * .65f + (1 - e) * 6), IM_COL32(255, 255, 255, (int)(255 * near * e * alpha)),
++						kCategoryName[c], .5f);
++			}
++		}
++	}
++
++	// The column under the current category: the selected item just below the bar, earlier ones above it
++	void drawItems(Frame& f, float alpha, float launch)
++	{
++		const ImVec2 o = barOrigin(f);
++		const float step = f.w * .13f;
++		for (int c = 0; c < CATEGORY_COUNT; c++)
++		{
++			const float k = c - catPos;
++			const float colAlpha = clamp01(1 - std::fabs(k) * 1.6f);
++			if (colAlpha <= 0)
++				continue;
++			const float x = o.x + k * step;
++			const int count = c == GAMES ? (int)f.games->size() : c == THEMES ? THEME_COUNT : 2;
++			if (count == 0)
++			{
++				drawText(f.dl, displayFont(), f.h * .03f, ImVec2(x - f.h * .04f, o.y + f.h * .13f), IM_COL32(255, 255, 255, (int)(230 * colAlpha * alpha)),
++						"No games yet");
++				drawText(f.dl, bodyFont(), f.h * .022f, ImVec2(x - f.h * .04f, o.y + f.h * .18f), IM_COL32(200, 205, 220, (int)(200 * colAlpha * alpha)),
++						"Copy games to /data/DeCast-S4/games");
++				continue;
++			}
++			const int selected = c == GAMES ? f.goal : item[c];
++			for (int i = (int)std::floor(itemPos[c]) - 4; i <= (int)std::ceil(itemPos[c]) + 7; i++)
++			{
++				if (c != GAMES && (i < 0 || i >= count))
++					continue;
++				if (c == GAMES && count < 12 && (i - selected > count - 1 - 3 || selected - i > 3))
++					continue;	// a short library: no repeats on screen
++				const float d = i - itemPos[c];
++				const bool isSel = i == selected;
++				const float near = clamp01(1 - std::fabs(d));
++				// below the bar for the selected and later items, above it for earlier ones
++				const float below = o.y + f.h * .14f, above = o.y - f.h * .1f;
++				float y;
++				if (d >= 0)
++					y = below + d * f.h * .11f;
++				else if (d <= -1)
++					y = above + (d + 1) * f.h * .09f;
++				else
++					y = below + (above - below) * -d;	// passing the bar
++				const float fade = clamp01(1.4f - std::fabs(d) * .22f) * colAlpha;
++				float a = fade * (isSel ? 1.f : .62f);
++				if (isSel && launch > 0)
++					a = 1.f;
++				else
++					a *= alpha;
++				if (a <= .01f)
++					continue;
++				drawItem(f, c, ((i % count) + count) % count, ImVec2(x, y), near * colAlpha, a, isSel ? launch : 0.f);
++			}
++		}
++	}
++
++	void drawItem(Frame& f, int c, int index, ImVec2 p, float focus, float alpha, float launch)
++	{
++		ImDrawList *dl = f.dl;
++		const float iconSize = f.h * (.075f + .045f * focus) * (1 + launch * 1.5f);
++		const ImVec2 i0(p.x - iconSize / 2, p.y - iconSize / 2), i1(p.x + iconSize / 2, p.y + iconSize / 2);
++		std::string title, detail;
++		if (c == GAMES)
++		{
++			const Game& g = (*f.games)[index];
++			if (focus > .01f)
++			{
++				// a breathing halo around the focused game
++				const float pulse = .5f + .5f * std::sin(f.t * 2.4f);
++				drawBlob(dl, p, iconSize * (1.1f + .1f * pulse), g.c1.u32(.4f * focus * alpha));
++			}
++			const ImTextureID tex = coverTexture(g);
++			if (tex != ImTextureID())
++				dl->AddImageRounded(tex, i0, i1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, (int)(255 * alpha)), iconSize * .06f);
++			else
++			{
++				dl->AddRectFilledMultiColor(i0, i1, g.c1.u32(alpha), g.c2.u32(alpha), g.c2.u32(alpha), g.c1.u32(alpha));
++				drawText(dl, bodyFont(), iconSize * .4f, ImVec2(p.x, p.y - iconSize * .22f), IM_COL32(255, 255, 255, (int)(200 * alpha)), ICON_FA_COMPACT_DISC, .5f);
++			}
++			dl->AddRect(i0, i1, IM_COL32(255, 255, 255, (int)(110 * focus * alpha)), iconSize * .06f, 0, 1.5f);
++			title = g.e.title;
++			detail = g.format;
++			if (!g.regionName.empty())
++				detail += "   \xC2\xB7   " + g.regionName;
++			if (!g.e.productId.empty())
++				detail += "   \xC2\xB7   " + g.e.productId;
++		}
++		else
++		{
++			const char *icon;
++			if (c == THEMES)
++			{
++				icon = index == currentTheme() ? ICON_FA_CHECK : index == 0 ? ICON_FA_COMPACT_DISC : index == 1 ? ICON_FA_TV
++						: index == 2 ? ICON_FA_LAYER_GROUP : ICON_FA_BARS;
++				title = themeName(index);
++				detail = kThemeBlurb[index];
++			}
++			else
++			{
++				icon = index == 0 ? ICON_FA_SLIDERS : ICON_FA_IMAGE;
++				title = index == 0 ? "Emulator settings" : "Covers";
++				detail = index == 0 ? "Video, audio, controls, BIOS, content folders"
++						: "Your own: /data/DeCast-S4/covers/<game file or serial>.png";
++			}
++			drawText(dl, bodyFont(), iconSize * .6f, ImVec2(p.x, p.y - iconSize * .33f), IM_COL32(255, 255, 255, (int)(255 * alpha)), icon, .5f);
++		}
++		if (launch > 0)
++			return;
++		const float tx = p.x + f.h * .1f;
++		const float ts = f.h * (.026f + .01f * focus);
++		drawText(dl, focus > .5f ? displayFont() : bodyFont(), ts, ImVec2(tx, p.y - ts * (.55f + .45f * focus)), IM_COL32(255, 255, 255, (int)(255 * alpha)),
++				title, 0, f.w * .95f - tx);
++		if (focus > .01f)
++		{
++			const float e = easeOut((f.t - std::max(f.selectedAt, itemChangedAt)) / .35f) * focus;
++			drawText(dl, bodyFont(), f.h * .022f, ImVec2(tx + (1 - e) * 10, p.y + ts * .45f), mix(tone1, { 1, 1, 1 }, .55f).u32(alpha * e),
++					detail, 0, f.w * .95f - tx);
++		}
++	}
++
++	void drawClock(Frame& f, float alpha)
++	{
++		char clock[32], date[32];
++		const time_t now = time(nullptr);
++		const tm *lt = localtime(&now);
++		strftime(clock, sizeof(clock), "%H:%M", lt);
++		strftime(date, sizeof(date), "%d/%m", lt);
++		const float x = f.w * .95f, y = f.h * .06f;
++		const float tw = drawText(f.dl, displayFont(), f.h * .03f, ImVec2(x, y), IM_COL32(255, 255, 255, (int)(235 * alpha)), clock, 1.f);
++		drawText(f.dl, bodyFont(), f.h * .024f, ImVec2(x - tw - f.h * .02f, y + f.h * .004f), IM_COL32(220, 225, 235, (int)(180 * alpha)), date, 1.f);
++	}
++
++	bool started = false;
++	int cat = GAMES;
++	int item[CATEGORY_COUNT] {};
++	float catPos = GAMES, catVel = 0;
++	float itemPos[CATEGORY_COUNT] {}, itemVel[CATEGORY_COUNT] {};
++	float catChangedAt = -10.f, itemChangedAt = -10.f;
++	Color tone1 { .3f, .5f, 1.f }, tone2 { .03f, .06f, .16f };
++};
++
++} // namespace
++
++std::unique_ptr<Theme> makeCrossBar() {
++	return std::make_unique<CrossBar>();
++}
++
++} // namespace launcher
 diff --git a/shell/ps4/ps4_gamepad.cpp b/shell/ps4/ps4_gamepad.cpp
 new file mode 100644
-index 000000000..b6a0932f7
+index 000000000..72d31c782
 --- /dev/null
 +++ b/shell/ps4/ps4_gamepad.cpp
-@@ -0,0 +1,377 @@
+@@ -0,0 +1,392 @@
 +/*
 +	DeCast-S4: DualShock 4 input through ScePad.
 +
@@ -1460,12 +4480,27 @@ index 000000000..b6a0932f7
 +int ps4_first_pad_handle() {
 +	return firstHandle;
 +}
++
++bool ps4_pad_state(u32& buttons, float& lx, float& ly)
++{
++	for (const auto& pad : gamepads)
++		if (pad->maple_port() == 0)
++		{
++			buttons = pad->buttons();
++			lx = pad->axis(ps4pad::AXIS_LX) / 32768.f;
++			ly = pad->axis(ps4pad::AXIS_LY) / 32768.f;
++			return true;
++		}
++	buttons = 0;
++	lx = ly = 0.f;
++	return false;
++}
 diff --git a/shell/ps4/ps4_gamepad.h b/shell/ps4/ps4_gamepad.h
 new file mode 100644
-index 000000000..8946466f3
+index 000000000..da82a4b66
 --- /dev/null
 +++ b/shell/ps4/ps4_gamepad.h
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,82 @@
 +/*
 +	DeCast-S4: DualShock 4 input through ScePad.
 +
@@ -1525,6 +4560,8 @@ index 000000000..8946466f3
 +	void update_rumble() override;
 +
 +	int userId() const { return user; }
++	u32 buttons() const { return lastButtons; }
++	int axis(u32 a) const { return lastAxes[a]; }
 +	int handle() const { return padHandle; }
 +
 +private:
@@ -1543,6 +4580,9 @@ index 000000000..8946466f3
 +void input_ps4_term();
 +// The first DualShock 4's handle (the frontend reads it before Flycast starts), or -1.
 +int ps4_first_pad_handle();
++// The first pad's latest state for the home screen (shell/ps4/launcher): ScePad button bits and
++// the left stick in -1..1. False when there is no pad.
++bool ps4_pad_state(u32& buttons, float& lx, float& ly);
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
 index 000000000..58d3226f6
