@@ -71,6 +71,36 @@ aside.spec{display:flex;flex-direction:column;gap:18px;min-width:0}
 .ch-corner{position:absolute;top:6%;right:5%;font-family:var(--f-mono);font-size:clamp(9px,1.1vw,12px);letter-spacing:.16em;color:#d7dbe7}
 @keyframes split{0%{text-shadow:-3px 0 #ff2b55,3px 0 #2bd9ff}50%{text-shadow:2px 0 #ff2b55,-2px 0 #2bd9ff}100%{text-shadow:none}}
 
+/* Study D: cover shelf (CSS 3D) */
+.shelf3d{position:absolute;inset:0;perspective:1100px;perspective-origin:50% 38%;overflow:hidden}
+.cover{position:absolute;left:37%;top:13%;width:26%;aspect-ratio:1;transform-style:preserve-3d;will-change:transform}
+.cover .face{position:absolute;inset:0;backface-visibility:hidden;border-radius:4px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+.cover .face img{width:100%;height:100%;display:block}
+.cover .back{transform:rotateY(180deg);background:#0d1017;border:1px solid #2a3040;display:flex;flex-direction:column;justify-content:center;gap:6%;padding:9%;font-family:var(--f-mono);font-size:clamp(8px,1vw,11px);letter-spacing:.08em;color:#c8cede;text-transform:uppercase}
+.cover .back b{font-family:var(--f-display);font-weight:400;font-size:clamp(10px,1.4vw,16px);letter-spacing:.02em;color:#fff;text-transform:none;line-height:1.25}
+.cover .refl{position:absolute;left:0;right:0;top:100%;height:100%;transform:scaleY(-1);opacity:.28;-webkit-mask-image:linear-gradient(to top,#000 0%,transparent 45%);mask-image:linear-gradient(to top,#000 0%,transparent 45%);backface-visibility:hidden}
+.cover .refl img{width:100%;height:100%;display:block}
+.shelf-info{position:absolute;left:0;right:0;bottom:7%;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center}
+.shelf-info .nm{font-family:var(--f-display);font-size:clamp(13px,2.2vw,24px);color:#fff;padding:0 6%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;transition:opacity .25s,transform .35s}
+.shelf-info .mt{font-family:var(--f-mono);font-size:clamp(9px,1.1vw,12px);letter-spacing:.12em;color:#aeb5c7;text-transform:uppercase;transition:opacity .25s}
+.shelf-info.swap .nm{opacity:0;transform:translateY(6px)}.shelf-info.swap .mt{opacity:0}
+
+/* Study E: XMB */
+.xmb{position:absolute;inset:0;font-family:var(--f-body)}
+.xmb-clock{position:absolute;top:6%;right:5%;font-family:var(--f-mono);font-size:clamp(10px,1.3vw,14px);color:#e8ecf6;letter-spacing:.06em}
+.xmb-cat{position:absolute;top:24%;left:0;width:14%;display:flex;flex-direction:column;align-items:center;gap:6px;will-change:transform,opacity}
+.xmb-cat svg{width:clamp(22px,4.2vw,48px);height:auto;stroke:#fff;fill:none;stroke-width:1.6}
+.xmb-cat span{font-size:clamp(9px,1.2vw,13px);color:#fff;letter-spacing:.04em;white-space:nowrap;transition:opacity .25s}
+.xmb-item{position:absolute;left:0;display:flex;align-items:center;gap:clamp(8px,1.4vw,16px);will-change:transform,opacity}
+.xmb-item .tile{width:clamp(26px,4.6vw,54px);aspect-ratio:1;border-radius:4px;overflow:hidden;flex:none;transition:transform .3s cubic-bezier(.2,.8,.2,1);transform-origin:left center}
+.xmb-item .tile img{width:100%;height:100%;display:block}
+.xmb-item .txt{display:flex;flex-direction:column;min-width:0}
+.xmb-item .lb{font-size:clamp(10px,1.45vw,16px);color:#fff;white-space:nowrap}
+.xmb-item .sb{font-size:clamp(9px,1.05vw,12px);color:#d6dbea;white-space:nowrap;opacity:0;transition:opacity .25s}
+.xmb-item.sel .tile{transform:scale(1.35)}.xmb-item.sel .sb{opacity:.85}
+.xmb-toast{position:absolute;left:50%;bottom:8%;transform:translateX(-50%);font-family:var(--f-mono);font-size:clamp(9px,1.1vw,12px);letter-spacing:.1em;color:#fff;background:rgba(0,0,0,.35);padding:6px 12px;border-radius:6px;opacity:0;transition:opacity .25s;white-space:nowrap}
+.xmb-toast.on{opacity:1}
+
 footer{color:var(--faint);font-size:13px;border-top:1px solid var(--line);padding-top:18px}
 @media (prefers-reduced-motion:reduce){.orbit-title span{animation:none;opacity:1;transform:none}.third{transition:none}.third .name.glitch{animation:none}}
 </style>
@@ -78,10 +108,10 @@ footer{color:var(--faint);font-size:13px;border-top:1px solid var(--line);paddin
 <div class="wrap">
 <header>
   <div class="eyebrow">DeCast-S4 · home screen studies</div>
-  <h1>Three moving shells for the Dreamcast emulator on PS4</h1>
+  <h1>Five moving shells for the Dreamcast emulator on PS4</h1>
   <p class="lede">Each stage below runs live at TV proportions, the way it would on the console. Browse the sample library, start a game, or leave a stage alone and it plays its own attract loop. The two games marked <span style="color:var(--accent)">on console</span> are the ones already in /data/DeCast-S4/games; the rest are sample titles.</p>
-  <div class="keys"><span><kbd>←</kbd> <kbd>→</kbd> browse</span><span><kbd>↑</kbd> <kbd>↓</kbd> list in study B</span><span><kbd>Enter</kbd> start</span><span>click a stage to give it the keys</span></div>
-  <nav class="jump" aria-label="Studies"><a href="#orbit">A · Orbit</a><a href="#lcd">B · Memory unit</a><a href="#channel">C · Channel</a></nav>
+  <div class="keys"><span><kbd>←</kbd> <kbd>→</kbd> browse</span><span><kbd>↑</kbd> <kbd>↓</kbd> lists in studies B and E</span><span><kbd>Enter</kbd> start</span><span>click a stage to give it the keys</span></div>
+  <nav class="jump" aria-label="Studies"><a href="#orbit">A · Orbit</a><a href="#lcd">B · Memory unit</a><a href="#channel">C · Channel</a><a href="#shelf">D · Cover shelf</a><a href="#xmb">E · XMB</a><a href="#covers">Where covers come from</a></nav>
 </header>
 
 <section class="study" id="orbit">
@@ -127,6 +157,48 @@ footer{color:var(--faint);font-size:13px;border-top:1px solid var(--line);paddin
     <div><h3>On the PS4</h3><p>The scene renders at 192 × 108 into an off-screen image and is scaled up with a scanline shader, so it costs almost nothing. The static is a noise texture shifted each frame.</p></div>
     <div class="cost"><span>draw calls</span><span>~6 per frame</span><span>assets</span><span>none, all generated</span><span>risk</span><span>retro look is divisive</span></div>
   </aside>
+</section>
+
+<section class="study" id="shelf">
+  <div class="study-head"><span class="tag">STUDY D</span><h2>Cover shelf</h2><p>Box art stands on a glossy shelf in real 3D perspective. Neighbours turn away on each side; the selected case faces you and the room picks up its colours. Starting a game flips the case to its back, where the details sit, before the game boots. The covers here are generated stand-ins; on the console they are the real box art.</p></div>
+  <div>
+    <div class="stage" tabindex="0" data-impl="shelf" aria-label="Cover shelf study, live demo">
+      <canvas></canvas>
+      <div class="shelf3d"></div>
+      <div class="hud"><div class="shelf-info"><div class="nm"></div><div class="mt"></div></div></div>
+    </div>
+    <div class="ctrl"><button data-act="prev">Previous</button><button data-act="go" class="go">Start</button><button data-act="next">Next</button></div>
+  </div>
+  <aside class="spec">
+    <div><h3>What moves</h3><ul><li>Cases turn and slide on one spring, with true depth</li><li>Each case has a soft mirror image on the shelf</li><li>Background light fields follow the selected cover</li><li>Start flips the case over to its back cover</li></ul></div>
+    <div><h3>On the PS4</h3><p>Each case is two textured quads (case and reflection) under one perspective matrix; covers are decoded once and kept as small textures. Without covers it falls back to the generated cases shown here.</p></div>
+    <div class="cost"><span>draw calls</span><span>~20 per frame</span><span>assets</span><span>box art per game</span><span>risk</span><span>looks bare without covers</span></div>
+  </aside>
+</section>
+
+<section class="study" id="xmb">
+  <div class="study-head"><span class="tag">STUDY E</span><h2>XMB</h2><p>The cross bar from DolphinPS4 and Crema: categories across, items down, over a slow light wave. Items you scroll past rise above the bar, the selection sits just below it. Games, memory cards, captures and settings all live in one place.</p></div>
+  <div>
+    <div class="stage" tabindex="0" data-impl="xmb" aria-label="XMB study, live demo">
+      <canvas></canvas>
+      <div class="xmb"><div class="xmb-clock"></div><div class="xmb-toast"></div></div>
+    </div>
+    <div class="ctrl"><button data-act="prev">Left</button><button data-act="up">Up</button><button data-act="down">Down</button><button data-act="next">Right</button><button data-act="go" class="go">Open</button></div>
+  </div>
+  <aside class="spec">
+    <div><h3>What moves</h3><ul><li>Light ribbons drift and bend behind everything</li><li>Both axes ride springs; passed items rise above the bar</li><li>The selected tile grows and its details fade in</li><li>Opening a game brightens the wave and boots it</li></ul></div>
+    <div><h3>On the PS4</h3><p>Crema already has this launcher (ported from DolphinPS4), so it is mostly reuse: the same fonts, sounds and button glyphs, with Dreamcast categories and the memory-card column added.</p></div>
+    <div class="cost"><span>draw calls</span><span>~40 per frame</span><span>assets</span><span>shared with Crema</span><span>risk</span><span>least new, most familiar</span></div>
+  </aside>
+</section>
+
+<section class="study" id="covers">
+  <div class="study-head"><span class="tag">COVERS</span><h2>Where the box art comes from</h2><p>DeCast-S4 can fetch covers by itself, the way RetroArch does, from the libretro thumbnail library. Every disc carries a product number that Flycast already reads at boot, and libretro's Dreamcast database ties that number to the exact image name.</p></div>
+  <div class="spec" style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px">
+    <div><h3>1 · Automatic</h3><p>Read the product number from the disc (T13002N, MK-51117), look it up in a table of 1,897 Dreamcast discs built into the app, and download that game's box art once from thumbnails.libretro.com. Both games on your console are there.</p></div>
+    <div><h3>2 · Your own</h3><p>Drop any PNG or JPG into /data/DeCast-S4/covers named after the game file or the product number. Your image always wins over a downloaded one.</p></div>
+    <div><h3>3 · Fallback</h3><p>No cover and no network: the shelf generates a case in the game's colours, like the ones on this page, so nothing ever shows a blank square.</p></div>
+  </div>
 </section>
 
 <footer>Studies for the DeCast-S4 launcher. Motion stops when your system asks for reduced motion; the stages still respond to keys and taps.</footer>
@@ -430,10 +502,178 @@ function channel(st) {
   };
 }
 
+/* ---------- Generated stand-in covers (real box art replaces these on the console) ---------- */
+const coverCache = new Map();
+function coverURL(g, size = 384) {
+  const key = g.t + size;
+  if (coverCache.has(key)) return coverCache.get(key);
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  const x = c.getContext("2d"), s = size / 384;
+  x.fillStyle = g.c2; x.fillRect(0, 0, size, size);
+  x.save(); x.translate(size * .58, size * .46); x.rotate(-.5);
+  for (let k = 0; k < 7; k++) { x.fillStyle = rgba(mix(g.b, g.a, .25 + k * .11), 1); x.fillRect(-size, -size * .5 + k * 34 * s, size * 2, 22 * s); }
+  x.restore();
+  const v = x.createLinearGradient(0, size * .45, 0, size); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.75)");
+  x.fillStyle = v; x.fillRect(0, 0, size, size);
+  x.fillStyle = "#e9ecf3"; x.fillRect(0, 0, 30 * s, size);
+  x.fillStyle = g.c2; x.font = `${11 * s}px "JetBrains Mono", monospace`;
+  x.save(); x.translate(20 * s, size - 14 * s); x.rotate(-Math.PI / 2); x.fillText("DECAST · GD", 0, 0); x.restore();
+  x.fillStyle = "#fff"; x.font = `${30 * s}px "Michroma", sans-serif`; x.textBaseline = "alphabetic";
+  const words = g.t.toUpperCase().split(" "); let line = "", y = size - 70 * s; const lines = [];
+  for (const w of words) { const tr = line ? line + " " + w : w; if (x.measureText(tr).width > size - 70 * s && line) { lines.push(line); line = w; } else line = tr; }
+  lines.push(line);
+  y -= (lines.length - 1) * 34 * s;
+  for (const l of lines) { x.fillText(l, 46 * s, y); y += 34 * s; }
+  x.fillStyle = g.c1; x.fillRect(46 * s, size - 52 * s, 64 * s, 5 * s);
+  x.fillStyle = "#cfd4e2"; x.font = `${12 * s}px "JetBrains Mono", monospace`; x.fillText(`${g.y} · ${g.g.toUpperCase()}`, 46 * s, size - 26 * s);
+  const url = c.toDataURL("image/png"); coverCache.set(key, url); return url;
+}
+
+/* ---------- Study D: Cover shelf ---------- */
+function shelf(st) {
+  const holder = st.root.querySelector(".shelf3d"), info = st.root.querySelector(".shelf-info");
+  const nm = info.querySelector(".nm"), mt = info.querySelector(".mt");
+  let pos = 0, vel = 0, flip = -1, colA = GAMES[0].a.slice(), colB = GAMES[0].b.slice();
+  const motes = Array.from({ length: 40 }, () => ({ x: Math.random(), y: Math.random(), s: .4 + Math.random() * 1.4, v: .005 + Math.random() * .02 }));
+  const els = GAMES.map(g => {
+    const d = document.createElement("div"); d.className = "cover";
+    d.innerHTML = `<div class="face front"><img alt=""></div><div class="face back"><b></b><span>${g.y}</span><span>${g.g}</span><span>${g.p} player${g.p === "1" ? "" : "s"}</span>${g.here ? "<span style='color:#ff7a2e'>on console</span>" : ""}</div><div class="refl"><img alt=""></div>`;
+    d.querySelector(".back b").textContent = g.t;
+    holder.appendChild(d); return d;
+  });
+  const paint = () => els.forEach((d, k) => { const u = coverURL(GAMES[k]); d.querySelector(".front img").src = u; d.querySelector(".refl img").src = u; });
+  paint(); document.fonts && document.fonts.ready.then(() => { coverCache.clear(); paint(); });
+  function label(anim) {
+    const g = GAMES[st.i];
+    const set = () => { nm.textContent = g.t; mt.textContent = `${g.y} · ${g.g} · ${g.p}P${g.here ? " · on console" : ""}`; };
+    if (!anim || reduce) return set();
+    info.classList.add("swap"); setTimeout(() => { set(); info.classList.remove("swap"); }, 180);
+  }
+  st.onIndex = () => label(true);
+  st.onGo = () => { if (flip < 0) flip = st.t; };
+  label(false);
+  st.draw = (ctx, w, h, t, dt) => {
+    vel += ((reduce ? 1e4 : 60) * (st.goal - pos) - (reduce ? 200 : 12) * vel) * dt; pos += vel * dt;
+    if (reduce) { pos = st.goal; vel = 0; }
+    const g = GAMES[st.i], e = 1 - Math.pow(.02, dt * 1.6);
+    colA = mix(colA, g.a, e); colB = mix(colB, g.b, e);
+    ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, w, h);
+    const g1 = ctx.createRadialGradient(w * .5, h * .35, 0, w * .5, h * .35, w * .6);
+    g1.addColorStop(0, rgba(colA, .32)); g1.addColorStop(.5, rgba(colB, .45)); g1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g1; ctx.fillRect(0, 0, w, h);
+    const fy = h * .13 + w * .26;
+    const fl = ctx.createLinearGradient(0, fy, 0, h); fl.addColorStop(0, rgba(colB, .35)); fl.addColorStop(1, "rgba(0,0,0,.9)");
+    ctx.fillStyle = fl; ctx.fillRect(0, fy, w, h - fy);
+    ctx.fillStyle = rgba(colA, .5); ctx.fillRect(w * .1, fy, w * .8, 1);
+    for (const m of motes) { if (!reduce) { m.y -= m.v * dt; if (m.y < 0) m.y = 1; } ctx.fillStyle = `rgba(255,255,255,${.08 + m.s * .08})`; ctx.fillRect(m.x * w, m.y * fy, m.s, m.s); }
+    let fp = flip >= 0 ? (t - flip) / (reduce ? .7 : 2.2) : -1;
+    if (fp >= 1) { flip = -1; fp = -1; }
+    els.forEach((d, k) => {
+      let rel = k - pos; rel = mod(rel + N / 2, N) - N / 2;
+      const a = Math.abs(rel), sgn = Math.sign(rel), near = Math.min(a, 1);
+      const x = sgn * (near * w * .22 + Math.max(0, a - 1) * w * .085);
+      let z = -near * 220 - Math.max(0, a - 1) * 40, ry = -sgn * near * 62;
+      if (k === st.i && fp >= 0) {
+        /* lift toward the viewer, turn to the back cover, hold, turn back */
+        const back = fp < .8 ? Math.min(1, fp * 3) : Math.max(0, 1 - (fp - .8) * 5);
+        z += 120 * Math.sin(Math.PI * Math.min(1, fp * 1.2)); ry = -180 * back;
+      }
+      d.style.transform = `translateX(${x}px) translateZ(${z}px) rotateY(${ry}deg)`;
+      d.style.zIndex = String(100 - Math.round(a * 10));
+      d.style.opacity = String(Math.max(0, Math.min(1, 4.2 - a)));
+    });
+  };
+}
+
+/* ---------- Study E: XMB ---------- */
+function xmb(st) {
+  const root = st.root.querySelector(".xmb"), clock = root.querySelector(".xmb-clock"), toast = root.querySelector(".xmb-toast");
+  const ICON = {
+    settings: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="7"/><path d="M24 6v6M24 36v6M6 24h6M36 24h6M11 11l4 4M33 33l4 4M37 11l-4 4M15 33l-4 4"/></svg>',
+    games: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17"/><circle cx="24" cy="24" r="4"/><path d="M24 7a17 17 0 0 1 15 9"/></svg>',
+    cards: '<svg viewBox="0 0 48 48"><rect x="12" y="7" width="24" height="34" rx="4"/><rect x="17" y="12" width="14" height="10" rx="1"/><path d="M19 30h10M19 35h6"/></svg>',
+    captures: '<svg viewBox="0 0 48 48"><rect x="7" y="12" width="34" height="26" rx="3"/><circle cx="24" cy="25" r="7"/><path d="M17 12l3-5h8l3 5"/></svg>',
+    system: '<svg viewBox="0 0 48 48"><rect x="8" y="10" width="32" height="22" rx="2"/><path d="M18 38h12M24 32v6"/></svg>',
+  };
+  const tileFor = (label, hue) => { const g = { t: label, c1: hue, c2: "#11151f", a: hex(hue), b: hex("#11151f"), y: "", g: "" }; return coverURL(g, 96); };
+  const CATS = [
+    { k: "settings", n: "Settings", items: [["Video", "Resolution, widescreen, filtering"], ["Audio", "Volume, latency"], ["Controls", "DualShock 4 to Dreamcast pad"], ["Emulation", "BIOS, region, speed"]].map(([l, s]) => ({ l, s, tile: tileFor(l, "#6fd6ff") })) },
+    { k: "games", n: "Games", items: GAMES.map(g => ({ l: g.t, s: `${g.y} · ${g.g}${g.here ? " · on console" : ""}`, tile: coverURL(g, 96), game: true })) },
+    { k: "cards", n: "Memory cards", items: [["Port A · card 1", "Sample: 4 saves, 72 of 200 blocks"], ["Port A · card 2", "Sample: empty"], ["Port B · card 1", "Sample: 1 save"]].map(([l, s]) => ({ l, s, tile: tileFor("VMU", "#9daa8b") })) },
+    { k: "captures", n: "Captures", items: [["Screenshots", "Saved from the in-game menu"], ["Save states", "Ten slots per game"]].map(([l, s]) => ({ l, s, tile: tileFor(l, "#ff7a2e") })) },
+    { k: "system", n: "System", items: [["Network", "Box art downloads"], ["About DeCast-S4", "Version, licences"]].map(([l, s]) => ({ l, s, tile: tileFor(l, "#b9c0d2") })) },
+  ];
+  let cat = 1, catPos = 1, catVel = 0, sel = CATS.map(() => 0), itemPos = 0, itemVel = 0, boot = -1, toastT = -10;
+  const catEls = CATS.map(c => { const d = document.createElement("div"); d.className = "xmb-cat"; d.innerHTML = ICON[c.k] + `<span>${c.n}</span>`; root.appendChild(d); return d; });
+  let itemEls = [];
+  function buildItems() {
+    itemEls.forEach(e => e.remove());
+    itemEls = CATS[cat].items.map(it => {
+      const d = document.createElement("div"); d.className = "xmb-item";
+      d.innerHTML = `<div class="tile"><img alt="" src="${it.tile}"></div><div class="txt"><div class="lb"></div><div class="sb"></div></div>`;
+      d.querySelector(".lb").textContent = it.l; d.querySelector(".sb").textContent = it.s;
+      root.appendChild(d); return d;
+    });
+    itemPos = sel[cat];
+  }
+  buildItems();
+  document.fonts && document.fonts.ready.then(() => { coverCache.clear(); CATS[1].items.forEach((it, k) => it.tile = coverURL(GAMES[k], 96)); buildItems(); });
+  st.step = (d, user) => { if (user) st.lastInput = st.t; cat = mod(cat + d, CATS.length); buildItems(); };
+  st.stepY = d => { st.lastInput = st.t; sel[cat] = Math.max(0, Math.min(CATS[cat].items.length - 1, sel[cat] + d)); };
+  st.autoStep = () => { if (cat !== 1) { cat = 1; buildItems(); } sel[1] = (sel[1] + 1) % CATS[1].items.length; };
+  st.onGo = () => {
+    const it = CATS[cat].items[sel[cat]];
+    if (it.game) { if (boot < 0) boot = st.t; toast.textContent = `Starting ${it.l}`; }
+    else toast.textContent = `Opening ${it.l}`;
+    toastT = st.t;
+  };
+  st.draw = (ctx, w, h, t, dt) => {
+    catVel += ((reduce ? 1e4 : 80) * (cat - catPos) - (reduce ? 200 : 14) * catVel) * dt; catPos += catVel * dt;
+    itemVel += ((reduce ? 1e4 : 80) * (sel[cat] - itemPos) - (reduce ? 200 : 14) * itemVel) * dt; itemPos += itemVel * dt;
+    if (reduce) { catPos = cat; itemPos = sel[cat]; catVel = itemVel = 0; }
+    const bp = boot >= 0 ? (t - boot) / (reduce ? .6 : 1.8) : -1;
+    if (bp >= 1) boot = -1;
+    const focus = cat === 1 ? GAMES[sel[1]].a : [60, 90, 170];
+    const bg = ctx.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, rgba(mix([10, 18, 52], focus, .18), 1)); bg.addColorStop(1, rgba(mix([4, 6, 20], focus, .1), 1));
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const speed = reduce ? 0 : (1 + (bp >= 0 ? bp * 5 : 0));
+    for (let r = 0; r < 5; r++) {
+      const ph = t * .25 * speed + r * .9, amp = h * (.05 + r * .018), base = h * (.58 + r * .02);
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 8) { const y = base + Math.sin(x / w * 3.2 + ph) * amp + Math.sin(x / w * 7.1 - ph * 1.3) * amp * .35; x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      for (let x = w; x >= 0; x -= 8) { const y = base + 10 + r * 3 + Math.sin(x / w * 3.2 + ph + .35) * amp * 1.1 + Math.sin(x / w * 6.3 - ph) * amp * .3; ctx.lineTo(x, y); }
+      ctx.closePath(); ctx.fillStyle = `rgba(200,220,255,${.035 + (bp >= 0 ? bp * .05 : 0)})`; ctx.fill();
+    }
+    ctx.restore();
+    if (bp >= 0) { ctx.fillStyle = `rgba(255,255,255,${Math.max(0, bp - .55) * 1.8})`; ctx.fillRect(0, 0, w, h); }
+    const baseX = w * .2, gap = w * .155, rowY = h * .24, cw = w * .14;
+    catEls.forEach((d, k) => {
+      const rel = k - catPos, x = baseX + rel * gap - cw / 2;
+      const on = Math.max(0, 1 - Math.abs(rel));
+      d.style.transform = `translateX(${x}px) scale(${.82 + on * .28})`;
+      d.style.opacity = String(Math.max(0, (.45 + on * .55) * (1 - Math.max(0, Math.abs(rel) - 3)) * (bp >= 0 ? 1 - bp : 1)));
+      d.querySelector("span").style.opacity = String(on);
+    });
+    const ih = h * .1, itemsTop = rowY + h * .17;
+    itemEls.forEach((d, k) => {
+      const rel = k - itemPos;
+      const y = rel < 0 ? rowY - h * .03 + rel * ih * .9 - ih : itemsTop + rel * ih;
+      d.style.transform = `translate(${baseX - w * .02}px, ${y}px)`;
+      d.classList.toggle("sel", k === sel[cat]);
+      const fade = rel < 0 ? .5 : 1;
+      d.style.opacity = String(Math.max(0, fade * (1 - Math.max(0, Math.abs(rel) - 3.5) * .5)) * (bp >= 0 ? 1 - bp : 1));
+    });
+    toast.classList.toggle("on", t - toastT < 1.6);
+    const now = new Date(); clock.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+}
+
 function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
 
 /* ---------- Stage runtime ---------- */
-const IMPLS = { orbit, lcd, channel };
+const IMPLS = { orbit, lcd, channel, shelf, xmb };
 const stages = [];
 document.querySelectorAll(".stage").forEach(root => {
   const canvas = root.querySelector("canvas"), ctx = canvas.getContext("2d");
@@ -446,16 +686,19 @@ document.querySelectorAll(".stage").forEach(root => {
     st.draw(ctx, st.w, st.h, st.t, 0);
   };
   new ResizeObserver(fit).observe(canvas);
-  st.step = (d, user) => {
+  st.step = st.step || ((d, user) => {
     const from = st.i; st.goal += d; st.i = mod(st.goal, N);
     if (user) st.lastInput = st.t;
     st.onIndex && st.onIndex(from);
-  };
+  });
+  /* ↑/↓: the XMB's item column, the memory unit's list, ignored elsewhere */
+  st.stepY = st.stepY || (root.dataset.impl === "lcd" ? d => st.step(d, true) : null);
   st.go = () => { st.lastInput = st.t; st.onGo && st.onGo(); };
   root.addEventListener("keydown", e => {
     const k = e.key;
-    if (k === "ArrowRight" || (root.dataset.impl === "lcd" && k === "ArrowDown")) { st.step(1, true); e.preventDefault(); }
-    else if (k === "ArrowLeft" || (root.dataset.impl === "lcd" && k === "ArrowUp")) { st.step(-1, true); e.preventDefault(); }
+    if (k === "ArrowRight") { st.step(1, true); e.preventDefault(); }
+    else if (k === "ArrowLeft") { st.step(-1, true); e.preventDefault(); }
+    else if ((k === "ArrowDown" || k === "ArrowUp") && st.stepY) { st.stepY(k === "ArrowDown" ? 1 : -1); e.preventDefault(); }
     else if (k === "Enter" || k === " ") { st.go(); e.preventDefault(); }
   });
   root.addEventListener("click", e => {
@@ -465,7 +708,9 @@ document.querySelectorAll(".stage").forEach(root => {
   });
   root.parentElement.querySelectorAll(".ctrl button").forEach(b => b.addEventListener("click", () => {
     const a = b.dataset.act;
-    if (a === "prev") st.step(-1, true); else if (a === "next") st.step(1, true); else st.go();
+    if (a === "prev") st.step(-1, true); else if (a === "next") st.step(1, true);
+    else if ((a === "up" || a === "down") && st.stepY) st.stepY(a === "down" ? 1 : -1);
+    else st.go();
   }));
   new IntersectionObserver(es => es.forEach(en => st.inView = en.isIntersecting), { threshold: .15 }).observe(root);
   stages.push(st);
@@ -477,7 +722,7 @@ function loop(now) {
   for (const st of stages) {
     if (!st.inView || !st.w) continue;
     st.t += dt;
-    if (!reduce && st.t - st.lastInput > 7 && st.t > st.nextAuto) { st.step(1, false); st.nextAuto = st.t + 3.6; }
+    if (!reduce && st.t - st.lastInput > 7 && st.t > st.nextAuto) { st.autoStep ? st.autoStep() : st.step(1, false); st.nextAuto = st.t + 3.6; }
     st.draw(st.ctx, st.w, st.h, st.t, dt);
   }
   requestAnimationFrame(loop);
