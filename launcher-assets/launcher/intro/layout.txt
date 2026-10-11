@@ -1,0 +1,4 @@
+# source 1024 559; <file> <x> <y> <w> <h> in source pixels (the files are 2x)
+sonic.png 271 39 462 520
+console.png 460 274 264 199
+bg.jpg 15.01 0 993.78 559

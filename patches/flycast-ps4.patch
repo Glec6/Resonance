@@ -43212,10 +43212,10 @@ index 9bf4830a7..1ed162421 100644
 +endif()
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
-index 000000000..c8972c1fd
+index 000000000..1d38cd0f0
 --- /dev/null
 +++ b/shell/ps4/CMakeLists.txt
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,40 @@
 +# DeCast-S4: Flycast on PS4 homebrew. Built with the DeCast-S4 toolchain (toolchain/ps4-decast.cmake,
 +# ps4-love-style.cmake: PS4_RUNTIME_SOURCES, ps4_link_mesa, ps4_add_eboot).
 +target_sources(${PROJECT_NAME} PRIVATE
@@ -43231,6 +43231,7 @@ index 000000000..c8972c1fd
 +	launcher/launcher.h
 +	launcher/launcher_internal.h
 +	launcher/covers.cpp
++	launcher/intro.cpp
 +	launcher/libretro_scraper.h
 +	launcher/sound.cpp
 +	launcher/theme_orbit.cpp
@@ -43842,12 +43843,633 @@ index 000000000..26f3b7021
 +}
 +
 +} // namespace launcher
+diff --git a/shell/ps4/launcher/intro.cpp b/shell/ps4/launcher/intro.cpp
+new file mode 100644
+index 000000000..5df0b7c63
+--- /dev/null
++++ b/shell/ps4/launcher/intro.cpp
+@@ -0,0 +1,615 @@
++/*
++	Resonance's opening, played once when the app starts: Sonic spin-dashes into the spotlight as a
++	ball, skids to the middle of the stage and hops up as the Dreamcast drops out of the sky, uncurls
++	and catches it (the trophy catch at the end of a Crash Team Racing cup), lands; confetti, light
++	rays, the name.
++
++	The pictures are cut from one illustration by scripts/make-resonance-art.py
++	(/app0/launcher/intro: the arena, Sonic holding the console, the console alone, and layout.txt
++	with where each sits in the illustration). The ball is drawn with the fur of Sonic.s head.
++	Any button skips.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "ps4_gamepad.h"
++#include "ui/imgui_driver.h"
++
++#include <stb_image.h>
++
++#include <cstdio>
++#include <cstring>
++#include <map>
++
++extern "C" void ps4_boot_trace(const char *line);
++
++namespace launcher
++{
++namespace
++{
++const char *const kDir = "/app0/launcher/intro/";
++
++// Timeline (seconds)
++constexpr float ROLL_START = .30f, ROLL_END = .95f;	// the ball rolls in and skids to the middle
++constexpr float CATCH = 1.20f;							// it hops up, Sonic uncurls with the console
++constexpr float DROP_START = .60f;						// the console falls; it arrives at CATCH
++constexpr float LAND = .26f;							// after the catch: back on his feet
++constexpr float TITLE_START = 1.55f;
++constexpr float END = 4.4f, FADE_OUT = .45f;
++
++struct Layer
++{
++	ImTextureID tex {};
++	float x = 0, y = 0, w = 0, h = 0;	// in the illustration's pixels
++};
++
++struct Particle
++{
++	ImVec2 p, v;
++	float rot, spin, size, flip, flipSpeed;
++	Color c;
++};
++
++class Intro
++{
++public:
++	bool load()
++	{
++		std::map<std::string, Layer> layout;
++		FILE *f = fopen((std::string(kDir) + "layout.txt").c_str(), "r");
++		if (f == nullptr)
++			return false;
++		char line[256];
++		while (fgets(line, sizeof(line), f) != nullptr)
++		{
++			char name[64];
++			Layer l;
++			if (line[0] == '#')
++			{
++				sscanf(line, "# source %f %f", &srcW, &srcH);
++				continue;
++			}
++			if (sscanf(line, "%63s %f %f %f %f", name, &l.x, &l.y, &l.w, &l.h) == 5)
++				layout[name] = l;
++		}
++		fclose(f);
++		const char *const names[] = { "bg.jpg", "sonic.png", "console.png" };
++		Layer *const dest[] = { &bg, &sonic, &console };
++		for (int i = 0; i < 3; i++)
++		{
++			auto it = layout.find(names[i]);
++			if (it == layout.end())
++				return false;
++			*dest[i] = it->second;
++			dest[i]->tex = loadTexture(std::string(kDir) + names[i]);
++			if (dest[i]->tex == ImTextureID())
++				return false;
++		}
++		return srcH > 0;
++	}
++
++	// false once finished (or skipped)
++	bool draw(Frame& f)
++	{
++		if (!started)
++		{
++			started = true;
++			t0 = f.t;
++			u32 b = 0;
++			float lx, ly;
++			ps4_pad_state(b, lx, ly);
++			prevButtons = b;
++			return true;		// the textures went up this frame: start the clock on the next
++		}
++		const float t = f.t - t0;
++		ImDrawList *dl = f.dl;
++		// any button skips (after a moment, so the button that launched the app doesn't)
++		u32 buttons = 0;
++		float lx, ly;
++		ps4_pad_state(buttons, lx, ly);
++		if ((buttons & ~prevButtons) != 0 && t > .3f && skipAt < 0)
++			skipAt = t;
++		prevButtons = buttons;
++		const float end = skipAt >= 0 ? std::min(END, skipAt + .3f) : END;
++		if (t >= end)
++			return false;
++
++		k = f.h / srcH;
++		cx = f.w * .5f;
++		fh = f.h;
++		const float since = t - CATCH;
++		// camera: a slow push in, a jolt when he lands
++		zoom = 1.f + .035f * easeOut((t - CATCH) / 3.f);
++		shake = ImVec2();
++		const float sinceLand = since - LAND;
++		if (sinceLand > 0 && sinceLand < .25f)
++		{
++			const float a = (1 - sinceLand / .25f) * f.h * .007f;
++			shake = ImVec2(std::sin(sinceLand * 90.f) * a, std::cos(sinceLand * 73.f) * a);
++		}
++
++		drawLayer(f, bg, 0, 0, 1, 1, IM_COL32_WHITE);
++		drawSpotlight(f, t);
++		if (since > 0)
++			drawRays(f, since);
++
++		if (!soundRoll && t >= ROLL_START)
++		{
++			soundRoll = true;
++			playSound(Sound::Launch);
++		}
++		if (!soundCatch && t >= CATCH)
++		{
++			soundCatch = true;
++			playSound(Sound::Confirm);
++			spawnConfetti(f);
++		}
++
++		if (t < CATCH)
++		{
++			drawSpeedLines(f, t);
++			drawDust(f, t);
++			if (t >= ROLL_START)
++			{
++				// afterimages, then the ball
++				for (int i = 4; i >= 1; i--)
++				{
++					const float tg = t - i * .03f;
++					if (tg >= ROLL_START)
++						drawBall(f, ballPos(f, tg), ballAngle(tg), .35f * (1 - i / 5.f) * clamp01(rollSpeed(tg) * 2.f));
++				}
++				drawBall(f, ballPos(f, t), ballAngle(t), 1.f);
++			}
++			drawFallingConsole(f, t);
++		}
++		else
++		{
++			// uncurled with the console in his hands, a little above the stage: drop, land, squash
++			const float air = std::max(0.f, 1 - since / LAND);
++			const float dy = -f.h * .06f * air * air;
++			const float pop = std::exp(-since * 9.f);
++			float sx = 1 - .12f * pop, sy = 1 - .12f * pop;
++			if (sinceLand > 0)
++			{
++				const float squash = std::exp(-sinceLand * 7.f) * std::cos(sinceLand * 22.f);
++				sx = 1 + .04f * squash;
++				sy = 1 - .06f * squash;
++			}
++			drawLayer(f, sonic, 0, dy, sx, sy, IM_COL32_WHITE);
++			drawDust(f, t);
++			drawCatchFlash(f, since);
++		}
++		updateConfetti(f);
++		drawConfetti(f);
++		drawTitle(f, t);
++
++		// in from black, out to black (the home screen fades in after)
++		float black = 1.f - clamp01(t / .35f);
++		black = std::max(black, clamp01((t - (end - FADE_OUT)) / FADE_OUT));
++		if (black > 0)
++			dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * black)));
++		return true;
++	}
++
++private:
++	static ImTextureID loadTexture(const std::string& path)
++	{
++		ImTextureID id = imguiDriver->getTexture(path);
++		if (id != ImTextureID())
++			return id;
++		int w, h, n;
++		u8 *data = stbi_load(path.c_str(), &w, &h, &n, 4);
++		if (data == nullptr)
++			return {};
++		try {
++			id = imguiDriver->updateTexture(path, data, w, h, false);
++		} catch (...) {
++		}
++		stbi_image_free(data);
++		return id;
++	}
++
++	// Illustration pixels -> screen (the arena fills the height, centred), with the camera
++	ImVec2 screen(float sx, float sy) const
++	{
++		const ImVec2 c(cx, fh * .5f);
++		const ImVec2 p(cx + (sx - srcW * .5f) * k, sy * k);
++		return ImVec2(c.x + (p.x - c.x) * zoom + shake.x, c.y + (p.y - c.y) * zoom + shake.y);
++	}
++
++	// A layer at its place in the illustration, moved by (dx, dy) and scaled about its bottom middle
++	void drawLayer(Frame& f, const Layer& l, float dx, float dy, float sx, float sy, ImU32 col)
++	{
++		const ImVec2 a = screen(l.x, l.y), b = screen(l.x + l.w, l.y + l.h);
++		const float midX = (a.x + b.x) * .5f, bottom = b.y;
++		auto at = [&](float x, float y) {
++			return ImVec2(midX + (x - midX) * sx + dx, bottom + (y - bottom) * sy + dy);
++		};
++		const ImVec2 p[4] = { at(a.x, a.y), at(b.x, a.y), at(b.x, b.y), at(a.x, b.y) };
++		const ImVec2 uv[4] = { ImVec2(0, 0), ImVec2(1, 0), ImVec2(1, 1), ImVec2(0, 1) };
++		const ImU32 c[4] = { col, col, col, col };
++		drawQuad(f.dl, l.tex, p, uv, c);
++	}
++
++	// ---- the spin dash ----
++
++	float ballRadius() const {
++		return fh * .15f;
++	}
++	ImVec2 catchPoint() const {
++		return screen(console.x + console.w * .5f, console.y + console.h * .5f);
++	}
++	float rollProgress(float t) const {
++		return clamp01((t - ROLL_START) / (ROLL_END - ROLL_START));
++	}
++	float rollSpeed(float t) const {		// 1 = flat out, 0 = stopped
++		return t > ROLL_END ? 0.f : std::pow(1 - rollProgress(t), 1.6f);
++	}
++	ImVec2 ballPos(const Frame& f, float t) const
++	{
++		const float r = ballRadius();
++		const float floorY = f.h * .965f - r;
++		const float targetX = catchPoint().x;
++		const float p = rollProgress(t);
++		const float x = -r * 1.5f + (targetX + r * 1.5f) * (1 - std::pow(1 - p, 2.4f));
++		if (t <= ROLL_END)
++			return ImVec2(x, floorY);
++		// the hop: up to the falling console
++		const float q = clamp01((t - ROLL_END) / (CATCH - ROLL_END));
++		const float apex = catchPoint().y;
++		return ImVec2(targetX, floorY + (apex - floorY) * (1 - (1 - q) * (1 - q)));
++	}
++	float ballAngle(float t) const
++	{
++		// rolling: the angle follows the distance; the hop spins it faster
++		const float p = rollProgress(t);
++		float a = (1 - std::pow(1 - p, 2.4f)) * 34.f;
++		if (t > ROLL_END)
++			a += (t - ROLL_END) * 30.f;
++		return a;
++	}
++
++	// A ball of Sonic's quill fur turning at angle, with dark spike lines, a rim and a highlight
++	void drawBall(Frame& f, ImVec2 c, float angle, float alpha)
++	{
++		if (alpha <= .01f)
++			return;
++		ImDrawList *dl = f.dl;
++		const float r = ballRadius();
++		// the fur: a fan textured from his forehead (illustration ~(505, 105)), turning
++		const float u0 = (505 - sonic.x) / sonic.w, v0 = (105 - sonic.y) / sonic.h;
++		const float ur = 38 / sonic.w, vr = 38 / sonic.h;
++		constexpr int SEG = 40;
++		dl->PushTexture(sonic.tex);
++		dl->PrimReserve(SEG * 3, SEG + 1);
++		const u32 base = dl->_VtxCurrentIdx;
++		const ImU32 col = Color { .78f, .83f, .96f }.u32(alpha);
++		dl->PrimWriteVtx(c, ImVec2(u0, v0), col);
++		for (int i = 0; i < SEG; i++)
++		{
++			const float a = 2 * PI * i / SEG;
++			dl->PrimWriteVtx(ImVec2(c.x + std::cos(a) * r, c.y + std::sin(a) * r),
++					ImVec2(u0 + std::cos(a + angle) * ur, v0 + std::sin(a + angle) * vr), col);
++		}
++		for (int i = 0; i < SEG; i++)
++		{
++			dl->PrimWriteIdx((ImDrawIdx)base);
++			dl->PrimWriteIdx((ImDrawIdx)(base + 1 + i));
++			dl->PrimWriteIdx((ImDrawIdx)(base + 1 + (i + 1) % SEG));
++		}
++		dl->PopTexture();
++		// spikes curling round as it spins
++		for (int i = 0; i < 5; i++)
++		{
++			const float a = angle + i * 2 * PI / 5;
++			auto at = [&](float rr, float da) { return ImVec2(c.x + std::cos(a + da) * r * rr, c.y + std::sin(a + da) * r * rr); };
++			dl->AddBezierQuadratic(at(.18f, 0), at(.62f, .45f), at(.97f, 1.05f), IM_COL32(16, 30, 92, (int)(210 * alpha)), r * .09f, 12);
++		}
++		// dark rim, then a highlight
++		dl->AddCircle(c, r * .97f, IM_COL32(10, 20, 70, (int)(200 * alpha)), 48, r * .07f);
++		drawBlob(dl, ImVec2(c.x - r * .35f, c.y - r * .4f), r * .45f, IM_COL32(255, 255, 255, (int)(70 * alpha)));
++		// its shadow on the stage while it rolls
++		if (alpha > .9f)
++		{
++			const float floorY = f.h * .965f;
++			const float lift = clamp01((floorY - r - c.y) / (r * 2));
++			drawBlob(dl, ImVec2(c.x, floorY), r * (1.1f - .4f * lift), IM_COL32(0, 0, 20, (int)(110 * (1 - lift))));
++		}
++	}
++
++	void drawFallingConsole(Frame& f, float t)
++	{
++		if (t < DROP_START)
++			return;
++		// gravity: from above the screen into his hands at the catch, turning as it falls
++		const float q = clamp01((t - DROP_START) / (CATCH - DROP_START));
++		const float rest = console.y * k;
++		const float height = rest + console.h * k + f.h * .15f;
++		for (int i = 3; i >= 1; i--)
++		{
++			const float qi = std::max(0.f, q - i * .06f);
++			drawRotated(f, console, -height * (1 - qi * qi), (1 - qi) * (1 - qi) * .9f,
++					IM_COL32(255, 255, 255, (int)(60 * (1 - i / 4.f))));
++		}
++		const float drop = height * (1 - q * q);
++		drawRotated(f, console, -drop, (1 - q) * (1 - q) * .9f, IM_COL32_WHITE);
++		const ImVec2 c = screen(console.x + console.w * .5f, console.y + console.h * .3f);
++		drawBlob(f.dl, ImVec2(c.x, c.y - drop), f.h * .05f, IM_COL32(255, 255, 255, (int)(150 * (.5f + .5f * std::sin(t * 30.f)))));
++	}
++
++	void drawRotated(Frame& f, const Layer& l, float dy, float angle, ImU32 col)
++	{
++		const ImVec2 a = screen(l.x, l.y), b = screen(l.x + l.w, l.y + l.h);
++		const ImVec2 c((a.x + b.x) * .5f, (a.y + b.y) * .5f + dy);
++		const float hw = (b.x - a.x) * .5f, hh = (b.y - a.y) * .5f;
++		const float cs = std::cos(angle), sn = std::sin(angle);
++		auto rot = [&](float x, float y) { return ImVec2(c.x + x * cs - y * sn, c.y + x * sn + y * cs); };
++		const ImVec2 p[4] = { rot(-hw, -hh), rot(hw, -hh), rot(hw, hh), rot(-hw, hh) };
++		const ImVec2 uv[4] = { ImVec2(0, 0), ImVec2(1, 0), ImVec2(1, 1), ImVec2(0, 1) };
++		const ImU32 cc[4] = { col, col, col, col };
++		drawQuad(f.dl, l.tex, p, uv, cc);
++	}
++
++	// ---- light and air ----
++
++	void drawSpotlight(Frame& f, float t)
++	{
++		// a beam from above sweeping onto the middle of the stage, then breathing
++		const float sweep = easeOut((t - .1f) / 1.1f);
++		const float x = f.w * (.15f + .35f * sweep) + std::sin(t * .8f) * f.w * .01f;
++		const float a = .22f * clamp01(t / .5f);
++		const ImVec2 p[4] = { ImVec2(x - f.w * .06f, -10), ImVec2(x + f.w * .06f, -10), ImVec2(x + f.w * .22f, f.h), ImVec2(x - f.w * .22f, f.h) };
++		const ImVec2 uv[4] {};
++		const ImU32 top = IM_COL32(255, 244, 214, (int)(255 * a)), bottom = IM_COL32(255, 244, 214, 0);
++		const ImU32 c[4] = { top, top, bottom, bottom };
++		drawQuad(f.dl, ImTextureID(), p, uv, c);
++		drawBlob(f.dl, ImVec2(x, f.h * .82f), f.w * .22f, IM_COL32(255, 236, 190, (int)(110 * a / .22f)));
++	}
++
++	void drawRays(Frame& f, float since)
++	{
++		// light rays turning behind Sonic after the catch
++		const ImVec2 c = catchPoint();
++		const float a = clamp01(since / .3f) * .16f;
++		const float r = f.w;
++		const int RAYS = 16;
++		for (int i = 0; i < RAYS; i++)
++		{
++			const float ang = since * .25f + i * 2 * PI / RAYS;
++			const float wdt = PI / RAYS * .55f;
++			const ImVec2 p[4] = { c, c, ImVec2(c.x + std::cos(ang - wdt) * r, c.y + std::sin(ang - wdt) * r),
++				ImVec2(c.x + std::cos(ang + wdt) * r, c.y + std::sin(ang + wdt) * r) };
++			const ImVec2 uv[4] {};
++			const ImU32 in = IM_COL32(255, 248, 220, (int)(255 * a)), out = IM_COL32(255, 248, 220, 0);
++			const ImU32 cc[4] = { in, in, out, out };
++			drawQuad(f.dl, ImTextureID(), p, uv, cc);
++		}
++	}
++
++	void drawSpeedLines(Frame& f, float t)
++	{
++		const float sp = t < ROLL_START ? 0.f : rollSpeed(t);
++		if (sp < .05f)
++			return;
++		u32 x = 0x1234567u;
++		for (int i = 0; i < 26; i++)
++		{
++			x ^= x << 13; x ^= x >> 17; x ^= x << 5;
++			const float y = (x & 0xffff) / 65535.f * f.h;
++			const float len = f.w * (.08f + .14f * ((x >> 16) & 0xff) / 255.f);
++			const float px = std::fmod(((x >> 8) & 0xffff) / 65535.f * f.w * 2 + t * f.w * 3.f, f.w * 1.6f) - f.w * .3f;
++			f.dl->AddRectFilledMultiColor(ImVec2(px - len, y), ImVec2(px, y + 2.5f), IM_COL32(255, 255, 255, 0),
++					IM_COL32(255, 255, 255, (int)(140 * sp)), IM_COL32(255, 255, 255, (int)(140 * sp)), IM_COL32(255, 255, 255, 0));
++		}
++	}
++
++	void drawDust(Frame& f, float t)
++	{
++		// puffs and sparks kicked up while the ball brakes, and when he lands
++		const float from = ROLL_START + (ROLL_END - ROLL_START) * .55f;
++		for (int i = 0; i < 12; i++)
++		{
++			const bool landing = i >= 8;
++			const float born = landing ? CATCH + LAND + (i - 8) * .03f : from + i * .045f;
++			const float age = t - born;
++			if (age < 0 || age > .9f)
++				continue;
++			const float x = landing ? catchPoint().x + (i % 2 ? 1 : -1) * f.w * (.08f + .1f * easeOut(age / .9f))
++					: ballPos(f, born).x - ballRadius() * .4f;
++			const float r = f.h * (.04f + .1f * easeOut(age / .9f));
++			drawBlob(f.dl, ImVec2(x - (landing ? 0 : age * f.w * .06f), f.h * .97f - age * f.h * .07f), r,
++					IM_COL32(236, 222, 200, (int)(150 * (1 - age / .9f))));
++			if (!landing && age < .25f)
++			{
++				// sparks off the stage
++				const ImVec2 s(x + ballRadius() * .3f - age * f.w * .3f, f.h * .965f - age * f.h * .25f * (1 + i % 3));
++				f.dl->AddLine(s, ImVec2(s.x + f.w * .02f, s.y + f.h * .01f), IM_COL32(255, 220, 120, (int)(255 * (1 - age / .25f))), 3.f);
++			}
++		}
++	}
++
++	void drawCatchFlash(Frame& f, float s)
++	{
++		if (s > .7f)
++			return;
++		const ImVec2 c = catchPoint();
++		const float e = easeOut(s / .7f);
++		// the uncurl hides in a white burst
++		f.dl->AddCircle(c, f.h * (.08f + .5f * e), IM_COL32(255, 255, 255, (int)(220 * (1 - e))), 96, 6.f * (1 - e) + 1.f);
++		drawBlob(f.dl, c, f.h * (.22f + .25f * e), IM_COL32(255, 255, 255, (int)(255 * (1 - e) * (1 - e))));
++		for (int i = 0; i < 8; i++)
++		{
++			const float ang = i * PI / 4 + .3f;
++			const float d = f.h * (.06f + .3f * e);
++			const ImVec2 p(c.x + std::cos(ang) * d, c.y + std::sin(ang) * d);
++			const float sz = f.h * .025f * (1 - e);
++			const ImU32 col = IM_COL32(255, 250, 220, (int)(255 * (1 - e)));
++			f.dl->AddLine(ImVec2(p.x - sz, p.y), ImVec2(p.x + sz, p.y), col, 3.f);
++			f.dl->AddLine(ImVec2(p.x, p.y - sz), ImVec2(p.x, p.y + sz), col, 3.f);
++		}
++	}
++
++	void spawnConfetti(const Frame& f)
++	{
++		static const Color colors[] = { { 1.f, .82f, .25f }, { .3f, .55f, 1.f }, { 1.f, 1.f, 1.f }, { 1.f, .5f, .2f }, { .95f, .3f, .4f } };
++		u32 x = 0xC0FFEEu;
++		auto rnd = [&]() { x ^= x << 13; x ^= x >> 17; x ^= x << 5; return (x & 0xffffff) / float(0xffffff); };
++		const ImVec2 c = catchPoint();
++		confetti.clear();
++		for (int i = 0; i < 220; i++)
++		{
++			Particle p;
++			if (i < 90)
++			{
++				// a burst out of the catch
++				const float ang = -PI * (.1f + .8f * rnd());
++				const float sp = f.h * (.8f + 1.3f * rnd());
++				p.p = c;
++				p.v = ImVec2(std::cos(ang) * sp, std::sin(ang) * sp);
++			}
++			else
++			{
++				// a shower from the top
++				p.p = ImVec2(rnd() * f.w, -f.h * (.05f + .6f * rnd()));
++				p.v = ImVec2((rnd() - .5f) * f.w * .15f, f.h * (.1f + .2f * rnd()));
++			}
++			p.rot = rnd() * PI;
++			p.spin = (rnd() - .5f) * 10.f;
++			p.size = f.h * (.008f + .01f * rnd());
++			p.flip = rnd() * PI;
++			p.flipSpeed = 4.f + 8.f * rnd();
++			p.c = colors[i % std::size(colors)];
++			confetti.push_back(p);
++		}
++	}
++
++	void updateConfetti(const Frame& f)
++	{
++		for (Particle& p : confetti)
++		{
++			p.v.y += f.h * 1.1f * f.dt;
++			const float drag = std::exp(-1.8f * f.dt);
++			p.v.x *= drag;
++			p.v.y = std::min(p.v.y * drag, f.h * .35f);	// paper flutters down slowly
++			p.p.x += (p.v.x + std::sin(p.flip) * f.h * .05f) * f.dt;
++			p.p.y += p.v.y * f.dt;
++			p.rot += p.spin * f.dt;
++			p.flip += p.flipSpeed * f.dt;
++		}
++	}
++
++	void drawConfetti(Frame& f)
++	{
++		for (const Particle& p : confetti)
++		{
++			if (p.p.y > f.h + 20)
++				continue;
++			// a paper square turning over: its width follows the flip
++			const float w = p.size * std::fabs(std::cos(p.flip)) + 1.f, h = p.size * .6f;
++			const float cs = std::cos(p.rot), sn = std::sin(p.rot);
++			auto at = [&](float x, float y) { return ImVec2(p.p.x + x * cs - y * sn, p.p.y + x * sn + y * cs); };
++			const ImVec2 q[4] = { at(-w, -h), at(w, -h), at(w, h), at(-w, h) };
++			const ImVec2 uv[4] {};
++			const float lit = .75f + .25f * std::cos(p.flip);
++			const ImU32 c = Color { p.c.r * lit, p.c.g * lit, p.c.b * lit }.u32();
++			const ImU32 cc[4] = { c, c, c, c };
++			drawQuad(f.dl, ImTextureID(), q, uv, cc);
++		}
++	}
++
++	void drawTitle(Frame& f, float t)
++	{
++		if (t < TITLE_START)
++			return;
++		static const char title[] = "RESONANCE";
++		ImFont *font = displayFont();
++		const float size = f.h * .085f, gap = size * .12f;
++		float total = 0;
++		for (const char *c = title; *c; c++)
++			total += textWidth(font, size, std::string(1, *c)) + gap;
++		total -= gap;
++		float x = f.w * .5f - total * .5f;
++		const float y = f.h * .80f;
++		// a dark band for the letters to sit on
++		const float band = clamp01((t - TITLE_START) / .3f);
++		f.dl->AddRectFilledMultiColor(ImVec2(0, y - size * .5f), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0),
++				IM_COL32(0, 8, 30, (int)(200 * band)), IM_COL32(0, 8, 30, (int)(200 * band)));
++		for (int i = 0; title[i]; i++)
++		{
++			const std::string ch(1, title[i]);
++			const float w = textWidth(font, size, ch);
++			const float lt = (t - TITLE_START - i * .055f) / .5f;
++			if (lt > 0)
++			{
++				// drop in from above and bounce
++				const float q = clamp01(lt);
++				const float bounce = q < 1 ? std::fabs(std::cos(q * PI * 1.5f)) * (1 - q) * (1 - q) : 0.f;
++				const float dy = -bounce * size * 1.6f;
++				const int a = (int)(255 * clamp01(lt * 3.f));
++				for (int g = 3; g >= 1; g--)
++					drawText(f.dl, font, size, ImVec2(x - g * 1.5f, y + dy - g * 1.5f), IM_COL32(60, 140, 255, a / (g + 2)), ch);
++				drawText(f.dl, font, size, ImVec2(x + 3, y + dy + 4), IM_COL32(0, 10, 40, a / 2), ch);
++				drawText(f.dl, font, size, ImVec2(x, y + dy), IM_COL32(255, 255, 255, a), ch);
++			}
++			x += w + gap;
++		}
++		// a light sweeping across the name once the letters are in
++		const float sweep = (t - TITLE_START - .9f) / .7f;
++		if (sweep > 0 && sweep < 1)
++			drawBlob(f.dl, ImVec2(f.w * .5f - total * .6f + total * 1.2f * sweep, y + size * .55f), size * .9f, IM_COL32(255, 255, 255, 90));
++		const float sub = clamp01((t - TITLE_START - .8f) / .4f);
++		drawText(f.dl, bodyFont(), f.h * .026f, ImVec2(f.w * .5f, y + size * 1.35f), IM_COL32(200, 215, 255, (int)(220 * sub)),
++				"Dreamcast  \xC2\xB7  PlayStation 4", .5f);
++	}
++
++	Layer bg, sonic, console;
++	float srcW = 0, srcH = 0;
++	float k = 1, cx = 0, fh = 1080, zoom = 1;
++	ImVec2 shake;
++	bool started = false, soundRoll = false, soundCatch = false;
++	float t0 = 0, skipAt = -1;
++	u32 prevButtons = 0;
++	std::vector<Particle> confetti;
++};
++
++std::unique_ptr<Intro> gIntro;
++bool gIntroDone;
++
++} // namespace
++
++bool introDraw(Frame& f)
++{
++	if (gIntroDone)
++		return false;
++	if (!gIntro)
++	{
++		gIntro = std::make_unique<Intro>();
++		if (!gIntro->load())
++		{
++			ps4_boot_trace("intro: pictures missing, skipped");
++			gIntro.reset();
++			gIntroDone = true;
++			return false;
++		}
++	}
++	if (gIntro->draw(f))
++		return true;
++	gIntro.reset();
++	gIntroDone = true;
++	return false;
++}
++
++} // namespace launcher
 diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
 new file mode 100644
-index 000000000..f9242b949
+index 000000000..01f33e7dd
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.cpp
-@@ -0,0 +1,800 @@
+@@ -0,0 +1,809 @@
 +/*
 +	DeCast-S4 launcher core: the library, covers and colours, DualShock 4 input, theme switching
 +	and starting games. The themes draw; this file decides what they draw.
@@ -44594,6 +45216,15 @@ index 000000000..f9242b949
 +	}
 +
 +	Frame f = makeFrame();
++	// the opening (intro.cpp) first, then the home screen fades in
++	static bool introOver;
++	if (!introOver)
++	{
++		if (introDraw(f))
++			return true;
++		introOver = true;
++		gFadeAt = gTime;
++	}
 +	handleInput(f);
 +	f = makeFrame();
 +
@@ -44702,10 +45333,10 @@ index 000000000..82268f8f0
 +bool launcher_draw();
 diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
 new file mode 100644
-index 000000000..eb759f3b5
+index 000000000..53a66c851
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher_internal.h
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,149 @@
 +/*
 +	DeCast-S4 launcher internals: what the core (launcher.cpp) shares with the themes
 +	(theme_*.cpp), covers (covers.cpp) and sounds (sound.cpp).
@@ -44837,6 +45468,9 @@ index 000000000..eb759f3b5
 +// Spring toward goal (critically damped-ish); returns the new position
 +void spring(float& pos, float& vel, float goal, float stiffness, float damping, float dt);
 +bool reducedMotion();
++
++// intro.cpp: the opening; false once it is over (or the pictures are missing)
++bool introDraw(Frame& f);
 +
 +// covers.cpp
 +// The cover to show for a game: the user's own file in /data/DeCast-S4/covers wins, else the
@@ -45442,7 +46076,7 @@ index 000000000..23ca313f7
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_orbit.cpp b/shell/ps4/launcher/theme_orbit.cpp
 new file mode 100644
-index 000000000..9fababcc4
+index 000000000..015dd0485
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_orbit.cpp
 @@ -0,0 +1,315 @@
@@ -45703,7 +46337,7 @@ index 000000000..9fababcc4
 +		ImDrawList *dl = f.dl;
 +		ImFont *display = fontFor(displayFont(), g.e.title);
 +		// brand and clock
-+		drawText(dl, display, f.h * .022f, ImVec2(f.w * .05f, f.h * .055f), IM_COL32(255, 255, 255, (int)(200 * alpha)), "DECAST-S4");
++		drawText(dl, display, f.h * .022f, ImVec2(f.w * .05f, f.h * .055f), IM_COL32(255, 255, 255, (int)(200 * alpha)), "RESONANCE");
 +		char clock[16];
 +		const time_t now = time(nullptr);
 +		strftime(clock, sizeof(clock), "%H:%M", localtime(&now));
