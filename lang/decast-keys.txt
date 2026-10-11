@@ -1,0 +1,30 @@
+# DeCast-S4 home screen texts (shell/ps4/launcher), English. Texts Flycast's flycast.pot already
+# has (Settings, Japan, USA, Europe, System Default, ...) are left out of keys.txt automatically.
+Start
+Settings
+Theme: %s
+Orbit
+Channel
+Shelf
+Cross bar
+Games
+Themes
+Language
+Your library is empty
+Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here.
+No games yet
+Copy games to /data/DeCast-S4/games
+Starting...
+LIVE
+Discs on a turning ring
+Every game is a TV channel
+Box art on a glossy shelf
+This menu
+Emulator settings
+Video, audio, controls, BIOS, content folders
+Covers
+Your own: /data/DeCast-S4/covers/<game file or serial>.png
+Press X to change the menu language
+Japan
+USA
+Europe

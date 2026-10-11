@@ -1,0 +1,728 @@
+# Español. <number><TAB><translation>, numbers from lang/keys.txt
+1	Usuario %s autenticado
+2	Error al autenticar en RetroAchievements
+3	No se recibió el token de usuario
+4	RetroAchievements desconectado
+5	RetroAchievements reconectado
+6	¡Logro %s desbloqueado!
+7	Clasificación %s iniciada
+8	Clasificación %s fallida
+9	Clasificación %s enviada
+10	%s dominado
+11	%s completado
+12	%d logros, %d puntos
+13	Has desbloqueado %d de %d logros.
+14	Este juego no tiene logros.
+15	Modo hardcore
+16	Modo hardcore desactivado
+17	Medio insertado no reconocido
+18	Error al cambiar el medio
+19	AVISO: DreamConn desconectado del puerto %c
+20	Cruceta 2 arriba
+21	Cruceta 2 abajo
+22	Cruceta 2 izquierda
+23	Cruceta 2 derecha
+24	VMU1 A
+25	VMU1 B
+26	VMU1 arriba
+27	VMU1 abajo
+28	VMU1 izquierda
+29	VMU1 derecha
+30	Conectado
+31	Desconectado
+32	Atrás
+33	Guía
+34	Start
+35	Cruceta arriba
+36	Cruceta abajo
+37	Cruceta izquierda
+38	Cruceta derecha
+39	Varios
+40	Paleta 1
+41	Paleta 2
+42	Paleta 3
+43	Paleta 4
+44	Panel táctil
+45	Stick izquierdo X
+46	Stick izquierdo Y
+47	Stick derecho X
+48	Stick derecho Y
+49	Ratón predeterminado
+50	Ratón %d
+51	Error de Flycast
+52	Sin audio
+53	Selección automática AAudio / OpenSL
+54	No se encuentra la biblioteca de imágenes
+55	No se puede leer la carpeta %s
+56	No se puede consultar %s
+57	Dispositivo no válido %s
+58	No se pueden leer los atributos de %s
+59	Nombre de archivo no válido %s
+60	Formato de disco desconocido
+61	Este medio no se puede cargar
+62	No se puede abrir el archivo CUE %s
+63	Error en CUE: archivo CUE demasiado grande
+64	Archivo CUE no válido
+65	Archivo CUE: no se puede abrir la pista %s
+66	Archivo CUE: la pista tiene un tipo de sector desconocido: %s
+67	Error en CUE: archivo no válido o sin pistas
+68	Error en CUE: menos de 3 pistas
+69	chd: el tipo de pista %s no es compatible
+70	No se puede abrir el archivo CHD %s
+71	Archivo CHD no válido %s
+72	Tamaño de bloque no válido en el archivo CHD %s
+73	Número de pista inesperado
+74	Subtipo o pre/postgap no compatible
+75	CHD no válido: menos de 3 pistas
+76	CHD no válido: no se encontró ninguna pista
+77	No se puede abrir el archivo GDI %s
+78	Archivo GDI demasiado grande
+79	Archivo GDI no válido
+80	Archivo GDI: no se puede abrir la pista %s
+81	No se puede abrir el archivo CDI %s
+82	Archivo CDI no válido %s
+83	Imagen CDI no válida
+84	Tamaño de sector CDI no válido
+85	No se puede volver a abrir el archivo CDI
+86	Tarjeta expulsada
+87	Velocidad: %3d
+88	Impresión guardada
+89	SystemSP: no se puede abrir el archivo CompactFlash %s
+90	Red iniciada
+91	Error al reservar memoria
+92	Error: no se puede cargar la BIOS %s
+93	Juego desconocido
+94	No se puede abrir %s ni %s
+95	No se puede abrir %s
+96	ROM no válida
+97	No se encuentra %s
+98	ROM no válida: %s truncado
+99	Error: no se puede cargar la BIOS desde naomi.zip
+100	Error: no se puede abrir %s
+101	Error: archivo LST no válido
+102	ROM vacía no válida
+103	Memoria insuficiente
+104	Error: no se pudo cargar el archivo BIN/DAT
+105	Izquierda
+106	Derecha
+107	Calibración completada
+108	Calibrando el volante. Mantenlo centrado.
+109	Naomi GDROM: no se puede abrir %s.chd
+110	Naomi GDROM: no se encontró el archivo que descifrar.
+111	Centro
+112	Reiniciar en la BIOS
+113	No se pudo abrir el ELF %s
+114	No se encuentra el archivo de arranque %s
+115	Error de arranque de Naomi
+116	Tamaño de cartucho no válido
+117	Código de truco no válido
+118	Falta el valor
+119	Faltan valores
+120	Falta la dirección o el valor
+121	Tipo de truco no compatible
+122	Falta la cantidad o el valor
+123	Falta la cantidad o la dirección de destino
+124	Los códigos maestros no son compatibles
+125	Código condicional no compatible
+126	Falta la dirección de prueba
+127	No se puede guardar el archivo de trucos
+128	API gráfica
+129	MoltenVK: una implementación de Vulkan que funciona sobre Metal, la API gráfica de Apple
+130	Ordenación de transparencias
+131	Por triángulo
+132	Ordena los polígonos transparentes por triángulo. Rápido, pero puede causar fallos gráficos
+133	Por tira
+134	Ordena los polígonos transparentes por tira. Más rápido, pero puede causar fallos gráficos
+135	Por píxel
+136	Ordena los polígonos transparentes por píxel. Más lento, pero preciso
+137	Opciones de renderizado
+138	Mitad
+139	Nativa
+140	Resolución interna
+141	Resolución interna de renderizado. Cuanto más alta mejor, pero exige más a la GPU. Los valores superiores a la resolución de tu pantalla (hasta el doble) sirven de supermuestreo: un antialiasing de calidad sin perder nitidez.
+142	Escalado entero
+143	Escala la imagen al mayor múltiplo entero que permite la resolución de la pantalla.
+144	Interpolación lineal
+145	Escala la imagen con interpolación lineal; si no, con el vecino más cercano. Desactívala con el escalado entero.
+146	VSync
+147	Sincroniza la velocidad de fotogramas con la frecuencia de la pantalla. Recomendado
+148	Ritmo de fotogramas (experimental)
+149	Indica a la GPU el momento de presentar cada fotograma para reproducir el ritmo original.
+150	Duplicar fotogramas
+151	Duplica fotogramas en monitores de alta frecuencia (120 Hz o más)
+152	Mostrar la VMU en el juego
+153	Muestra las pantallas LCD de las VMU durante el juego
+154	Emulación completa del framebuffer
+155	Emulación totalmente precisa del framebuffer de la VRAM. Ayuda a los juegos que acceden directamente al framebuffer para efectos especiales. Muy lenta e incompatible con el reescalado y la pantalla panorámica.
+156	Cargar texturas personalizadas
+157	Carga texturas personalizadas o en alta resolución desde data/textures/<game id>
+158	Precargar texturas personalizadas
+159	Precarga las texturas personalizadas al iniciar el juego. Puede mejorar el rendimiento, pero usa más memoria
+160	Relación de aspecto
+161	Panorámica
+162	Dibuja la geometría fuera del formato 4:3 normal. Puede causar fallos gráficos en las zonas nuevas.\nAjusta la imagen y muestra todo el contenido en 16:9.
+163	Superpanorámica
+164	Usa todo el ancho de la pantalla o ventana cuando es más ancha que 16:9.\nRellena y elimina las barras negras. No es compatible con el escalado entero.
+165	Trucos de pantalla panorámica
+166	Modifica el juego para que se vea en 16:9 anamórfico con estiramiento horizontal. Solo algunos juegos son compatibles.
+167	Estirar horizontalmente
+168	Estira la imagen en horizontal
+169	Girar la pantalla 90°
+170	Gira la pantalla 90° en sentido antihorario
+171	Ajustes por píxel
+172	512 MB
+173	1 GB
+174	2 GB
+175	4 GB
+176	Tamaño del búfer de píxeles
+177	El tamaño del búfer de píxeles. Puede que haya que aumentarlo con un reescalado grande.
+178	Capas máximas
+179	Número máximo de capas transparentes. Puede que haya que aumentarlo en algunas escenas complejas. Reducirlo puede mejorar el rendimiento.
+180	Rendimiento
+181	Salto automático de fotogramas:
+182	Desactivado
+183	Sin salto de fotogramas
+184	Normal
+185	Salta un fotograma cuando la GPU y la CPU van lentas
+186	Máximo
+187	Salta un fotograma cuando la GPU va lenta
+188	Salto de fotogramas
+189	Número de fotogramas que se saltan entre dos fotogramas dibujados
+190	Sombras
+191	Activa los volúmenes modificadores, normalmente usados para sombras
+192	Niebla
+193	Activa los efectos de niebla
+194	Avanzado
+195	Retrasar el cambio de fotograma
+196	Útil para evitar parpadeos o vídeos con fallos. No recomendado en plataformas lentas
+197	Corregir bordes al reescalar
+198	Ayuda con el sangrado de texturas al reescalar. Desactivarlo puede ayudar si los píxeles se deforman al reescalar juegos 2D (MVC2, CVS, KOF, etc.)
+199	Interpolación de profundidad nativa
+200	Ayuda con texturas corruptas y problemas de profundidad en GPU AMD. También puede ayudar a GPU Intel en algunos casos.
+201	Copiar texturas renderizadas a la VRAM
+202	Copia de vuelta a la VRAM las texturas renderizadas. Más lento, pero preciso
+203	Filtrado anisótropo
+204	Los valores altos hacen más nítidas las texturas vistas en ángulo, pero exigen más a la GPU. Solo afecta a las texturas con mipmaps.
+205	Filtrado de texturas:
+206	Predeterminado
+207	Usa el filtrado de texturas del juego
+208	Forzar vecino más cercano
+209	Fuerza el filtrado por vecino más cercano en todas las texturas. Aspecto más nítido, pero puede causar fallos de renderizado. Normalmente no afecta al rendimiento.
+210	Forzar lineal
+211	Fuerza el filtrado lineal en todas las texturas. Aspecto más suave, pero puede causar fallos de renderizado. Normalmente no afecta al rendimiento.
+212	Mostrar contador de FPS
+213	Muestra en pantalla los fotogramas por segundo
+214	Enrutado de vídeo (Syphon)
+215	Enrutado de vídeo (Spout)
+216	Enrutado de vídeo (solo con OpenGL o DirectX 11)
+217	Envía el vídeo a otro programa
+218	p. ej., envía la textura de la GPU directamente a OBS Studio en vez de usar la captura de pantalla o ventana, que usa mucha CPU
+219	Reducir antes de enviar
+220	Puede mejorar el rendimiento al compartir una textura más pequeña, según el equipo
+221	Resolución vertical de salida
+222	Tamaño de la textura de salida: %d x %d
+223	Establecer
+224	Añadir
+225	Selecciona una carpeta de contenido
+226	Predeterminado del sistema
+227	Idioma de la interfaz
+228	Japonés
+229	Inglés
+230	Alemán
+231	Francés
+232	Español
+233	Italiano
+234	Idioma de Dreamcast
+235	El idioma configurado en la BIOS de Dreamcast
+236	Emisión
+237	Norma de televisión para los modos que no son VGA
+238	Japón
+239	EE. UU.
+240	Europa
+241	Exportación
+242	Corea
+243	Región
+244	Región de la BIOS
+245	VGA
+246	RGB por componentes
+247	TV compuesto
+248	Cable
+249	Tipo de conexión de vídeo
+250	Ubicación del contenido
+251	Volver a buscar contenido
+252	Las carpetas donde están tus juegos
+253	Carpeta de datos
+254	La carpeta con los archivos de BIOS y las VMU y estados guardados
+255	Carpeta principal
+256	Importar
+257	Exportar
+258	Mostrar en el Finder
+259	La carpeta donde Flycast guarda la configuración y las VMU. Los archivos de BIOS deben estar en una subcarpeta llamada \"data\"
+260	Lista de juegos con carátulas
+261	Muestra las carátulas en la lista de juegos.
+262	Descargar carátulas
+263	Descarga carátulas de TheGamesDB.net.
+264	Escala de la interfaz
+265	Ajusta el tamaño de los elementos y las fuentes de la interfaz.
+266	Aplicar
+267	Oscuro
+268	Claro
+269	Dreamcast
+270	Alto contraste
+271	Nintendo
+272	Aqua Chill
+273	Tema de la interfaz
+274	Elige los colores de la interfaz.
+275	Ocultar ROMs antiguas de Naomi
+276	Oculta los archivos .bin, .dat y .lst del explorador de contenido
+277	Usar el selector de archivos SAF
+278	Usa el selector de archivos del Android Storage Access Framework para elegir carpetas y archivos. Se ignora en Android 10 y posteriores.
+279	Estado automático:
+280	Cargar
+281	Carga el último estado guardado del juego al iniciarlo
+282	Guardar
+283	Guarda el estado del juego al detenerlo
+284	Naomi Free Play
+285	Configura los juegos de Naomi en modo Free Play.
+286	Presencia en Discord
+287	Muestra en Discord a qué juego estás jugando
+288	Activar RetroAchievements
+289	Sigue tus logros con RetroAchievements.org
+290	Activa el modo hardcore de RetroAchievements. En este modo no se permiten trucos ni cargar estados.
+291	Usuario
+292	Autenticación correcta
+293	Cerrar sesión
+294	Contraseña
+295	Autenticando...
+296	Iniciar sesión
+297	Rutas personalizadas
+298	Carpetas de BIOS
+299	Selecciona una carpeta de BIOS
+300	Carpetas con archivos de BIOS (p. ej. dc_boot.bin o dc_bios.bin) y BIOS de arcade
+301	Carpeta de VMU
+302	Selecciona la carpeta de VMU
+303	Carpeta donde se guardan las VMU (.bin)
+304	Carpetas de estados
+305	Selecciona una carpeta de estados
+306	Carpetas para los estados guardados. Los nuevos van a la primera ruta; al cargar se buscan en todas
+307	Carpeta de partidas guardadas
+308	Selecciona la carpeta de partidas guardadas
+309	Carpeta para los datos guardados de los juegos (p. ej. NVRAM de arcade)
+310	Carpetas de paquetes de texturas
+311	Selecciona una carpeta de paquetes de texturas
+312	Carpetas con textures/<gameId> o <gameId> dentro de una subcarpeta textures
+313	Carpeta de volcado de texturas
+314	Selecciona la carpeta de volcado de texturas
+315	Carpeta donde se guardan los volcados de texturas. Las subcarpetas de cada juego se crean automáticamente
+316	Carpeta de carátulas
+317	Selecciona la carpeta de carátulas
+318	Carpeta con imágenes de carátulas (png/jpg). Si está vacía, Flycast usará Carpeta principal/boxart para las descargas y las imágenes generadas
+319	Carpetas de asignación de mandos
+320	Selecciona una carpeta de asignación de mandos
+321	Carpetas con archivos de asignación de mandos (.cfg). El emulador también busca en Carpeta principal/mappings. Las asignaciones por juego terminan en _<gameId>.cfg
+322	Carpetas de trucos
+323	Selecciona una carpeta de trucos
+324	Carpetas con archivos de trucos (.cht/.txt) con el nombre del ID del juego. Flycast carga automáticamente los que coincidan
+325	J2
+326	J1
+327	BIOS de Dreamcast
+328	Ninguno
+329	Mando de Sega
+330	Pistola de luz
+331	Teclado
+332	Ratón
+333	Twin Stick
+334	Stick arcade/Ascii
+335	Mando de maracas
+336	Mando de pesca
+337	Mando de Pop'n Music
+338	Mando de carreras
+339	Mando de Densha de Go!
+340	Panther DC/Full Controller
+341	Mando de DreamParaPara
+342	Sega VMU
+343	Vibration Pack
+344	Micrófono
+345	DreamPotato
+346	Todo
+347	Direcciones
+348	Arriba
+349	Abajo
+350	Stick arriba
+351	Stick abajo
+352	Stick izquierda
+353	Stick derecha
+354	Stick D. arriba
+355	Stick D. abajo
+356	Stick D. izquierda
+357	Stick D. derecha
+358	Eje 3 arriba
+359	Eje 3 abajo
+360	Eje 3 izquierda
+361	Eje 3 derecha
+362	Botones
+363	Gatillos
+364	Gatillo izquierdo
+365	Gatillo derecho
+366	Gatillo izquierdo 2
+367	Gatillo derecho 2
+368	Botones del sistema
+369	Recargar
+370	Emulador
+371	Menú
+372	Salir
+373	Pausa
+374	Avance rápido
+375	Cargar estado
+376	Guardar estado
+377	Cargar estado de la RAM
+378	Guardar estado en la RAM
+379	Siguiente ranura de estado
+380	Ranura de estado anterior
+381	Saltar el teclado emulado
+382	Guardar captura
+383	Botón 1
+384	Botón 2
+385	Botón 3
+386	Botón 4
+387	Botón 5
+388	Botón 6
+389	Botón 7
+390	Botón 8
+391	Moneda
+392	Servicio
+393	Prueba
+394	Insertar tarjeta
+395	Asignar control
+396	Esperando el control '%s'...
+397	Tiempo restante: %d s
+398	Entradas actuales:
+399	Confirmar
+400	Secuencial
+401	Si está marcado, la combinación solo se activa cuando se pulsan todas las teclas en el orden indicado.\nSi no, se activa cuando se pulsan todas las teclas en cualquier orden.
+402	Asignación de mandos
+403	Asignar
+404	Quitar
+405	Hecho
+406	Puerto
+407	Controles de Dreamcast
+408	Borrar configuración del juego
+409	Crear configuración del juego
+410	Restablecer...
+411	Confirmar restablecimiento
+412	¿Seguro que quieres restablecer las asignaciones predeterminadas?
+413	Tipo de mando:
+414	Mando
+415	Arcade / Hit Box
+416	Sí
+417	No
+418	Controles de arcade
+419	Ajustes del mando
+420	Háptica
+421	Potencia
+422	Potencia de la respuesta háptica
+423	Vista
+424	Transparencia
+425	Transparencia de los botones del mando virtual
+426	Selecciona un archivo PNG
+427	Elegir imagen...
+428	Usar predeterminado
+429	Vibración
+430	Potencia de vibración
+431	Sticks
+432	Zona muerta
+433	Desviación mínima que cuenta como entrada
+434	Saturación
+435	Valor que recibe el juego con el stick al 100%. Por encima de 100% se satura antes de llegar al tope.
+436	Dispositivos físicos
+437	Sistema
+438	Nombre
+439	DreamLink: %s
+440	Editar diseño
+441	Ajustes
+442	Sensibilidad del ratón
+443	Usar Raw Input
+444	Admite varios dispositivos apuntadores (ratones, pistolas de luz) y teclados
+445	Dispositivos de Dreamcast
+446	Puerto %c
+447	Color de la mira
+448	Mira
+449	VMU A1 por juego
+450	Si está activo, cada juego tiene su propia VMU en el puerto 1 del mando A.
+451	Usar almacenamiento físico de VMU
+452	Permite leer y escribir en una VMU real mediante DreamPicoPort o DreamPotato. No es compatible con la carga de estados.
+453	Tamaño de la mira
+454	Cerrar
+455	Has desbloqueado %d de %d logros y %d de %d puntos.
+456	Bloqueado
+457	Desafíos activos
+458	Casi lo tienes
+459	Desbloqueado
+460	Desbloqueado recientemente
+461	Error del renderizador:
+462	El juego se ha pausado, pero se recomienda reiniciar Flycast
+463	No se pudo iniciar el renderizador.\nElige otra API gráfica
+464	Flycast se ha detenido.
+465	Continuar
+466	Trucos
+467	Logros
+468	Tarjeta de código de barras
+469	Insertar disco
+470	Expulsar disco
+471	Cerrar juego
+472	Ranura %d
+473	Vacío
+474	Aceptar
+475	¿Ubicación del contenido incorrecta?
+476	¡Se buscó en %d carpetas pero no se encontró ningún juego!
+477	Volver a elegir
+478	Cancelar
+479	JUEGOS
+480	Filtro
+481	Cargar...
+482	Tu lista de juegos está vacía
+483	Añadir carpeta de juegos
+484	Selección no válida:
+485	Flycast no puede escribir en esta carpeta.
+486	Selecciona la carpeta principal de Flycast
+487	Iniciando...
+488	Iniciando la red...
+489	Pulsa Start para iniciar el juego ya.
+490	Iniciar ahora
+491	Cargando...
+492	Precargando texturas personalizadas
+493	Preparando...
+494	Ranura de estado %d
+495	No hay captura disponible
+496	Captura guardada
+497	Error al guardar la captura
+498	Activar DSP
+499	Activa el procesador de sonido digital de Dreamcast. Solo recomendado en plataformas rápidas
+500	Activar sonidos de la VMU
+501	Reproduce los pitidos de la VMU.
+502	Volumen
+503	Ajusta el volumen del emulador
+504	Latencia automática
+505	Ajusta la latencia de audio automáticamente. Recomendado
+506	Latencia
+507	Fija la latencia máxima de audio. No todos los controladores de audio lo admiten.
+508	Controlador de audio
+509	auto - Selección automática del controlador
+510	El controlador de audio que se usará
+511	AÑADIR TRUCO
+512	Código
+513	Selecciona un archivo de trucos
+514	TRUCOS
+515	(Ningún truco cargado)
+516	Modo de CPU
+517	Dynarec
+518	Usa el recompilador dinámico. Recomendado en la mayoría de los casos
+519	Intérprete
+520	Usa el intérprete. Muy lento, pero puede ayudar si hay un problema con el dynarec
+521	Reloj del SH4
+522	Sube o baja la frecuencia de la CPU principal SH4. Por defecto son 200 MHz. Otros valores pueden provocar cuelgues, bloqueos o reacciones nucleares inesperadas.
+523	Otros
+524	BIOS HLE
+525	Fuerza la emulación de alto nivel de la BIOS
+526	Emulación multihilo
+527	Ejecuta la CPU y la GPU emuladas en hilos distintos
+528	Consola serie
+529	Envía la consola serie de Dreamcast a stdout
+530	Mod de 32 MB de RAM para Dreamcast
+531	Activa el mod de 32 MB de RAM para Dreamcast. Puede afectar a la compatibilidad
+532	Volcar texturas
+533	Vuelca todas las texturas en data/texdump/<game id>
+534	Volcar texturas sustituidas
+535	Vuelca siempre las texturas que ya están sustituidas por texturas personalizadas
+536	Descartar texturas de vídeo y animadas
+537	No vuelca el vídeo (YUV) ni las texturas ya actualizadas
+538	Registro en archivo
+539	Guarda información de depuración en flycast.log
+540	Informar de fallos automáticamente
+541	Envía automáticamente los informes de fallos a sentry.io para ayudar a resolverlos. No se incluye información personal.
+542	Scripts de Lua
+543	Archivo de Lua
+544	El archivo de Lua que se usará. Debe estar en la carpeta de configuración de Flycast. Si está vacío, se usa flycast.lua.
+545	General
+546	Controles
+547	Vídeo
+548	Audio
+549	Red
+550	Acerca de
+551	Almacenamiento
+552	.. Subir a la carpeta superior
+553	Seleccionar la carpeta actual
+554	(?)
+555	Restablecer
+556	Tipo de red
+557	Usa las funciones en línea propias de Dreamcast con el módem o el adaptador de banda ancha
+558	Activa la red mediante GGPO
+559	Activa la red para los juegos de Naomi y Atomiswave compatibles
+560	Cable de combate
+561	Emula el cable módem nulo Taisen (de combate) en los juegos que lo admiten
+562	Configuración
+563	Jugar como jugador 1
+564	Desmárcalo para jugar como jugador 2
+565	Rival
+566	La dirección IP del rival y, si quieres, el puerto
+567	Retraso de fotogramas
+568	Fija el retraso de fotogramas; aconsejable en sesiones con ping de más de 100 ms
+569	Stick izquierdo:
+570	Stick izquierdo sin uso
+571	Horizontal
+572	Usa solo el eje horizontal del stick izquierdo
+573	Completo
+574	Usa los ejes horizontal y vertical del stick izquierdo
+575	Activar chat
+576	Abre la ventana de chat al recibir un mensaje
+577	Cerrar el chat automáticamente
+578	Cierra la ventana de chat automáticamente a los 20 segundos
+579	Tiempo de la ventana de chat (segundos)
+580	Cuánto tiempo sigue abierta la ventana de chat tras recibir un mensaje.
+581	Estadísticas de red
+582	Muestra las estadísticas de red en pantalla
+583	Papel en la red
+584	Maestro
+585	Crea un servidor local para los juegos en red de Naomi
+586	Esclavo
+587	Se conecta al servidor maestro
+588	Satélite
+589	Monitor en directo para los juegos que lo admiten (Virtual-On Oratorio Tangram y Club Kart)
+590	Servidor
+591	El servidor al que conectarse. Déjalo vacío para buscar uno automáticamente en el puerto predeterminado
+592	Puerto local
+593	El puerto UDP local que se usará
+594	Código de partida
+595	Elige una palabra o un número único y compártelo con tu rival.
+596	Conectar
+597	Desconectar
+598	Esperando en el punto de encuentro...
+599	Preparando el juego...
+600	Jugando a %s (%s)
+601	Manual
+602	El rival al que conectarse. Déjalo vacío para buscar un jugador automáticamente en el puerto predeterminado
+603	Actuar como maestro
+604	Solo se usa para la velocidad máxima. Uno de los rivales debe ser el maestro.
+605	Opciones de red
+606	Activar UPnP
+607	Configura tu router automáticamente para el juego en red
+608	Emitir salidas digitales
+609	Emite las salidas digitales y el estado de force feedback por el puerto TCP 8000. Compatible con la opción \"-output network\" de MAME. Solo juegos de arcade.
+610	Emulación del adaptador de banda ancha
+611	Emula el adaptador de banda ancha Ethernet (BBA) en vez del módem
+612	Usar DCNet
+613	Usa el servicio en la nube DCNet para el acceso a Internet de Dreamcast.
+614	Usuario del proveedor
+615	El nombre de usuario del proveedor guardado en la Flash RAM de la consola. Algunos juegos en línea lo usan como nombre del jugador. Déjalo vacío para mantener el valor actual.
+616	Nombre o dirección IP del servidor DNS
+617	Pantallas multiplaca
+618	1 (Twin, satélite)
+619	Configuración de una pantalla (F355 Twin, satélite de Derby Owners Club)
+620	2+ (Deluxe, pantalla principal)
+621	Configuración de dos o tres pantallas (Airline Pilot, pantalla principal de Derby Owners Club, F355 Deluxe, Sega Strike Fighter)
+622	Versión: %s
+623	Hash de Git: %s
+624	Fecha de compilación: %s
+625	Plataforma
+626	CPU: %s
+627	Desconocido
+628	Sistema operativo: %s
+629	Windows Universal Platform
+630	Estado del JIT: %s
+631	Controlador: %s
+632	Selecciona un controlador de GPU personalizado
+633	Controlador personalizado:
+634	Usar el controlador predeterminado
+635	Reiniciar Vulkan
+636	Subir controlador personalizado
+637	¿Quieres reiniciar Vulkan para usar el nuevo controlador?
+638	No se pudo guardar el estado: memoria llena
+639	No se puede abrir el archivo de guardado
+640	Estado guardado
+641	Error al guardar el estado
+642	No se encontró el estado guardado
+643	No se pudo cargar el estado
+644	Memoria insuficiente
+645	Error de E/S
+646	Conectado a DCNet por módem
+647	Conectado a DCNet por Ethernet
+648	DCNet desconectado
+649	Host no encontrado
+650	No se puede conectar a DCNet
+651	Conectado con el rival
+652	Sincronizando con el rival
+653	Sincronizado con el rival
+654	En marcha
+655	Desconectado del rival
+656	Conexión interrumpida
+657	Conexión restablecida
+658	Red conectada
+659	Juego no compatible
+660	Error al conectar con la sala:
+661	Error de conexión
+662	Conexión directa P2P
+663	Usando un relé
+664	NAT
+665	Conexión perdida
+666	Esperando a los jugadores...
+667	%d jugador conectado. Esperando... || %d jugadores conectados. Esperando...
+668	Iniciando el juego
+669	Ningún jugador conectado
+670	Conectando con el servidor
+671	Conectado en la ranura %d
+672	DirectX 9 no admite juegos de Naomi 2. Elige otra API gráfica
+673	No se puede abrir el archivo zip
+674	Archivo zip no válido
+675	No se pueden guardar los archivos
+676	No se puede leer el zip
+677	Error al compilar el shader de OpenGL
+678	Naomi 2 necesita OpenGL ES 3.0 o superior
+679	No se encontró ningún archivo de BIOS en %s
+680	Este juego necesita una BIOS real
+681	Truco de pantalla panorámica activado
+682	Mando virtual
+683	Botón izquierdo
+684	Botón derecho
+685	Botón central
+686	Ratón táctil
+687	No se puede iniciar la API gráfica
+688	No puede funcionar sin JIT
+689	Cruceta centro
+690	Select
+691	Modo
+692	Hat X
+693	Hat Y
+694	Acelerador
+695	Freno
+696	Timón
+697	Volante
+698	Palanca de gases
+699	Error al iniciar la memoria
+700	Error de acceso al almacenamiento: %s
+701	Mando MFi
+702	Opciones
+703	Inicio
+704	Compartir
+705	No compatible con Switch
+2001	Tema: %s
+2002	Órbita
+2003	Canal
+2004	Estante
+2005	Barra cruzada
+2006	Juegos
+2007	Temas
+2008	Idioma
+2009	Tu biblioteca está vacía
+2010	Copia juegos GDI, CHD o CDI en /data/DeCast-S4/games y aparecerán aquí.
+2011	Aún no hay juegos
+2012	Copia juegos en /data/DeCast-S4/games
+2013	EN DIRECTO
+2014	Discos en un anillo que gira
+2015	Cada juego es un canal de TV
+2016	Cajas en un estante brillante
+2017	Este menú
+2018	Ajustes del emulador
+2019	Vídeo, audio, controles, BIOS, carpetas de contenido
+2020	Carátulas
+2021	Las tuyas: /data/DeCast-S4/covers/<archivo del juego o número de serie>.png
+2022	Pulsa X para cambiar el idioma del menú

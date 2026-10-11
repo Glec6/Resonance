@@ -1,0 +1,23 @@
+# Français: Flycast's fr.po has the rest. <number><TAB><translation>, numbers from lang/keys.txt
+2001	Thème : %s
+2002	Orbite
+2003	Chaîne
+2004	Étagère
+2005	Barre croisée
+2006	Jeux
+2007	Thèmes
+2008	Langue
+2009	Ta bibliothèque est vide
+2010	Copie des jeux GDI, CHD ou CDI dans /data/DeCast-S4/games et ils apparaîtront ici.
+2011	Pas encore de jeux
+2012	Copie des jeux dans /data/DeCast-S4/games
+2013	EN DIRECT
+2014	Des disques sur un anneau qui tourne
+2015	Chaque jeu est une chaîne de télé
+2016	Des boîtiers sur une étagère brillante
+2017	Ce menu
+2018	Paramètres de l'émulateur
+2019	Vidéo, audio, commandes, BIOS, dossiers de contenu
+2020	Jaquettes
+2021	Les tiennes : /data/DeCast-S4/covers/<fichier du jeu ou numéro de série>.png
+2022	Appuie sur X pour changer la langue du menu

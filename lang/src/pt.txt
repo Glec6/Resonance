@@ -1,0 +1,38 @@
+# Português: Flycast's pt_BR.po has the rest. <number><TAB><translation>, numbers from lang/keys.txt
+111	Centro
+148	Ritmo de quadros (experimental)
+149	Informa à GPU o momento de exibir cada quadro para reproduzir o ritmo original.
+490	Iniciar agora
+557	Usa os recursos online nativos do Dreamcast com o modem ou o adaptador de banda larga
+583	Papel na rede
+584	Mestre
+586	Escravo
+587	Conecta ao servidor mestre
+588	Satélite
+589	Monitor ao vivo para jogos compatíveis (Virtual-On Oratorio Tangram e Club Kart)
+618	1 (Twin, satélite)
+619	Configuração de uma tela (F355 Twin, satélite do Derby Owners Club)
+620	2+ (Deluxe, tela principal)
+621	Configuração de duas ou três telas (Airline Pilot, tela principal do Derby Owners Club, F355 Deluxe, Sega Strike Fighter)
+2001	Tema: %s
+2002	Órbita
+2003	Canal
+2004	Estante
+2005	Barra cruzada
+2006	Jogos
+2007	Temas
+2008	Idioma
+2009	Sua biblioteca está vazia
+2010	Copie jogos GDI, CHD ou CDI para /data/DeCast-S4/games e eles aparecerão aqui.
+2011	Ainda não há jogos
+2012	Copie jogos para /data/DeCast-S4/games
+2013	AO VIVO
+2014	Discos em um anel que gira
+2015	Cada jogo é um canal de TV
+2016	Caixas em uma estante brilhante
+2017	Este menu
+2018	Configurações do emulador
+2019	Vídeo, áudio, controles, BIOS, pastas de conteúdo
+2020	Capas
+2021	As suas: /data/DeCast-S4/covers/<arquivo do jogo ou número de série>.png
+2022	Pressione X para mudar o idioma do menu

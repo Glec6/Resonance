@@ -1,0 +1,729 @@
+# Türkçe. <number><TAB><translation>, numbers from lang/keys.txt. Flycast's own tr.po wins where
+# it has a translation; these fill the rest.
+1	%s kullanıcısı doğrulandı
+2	RetroAchievements doğrulaması başarısız
+3	Kullanıcı belirteci alınamadı
+4	RetroAchievements bağlantısı kesildi
+5	RetroAchievements yeniden bağlandı
+6	%s başarımı açıldı!
+7	%s sıralaması başladı
+8	%s sıralaması başarısız
+9	%s sıralaması gönderildi
+10	%s ustalaşıldı
+11	%s tamamlandı
+12	%d başarım, %d puan
+13	%d başarımdan %d tanesini açtın.
+14	Bu oyunda başarım yok.
+15	Hardcore modu
+16	Hardcore modu kapatıldı
+17	Tanınmayan medya takıldı
+18	Medya değiştirilemedi
+19	UYARI: DreamConn %c bağlantı noktasından ayrıldı
+20	Yön tuşu 2 yukarı
+21	Yön tuşu 2 aşağı
+22	Yön tuşu 2 sol
+23	Yön tuşu 2 sağ
+24	VMU1 A
+25	VMU1 B
+26	VMU1 yukarı
+27	VMU1 aşağı
+28	VMU1 sol
+29	VMU1 sağ
+30	Bağlı
+31	Bağlı değil
+32	Geri
+33	Rehber
+34	Start
+35	Yön tuşu yukarı
+36	Yön tuşu aşağı
+37	Yön tuşu sol
+38	Yön tuşu sağ
+39	Diğer
+40	Kulakçık 1
+41	Kulakçık 2
+42	Kulakçık 3
+43	Kulakçık 4
+44	Dokunmatik yüzey
+45	Sol çubuk X
+46	Sol çubuk Y
+47	Sağ çubuk X
+48	Sağ çubuk Y
+49	Varsayılan fare
+50	Fare %d
+51	Flycast hatası
+52	Ses yok
+53	Otomatik AAudio / OpenSL seçimi
+54	Resimler kitaplığı bulunamadı
+55	%s klasörü okunamıyor
+56	%s bilgisi alınamıyor
+57	Geçersiz aygıt %s
+58	%s özellikleri okunamıyor
+59	Geçersiz dosya adı %s
+60	Bilinmeyen disk biçimi
+61	Bu medya yüklenemiyor
+62	%s CUE dosyası açılamıyor
+63	CUE hatası: CUE dosyası çok büyük
+64	Geçersiz CUE dosyası
+65	CUE dosyası: %s parçası açılamıyor
+66	CUE dosyası: parçanın sektör türü bilinmiyor: %s
+67	CUE hatası: dosya geçersiz veya parça yok
+68	CUE hatası: 3'ten az parça
+69	chd: %s parça türü desteklenmiyor
+70	%s CHD dosyası açılamıyor
+71	Geçersiz CHD dosyası %s
+72	%s CHD dosyasında geçersiz blok boyutu
+73	Beklenmeyen parça numarası
+74	Desteklenmeyen alt tür veya pre/postgap
+75	Geçersiz CHD: 3'ten az parça
+76	Geçersiz CHD: parça bulunamadı
+77	%s GDI dosyası açılamıyor
+78	GDI dosyası çok büyük
+79	Geçersiz GDI dosyası
+80	GDI dosyası: %s parçası açılamıyor
+81	%s CDI dosyası açılamıyor
+82	Geçersiz CDI dosyası %s
+83	Geçersiz CDI kalıbı
+84	Geçersiz CDI sektör boyutu
+85	CDI dosyası yeniden açılamıyor
+86	Kart çıkarıldı
+87	Hız: %3d
+88	Çıktı kaydedildi
+89	SystemSP: %s CompactFlash dosyası açılamıyor
+90	Ağ başlatıldı
+91	Bellek ayrılamadı
+92	Hata: %s BIOS'u yüklenemiyor
+93	Bilinmeyen oyun
+94	%s veya %s açılamıyor
+95	%s açılamıyor
+96	Geçersiz ROM
+97	%s bulunamadı
+98	Geçersiz ROM: %s kesik
+99	Hata: naomi.zip içinden BIOS yüklenemiyor
+100	Hata: %s açılamıyor
+101	Hata: Geçersiz LST dosyası
+102	Geçersiz boş ROM
+103	Bellek yetersiz
+104	Hata: BIN/DAT dosyası yüklenemedi
+105	Sol
+106	Sağ
+107	Kalibrasyon tamamlandı
+108	Direksiyon kalibre ediliyor. Ortada tut.
+109	Naomi GDROM: %s.chd açılamıyor
+110	Naomi GDROM: Şifresi çözülecek dosya bulunamadı.
+111	Orta
+112	BIOS'a yeniden başlat
+113	%s ELF dosyası açılamadı
+114	%s önyükleme dosyası bulunamadı
+115	Naomi önyükleme hatası
+116	Geçersiz kartuş boyutu
+117	Geçersiz hile kodu
+118	Değer eksik
+119	Değerler eksik
+120	Adres veya değer eksik
+121	Desteklenmeyen hile türü
+122	Sayı veya değer eksik
+123	Sayı veya hedef adres eksik
+124	Ana kodlar desteklenmiyor
+125	Desteklenmeyen koşullu kod
+126	Test adresi eksik
+127	Hile dosyası kaydedilemiyor
+128	Grafik API'si
+129	MoltenVK: Apple'ın Metal grafik altyapısında çalışan bir Vulkan uygulaması
+130	Saydamlık sıralaması
+131	Üçgen başına
+132	Saydam çokgenleri üçgen başına sıralar. Hızlı ama grafik hatalarına yol açabilir
+133	Şerit başına
+134	Saydam çokgenleri şerit başına sıralar. Daha hızlı ama grafik hatalarına yol açabilir
+135	Piksel başına
+136	Saydam çokgenleri piksel başına sıralar. Daha yavaş ama doğru
+137	Görüntü seçenekleri
+138	Yarım
+139	Doğal
+140	İç çözünürlük
+141	İç görüntü çözünürlüğü. Yüksek olması daha iyidir ama GPU'yu daha çok zorlar. Ekran çözünürlüğünden yüksek değerler (en fazla iki katı) süper örnekleme yapar: keskinlik kaybı olmadan kaliteli kenar yumuşatma.
+142	Tam sayı ölçekleme
+143	Görüntüyü ekran çözünürlüğünün izin verdiği en büyük tam sayı katıyla ölçekler.
+144	Doğrusal ara değerleme
+145	Görüntüyü doğrusal ara değerlemeyle, aksi halde en yakın komşuyla ölçekler. Tam sayı ölçeklemede kapat.
+146	VSync
+147	Kare hızını ekranın yenileme hızıyla eşitler. Önerilir
+148	Kare zamanlaması (deneysel)
+149	Özgün kare ritmini yakalamak için GPU'ya her karenin gösterim zamanını verir.
+150	Kareleri çoğalt
+151	Yüksek yenileme hızlı monitörlerde (120 Hz ve üstü) kareleri çoğaltır
+152	Oyunda VMU'yu göster
+153	Oyun sırasında VMU LCD ekranlarını gösterir
+154	Tam kare arabelleği öykünmesi
+155	VRAM kare arabelleğinin tam doğru öykünmesi. Özel efektler için kare arabelleğine doğrudan erişen oyunlara yardımcı olur. Çok yavaştır; çözünürlük artırma ve geniş ekranla uyumsuzdur.
+156	Özel dokuları yükle
+157	data/textures/<game id> klasöründen özel/yüksek çözünürlüklü dokuları yükler
+158	Özel dokuları önceden yükle
+159	Özel dokuları oyun başında yükler. Performansı artırabilir ama daha çok bellek kullanır
+160	En boy oranı
+161	Geniş ekran
+162	Normal 4:3 görüntünün dışındaki geometriyi de çizer. Açılan alanlarda grafik hataları olabilir.\nGörüntüyü sığdırır ve 16:9 içeriğin tamamını gösterir.
+163	Süper geniş ekran
+164	Ekran veya pencere 16:9'dan genişse tüm genişliği kullanır.\nDoldurur ve siyah şeritleri kaldırır. Tam sayı ölçeklemeyle uyumsuz.
+165	Geniş ekran hileleri
+166	Oyunu yatay germeyle 16:9 anamorfik görüntüleyecek şekilde değiştirir. Yalnızca bazı oyunlar desteklenir.
+167	Yatay germe
+168	Görüntüyü yatay olarak gerer
+169	Ekranı 90° döndür
+170	Ekranı saat yönünün tersine 90° döndürür
+171	Piksel başına ayarlar
+172	512 MB
+173	1 GB
+174	2 GB
+175	4 GB
+176	Piksel arabelleği boyutu
+177	Piksel arabelleğinin boyutu. Yüksek oranda çözünürlük artırırken büyütülmesi gerekebilir.
+178	En fazla katman
+179	En fazla saydam katman sayısı. Bazı karmaşık sahnelerde artırılması gerekebilir. Azaltmak performansı artırabilir.
+180	Performans
+181	Otomatik kare atlama:
+182	Kapalı
+183	Kare atlama yok
+184	Normal
+185	GPU ve CPU ikisi de yavaşken bir kare atlar
+186	En fazla
+187	GPU yavaşken bir kare atlar
+188	Kare atlama
+189	Çizilen iki kare arasında atlanacak kare sayısı
+190	Gölgeler
+191	Genelde gölgeler için kullanılan değiştirici hacimleri açar
+192	Sis
+193	Sis efektlerini açar
+194	Gelişmiş
+195	Kare değişimini geciktir
+196	Titreyen ekranı veya bozuk videoları önlemeye yardımcı olur. Yavaş platformlarda önerilmez
+197	Çözünürlük artırmada kenar taşmasını düzelt
+198	Çözünürlük artırırken doku taşmasına yardımcı olur. 2D oyunlarda pikseller bozuluyorsa kapatmak yardımcı olabilir (MVC2, CVS, KOF vb.)
+199	Doğal derinlik ara değerlemesi
+200	AMD GPU'larda doku bozulmalarına ve derinlik sorunlarına yardımcı olur. Bazen Intel GPU'lara da yardımcı olur.
+201	Çizilen dokuları VRAM'e kopyala
+202	Çizilen dokuları VRAM'e geri kopyalar. Daha yavaş ama doğru
+203	Anizotropik filtreleme
+204	Yüksek değerler eğik açıdan görülen dokuları keskinleştirir ama GPU'yu daha çok zorlar. Yalnızca mipmap'li dokuları etkiler.
+205	Doku filtreleme:
+206	Varsayılan
+207	Oyunun kendi doku filtrelemesini kullanır
+208	En yakın komşuyu zorla
+209	Tüm dokular için en yakın komşu filtrelemesini zorlar. Daha keskin görüntü ama çizim hataları olabilir. Genelde performansı etkilemez.
+210	Doğrusalı zorla
+211	Tüm dokular için doğrusal filtrelemeyi zorlar. Daha yumuşak görüntü ama çizim hataları olabilir. Genelde performansı etkilemez.
+212	FPS sayacını göster
+213	Ekranda saniyedeki kare sayısını gösterir
+214	Video yönlendirme (Syphon)
+215	Video yönlendirme (Spout)
+216	Video yönlendirme (yalnızca OpenGL veya DirectX 11 ile)
+217	Görüntüyü başka bir programa gönderir
+218	örn. CPU'yu yoran ekran/pencere yakalama yerine GPU dokusunu doğrudan OBS Studio'ya gönderir
+219	Göndermeden önce küçült
+220	Daha küçük doku paylaşarak performansı artırabilir, sisteme bağlı
+221	Çıkış dikey çözünürlüğü
+222	Çıkış dokusu boyutu: %d x %d
+223	Ayarla
+224	Ekle
+225	Bir içerik klasörü seç
+226	Sistem varsayılanı
+227	Arayüz dili
+228	Japonca
+229	İngilizce
+230	Almanca
+231	Fransızca
+232	İspanyolca
+233	İtalyanca
+234	Dreamcast dili
+235	Dreamcast BIOS'unda ayarlı dil
+236	Yayın
+237	VGA dışı modlar için TV yayın standardı
+238	Japonya
+239	ABD
+240	Avrupa
+241	İhracat
+242	Kore
+243	Bölge
+244	BIOS bölgesi
+245	VGA
+246	RGB bileşen
+247	TV kompozit
+248	Kablo
+249	Video bağlantı türü
+250	İçerik konumu
+251	İçeriği yeniden tara
+252	Oyunlarının bulunduğu klasörler
+253	Veri klasörü
+254	BIOS dosyalarını, kayıtlı VMU'ları ve durumları içeren klasör
+255	Ana klasör
+256	İçe aktar
+257	Dışa aktar
+258	Finder'da göster
+259	Flycast'in ayarları ve VMU'ları kaydettiği klasör. BIOS dosyaları \"data\" adlı bir alt klasörde olmalı
+260	Kapaklı oyun listesi
+261	Oyun listesinde kapak resimlerini gösterir.
+262	Kapakları indir
+263	Kapak resimlerini TheGamesDB.net'ten indirir.
+264	Arayüz ölçeği
+265	Arayüz öğelerinin ve yazı tiplerinin boyutunu ayarlar.
+266	Uygula
+267	Koyu
+268	Açık
+269	Dreamcast
+270	Yüksek karşıtlık
+271	Nintendo
+272	Aqua Chill
+273	Arayüz teması
+274	Arayüzün renk temasını seç.
+275	Eski Naomi ROM'larını gizle
+276	İçerik tarayıcısında .bin, .dat ve .lst dosyalarını gizler
+277	SAF dosya seçiciyi kullan
+278	Klasör ve dosya seçmek için Android Storage Access Framework dosya seçicisini kullanır. Android 10 ve sonrasında yok sayılır.
+279	Otomatik durum:
+280	Yükle
+281	Oyun başlarken son kaydedilen durumu yükler
+282	Kaydet
+283	Oyun dururken durumu kaydeder
+284	Naomi Free Play
+285	Naomi oyunlarını Free Play modunda ayarlar.
+286	Discord durumu
+287	Discord'da hangi oyunu oynadığını gösterir
+288	RetroAchievements'ı aç
+289	Başarımlarını RetroAchievements.org ile takip et
+290	RetroAchievements hardcore modunu açar. Bu modda hile kullanmak ve durum yüklemek yasaktır.
+291	Kullanıcı adı
+292	Doğrulama başarılı
+293	Çıkış yap
+294	Parola
+295	Doğrulanıyor...
+296	Giriş yap
+297	Özel yollar
+298	BIOS klasörleri
+299	Bir BIOS klasörü seç
+300	BIOS dosyalarını (örn. dc_boot.bin veya dc_bios.bin) ve atari BIOS'larını içeren klasörler
+301	VMU klasörü
+302	VMU klasörünü seç
+303	VMU kayıtlarının (.bin) tutulduğu klasör
+304	Durum klasörleri
+305	Bir durum klasörü seç
+306	Kayıtlı durumlar için klasörler. Yeniler ilk yola yazılır; yüklerken hepsinde aranır
+307	Oyun kaydı klasörü
+308	Oyun kaydı klasörünü seç
+309	Oyun kayıt verileri için klasör (örn. atari NVRAM)
+310	Doku paketi klasörleri
+311	Bir doku paketi klasörü seç
+312	textures/<gameId> veya textures alt klasöründe <gameId> içeren klasörler
+313	Doku dökümü klasörü
+314	Doku dökümü klasörünü seç
+315	Doku dökümlerinin kaydedildiği klasör. Oyuna özel alt klasörler otomatik oluşturulur
+316	Kapak klasörü
+317	Kapak klasörünü seç
+318	Kapak resimlerini (png/jpg) içeren klasör. Boşsa Flycast indirmeler ve oluşturulan resimler için Ana klasör/boxart kullanır
+319	Kontrolcü eşleme klasörleri
+320	Bir kontrolcü eşleme klasörü seç
+321	Kontrolcü eşleme dosyalarını (.cfg) içeren klasörler. Öykünücü Ana klasör/mappings içine de bakar. Oyuna özel eşlemeler _<gameId>.cfg ile biter
+322	Hile klasörleri
+323	Bir hile klasörü seç
+324	Oyun kimliğiyle adlandırılmış hile dosyalarını (.cht/.txt) içeren klasörler. Flycast eşleşen dosyaları otomatik yükler
+325	O2
+326	O1
+327	Dreamcast BIOS'u
+328	Yok
+329	Sega kontrolcüsü
+330	Işık tabancası
+331	Klavye
+332	Fare
+333	Twin Stick
+334	Atari/Ascii çubuğu
+335	Marakas kontrolcüsü
+336	Balıkçılık kontrolcüsü
+337	Pop'n Music kontrolcüsü
+338	Yarış kontrolcüsü
+339	Densha de Go! kontrolcüsü
+340	Panther DC/Full Controller
+341	DreamParaPara kontrolcüsü
+342	Sega VMU
+343	Vibration Pack
+344	Mikrofon
+345	DreamPotato
+346	Tümü
+347	Yönler
+348	Yukarı
+349	Aşağı
+350	Çubuk yukarı
+351	Çubuk aşağı
+352	Çubuk sol
+353	Çubuk sağ
+354	S. çubuk yukarı
+355	S. çubuk aşağı
+356	S. çubuk sol
+357	S. çubuk sağ
+358	Eksen 3 yukarı
+359	Eksen 3 aşağı
+360	Eksen 3 sol
+361	Eksen 3 sağ
+362	Düğmeler
+363	Tetikler
+364	Sol tetik
+365	Sağ tetik
+366	Sol tetik 2
+367	Sağ tetik 2
+368	Sistem düğmeleri
+369	Yeniden yükle
+370	Öykünücü
+371	Menü
+372	Çık
+373	Duraklat
+374	İleri sar
+375	Durum yükle
+376	Durum kaydet
+377	Durumu RAM'den yükle
+378	Durumu RAM'e kaydet
+379	Sonraki durum yuvası
+380	Önceki durum yuvası
+381	Öykünen klavyeyi atla
+382	Ekran görüntüsü kaydet
+383	Düğme 1
+384	Düğme 2
+385	Düğme 3
+386	Düğme 4
+387	Düğme 5
+388	Düğme 6
+389	Düğme 7
+390	Düğme 8
+391	Jeton
+392	Servis
+393	Test
+394	Kart tak
+395	Kontrol ata
+396	'%s' kontrolü bekleniyor...
+397	%d sn içinde zaman aşımı
+398	Geçerli girişler:
+399	Onayla
+400	Sıralı
+401	İşaretliyse bu kombinasyon yalnızca tüm tuşlar verilen sırayla basıldığında çalışır.\nİşaretli değilse tüm tuşlar herhangi bir sırayla basıldığında çalışır.
+402	Kontrolcü eşleme
+403	Ata
+404	Kaldır
+405	Bitti
+406	Bağlantı noktası
+407	Dreamcast kontrolleri
+408	Oyun ayarını sil
+409	Oyun ayarı oluştur
+410	Sıfırla...
+411	Sıfırlamayı onayla
+412	Eşlemeleri varsayılana sıfırlamak istediğine emin misin?
+413	Kontrolcü türü:
+414	Oyun kumandası
+415	Atari / Hit Box
+416	Evet
+417	Hayır
+418	Atari kontrolleri
+419	Oyun kumandası ayarları
+420	Dokunsal
+421	Güç
+422	Dokunsal geri bildirim gücü
+423	Görünüm
+424	Saydamlık
+425	Sanal kumanda düğmelerinin saydamlığı
+426	Bir PNG dosyası seç
+427	Resim seç...
+428	Varsayılanı kullan
+429	Titreşim
+430	Titreşim gücü
+431	Çubuklar
+432	Ölü bölge
+433	Giriş sayılan en küçük sapma
+434	Doygunluk
+435	Çubuk %100 saptığında oyuna giden değer. %100'ün üstündeki değerler tam sapmadan önce doyar.
+436	Fiziksel aygıtlar
+437	Sistem
+438	Ad
+439	DreamLink: %s
+440	Düzeni düzenle
+441	Ayarlar
+442	Fare hassasiyeti
+443	Raw Input kullan
+444	Birden çok işaretçi aygıtını (fareler, ışık tabancaları) ve klavyeyi destekler
+445	Dreamcast aygıtları
+446	Bağlantı noktası %c
+447	Nişangah rengi
+448	Nişangah
+449	Oyun başına VMU A1
+450	Açıksa her oyunun A kontrolcüsünün 1. bağlantı noktasında kendi VMU'su olur.
+451	Fiziksel VMU depolamasını kullan
+452	DreamPicoPort veya DreamPotato ile gerçek VMU'ya okuma ve yazma sağlar. Durum yükleme ile uyumlu değildir.
+453	Nişangah boyutu
+454	Kapat
+455	%d başarımdan %d tanesini ve %d puandan %d tanesini açtın.
+456	Kilitli
+457	Etkin görevler
+458	Az kaldı
+459	Açıldı
+460	Son açılanlar
+461	Çizici hatası:
+462	Oyun duraklatıldı ama Flycast'i yeniden başlatman önerilir
+463	Çizici başlatılamadı.\nLütfen başka bir grafik API'si seç
+464	Flycast durdu.
+465	Devam et
+466	Hileler
+467	Başarımlar
+468	Barkod kartı
+469	Disk tak
+470	Diski çıkar
+471	Oyunu kapat
+472	Yuva %d
+473	Boş
+474	Tamam
+475	İçerik konumu yanlış mı?
+476	%d klasör tarandı ama hiç oyun bulunamadı!
+477	Yeniden seç
+478	İptal
+479	OYUNLAR
+480	Filtre
+481	Yükle...
+482	Oyun listen boş
+483	Oyun klasörü ekle
+484	Geçersiz seçim:
+485	Flycast bu klasöre yazamıyor.
+486	Flycast ana klasörünü seç
+487	Başlatılıyor...
+488	Ağ başlatılıyor...
+489	Oyunu hemen başlatmak için Start'a bas.
+490	Şimdi başlat
+491	Yükleniyor...
+492	Özel dokular önceden yükleniyor
+493	Hazırlanıyor...
+494	Durum yuvası %d
+495	Ekran görüntüsü yok
+496	Ekran görüntüsü kaydedildi
+497	Ekran görüntüsü kaydedilemedi
+498	DSP'yi aç
+499	Dreamcast'in dijital ses işlemcisini açar. Yalnızca hızlı platformlarda önerilir
+500	VMU seslerini aç
+501	VMU bip seslerini çalar.
+502	Ses düzeyi
+503	Öykünücünün ses düzeyini ayarlar
+504	Otomatik gecikme
+505	Ses gecikmesini otomatik ayarlar. Önerilir
+506	Gecikme
+507	En fazla ses gecikmesini ayarlar. Tüm ses sürücüleri desteklemez.
+508	Ses sürücüsü
+509	auto - Otomatik sürücü seçimi
+510	Kullanılacak ses sürücüsü
+511	HİLE EKLE
+512	Kod
+513	Bir hile dosyası seç
+514	HİLELER
+515	(Hile yüklenmedi)
+516	CPU modu
+517	Dynarec
+518	Dinamik yeniden derleyiciyi kullanır. Çoğu durumda önerilir
+519	Yorumlayıcı
+520	Yorumlayıcıyı kullanır. Çok yavaş ama dynarec sorunlarında yardımcı olabilir
+521	SH4 saati
+522	Ana SH4 işlemcisini hızlandırır veya yavaşlatır. Varsayılan 200 MHz. Başka değerler çökme, donma veya beklenmedik nükleer tepkimelere yol açabilir.
+523	Diğer
+524	HLE BIOS
+525	BIOS'un yüksek düzeyli öykünmesini zorlar
+526	Çok iş parçacıklı öykünme
+527	Öykünen CPU ve GPU'yu ayrı iş parçacıklarında çalıştırır
+528	Seri konsol
+529	Dreamcast seri konsolunu stdout'a yazar
+530	Dreamcast 32 MB RAM modu
+531	Dreamcast için 32 MB RAM modunu açar. Uyumluluğu etkileyebilir
+532	Dokuları dök
+533	Tüm dokuları data/texdump/<game id> içine döker
+534	Değiştirilmiş dokuları dök
+535	Özel dokularla zaten değiştirilmiş dokuları da döker
+536	Video ve hareketli dokuları atla
+537	Video (YUV) ve zaten güncellenmiş dokuları dökmez
+538	Dosyaya günlük yaz
+539	Hata ayıklama bilgilerini flycast.log dosyasına yazar
+540	Çökmeleri otomatik bildir
+541	Sorun gidermeye yardım için çökme raporlarını otomatik olarak sentry.io'ya gönderir. Kişisel bilgi içermez.
+542	Lua betikleri
+543	Lua dosya adı
+544	Kullanılacak Lua dosyası. Flycast ayar klasöründe olmalı. Boşsa flycast.lua kullanılır.
+545	Genel
+546	Kontroller
+547	Video
+548	Ses
+549	Ağ
+550	Hakkında
+551	Depolama
+552	.. Üst klasöre çık
+553	Geçerli klasörü seç
+554	(?)
+555	Sıfırla
+556	Ağ türü
+557	Modem veya geniş bant adaptörüyle Dreamcast'in kendi çevrimiçi özelliklerini kullanır
+558	GGPO ile ağı açar
+559	Desteklenen Naomi ve Atomiswave oyunları için ağı açar
+560	Dövüş kablosu
+561	Destekleyen oyunlar için Taisen (dövüş) null modem kablosunu öykünür
+562	Yapılandırma
+563	1. oyuncu olarak oyna
+564	2. oyuncu olarak oynamak için işareti kaldır
+565	Rakip
+566	Rakibin IP adresi ve isteğe bağlı bağlantı noktası
+567	Kare gecikmesi
+568	Kare gecikmesini ayarlar; ping 100 ms'nin üstündeyse önerilir
+569	Sol çubuk:
+570	Sol çubuk kullanılmıyor
+571	Yatay
+572	Yalnızca sol çubuğun yatay eksenini kullanır
+573	Tam
+574	Sol çubuğun yatay ve dikey eksenlerini kullanır
+575	Sohbeti aç
+576	Bir sohbet mesajı gelince sohbet penceresini açar
+577	Sohbet penceresini otomatik kapat
+578	Sohbet penceresini 20 saniye sonra otomatik kapatır
+579	Sohbet penceresi süresi (saniye)
+580	Yeni mesajdan sonra sohbet penceresinin açık kalacağı süre.
+581	Ağ istatistikleri
+582	Ağ istatistiklerini ekranda gösterir
+583	Ağ rolü
+584	Ana
+585	Naomi ağ oyunları için yerel bir sunucu oluşturur
+586	Bağımlı
+587	Ana sunucuya bağlanır
+588	Uydu
+589	Destekleyen oyunlar için canlı monitör (Virtual-On Oratorio Tangram ve Club Kart)
+590	Sunucu
+591	Bağlanılacak sunucu. Varsayılan bağlantı noktasında otomatik sunucu bulmak için boş bırak
+592	Yerel bağlantı noktası
+593	Kullanılacak yerel UDP bağlantı noktası
+594	Maç kodu
+595	Benzersiz bir sözcük veya sayı seç ve rakibinle paylaş.
+596	Bağlan
+597	Bağlantıyı kes
+598	Buluşma noktasında bekleniyor...
+599	Oyun hazırlanıyor...
+600	%s oynanıyor (%s)
+601	Elle
+602	Bağlanılacak rakip. Varsayılan bağlantı noktasında otomatik oyuncu bulmak için boş bırak
+603	Ana olarak davran
+604	Yalnızca en yüksek hız için kullanılır. Rakiplerden biri ana olmalı.
+605	Ağ seçenekleri
+606	UPnP'yi aç
+607	Ağ oyunu için yönlendiricini otomatik ayarlar
+608	Dijital çıkışları yayınla
+609	Dijital çıkışları ve force feedback durumunu TCP 8000 bağlantı noktasından yayınlar. MAME'nin \"-output network\" seçeneğiyle uyumlu. Yalnızca atari oyunları.
+610	Geniş bant adaptörü öykünmesi
+611	Modem yerine Ethernet geniş bant adaptörünü (BBA) öykünür
+612	DCNet kullan
+613	Dreamcast internet erişimi için DCNet bulut hizmetini kullanır.
+614	ISS kullanıcı adı
+615	Konsolun Flash RAM'inde kayıtlı ISS kullanıcı adı. Bazı çevrimiçi oyunlar bunu oyuncu adı olarak kullanır. Geçerli değeri korumak için boş bırak.
+616	DNS sunucusu adı veya IP adresi
+617	Çoklu kart ekranları
+618	1 (Twin, uydu)
+619	Tek ekranlı düzen (F355 Twin, Derby Owners Club uydu)
+620	2+ (Deluxe, ana ekran)
+621	İki veya üç ekranlı düzen (Airline Pilot, Derby Owners Club ana ekranı, F355 Deluxe, Sega Strike Fighter)
+622	Sürüm: %s
+623	Git karması: %s
+624	Derleme tarihi: %s
+625	Platform
+626	CPU: %s
+627	Bilinmiyor
+628	İşletim sistemi: %s
+629	Windows Universal Platform
+630	JIT durumu: %s
+631	Sürücü adı: %s
+632	Özel bir GPU sürücüsü seç
+633	Özel sürücü:
+634	Varsayılan sürücüyü kullan
+635	Vulkan'ı sıfırla
+636	Özel sürücü yükle
+637	Yeni sürücüyü kullanmak için Vulkan'ı sıfırlamak istiyor musun?
+638	Durum kaydedilemedi - bellek dolu
+639	Kayıt dosyası açılamıyor
+640	Durum kaydedildi
+641	Durum kaydedilemedi
+642	Kayıtlı durum bulunamadı
+643	Durum yüklenemedi
+644	Yetersiz bellek
+645	G/Ç hatası
+646	DCNet'e modemle bağlanıldı
+647	DCNet'e Ethernet ile bağlanıldı
+648	DCNet bağlantısı kesildi
+649	Ana makine bulunamadı
+650	DCNet'e bağlanılamıyor
+651	Rakibe bağlanıldı
+652	Rakiple eşitleniyor
+653	Rakiple eşitlendi
+654	Çalışıyor
+655	Rakiple bağlantı kesildi
+656	Bağlantı kesintiye uğradı
+657	Bağlantı sürdürüldü
+658	Ağ bağlandı
+659	Oyun desteklenmiyor
+660	Lobiye bağlanılamadı:
+661	Bağlantı başarısız
+662	Doğrudan eşler arası
+663	Aktarıcı üzerinden
+664	NAT
+665	Bağlantı koptu
+666	Oyuncular bekleniyor...
+667	%d oyuncu bağlandı. Bekleniyor... || %d oyuncu bağlandı. Bekleniyor...
+668	Oyun başlıyor
+669	Bağlı oyuncu yok
+670	Sunucuya bağlanılıyor
+671	%d yuvasıyla bağlanıldı
+672	DirectX 9 Naomi 2 oyunlarını desteklemiyor. Başka bir grafik API'si seç
+673	Zip dosyası açılamıyor
+674	Geçersiz zip dosyası
+675	Dosyalar kaydedilemiyor
+676	Zip okunamıyor
+677	OpenGL gölgelendirici derlemesi başarısız
+678	Naomi 2 için OpenGL ES 3.0+ gerekir
+679	%s içinde BIOS dosyası bulunamadı
+680	Bu oyun gerçek bir BIOS gerektiriyor
+681	Geniş ekran hilesi etkin
+682	Sanal kumanda
+683	Sol düğme
+684	Sağ düğme
+685	Orta düğme
+686	Dokunmatik fare
+687	Grafik API'si başlatılamıyor
+688	JIT olmadan çalışamaz
+689	Yön tuşu orta
+690	Select
+691	Mod
+692	Hat X
+693	Hat Y
+694	Gaz
+695	Fren
+696	Dümen
+697	Direksiyon
+698	Gaz kolu
+699	Bellek başlatılamadı
+700	Depolama erişimi başarısız: %s
+701	MFi kumandası
+702	Seçenekler
+703	Ana sayfa
+704	Paylaş
+705	Switch'te desteklenmiyor
+2001	Tema: %s
+2002	Yörünge
+2003	Kanal
+2004	Raf
+2005	Çapraz çubuk
+2006	Oyunlar
+2007	Temalar
+2008	Dil
+2009	Kitaplığın boş
+2010	GDI, CHD veya CDI oyunlarını /data/DeCast-S4/games klasörüne kopyala, burada görünürler.
+2011	Henüz oyun yok
+2012	Oyunları /data/DeCast-S4/games klasörüne kopyala
+2013	CANLI
+2014	Dönen bir halkada diskler
+2015	Her oyun bir TV kanalı
+2016	Parlak bir rafta kutular
+2017	Bu menü
+2018	Öykünücü ayarları
+2019	Video, ses, kontroller, BIOS, içerik klasörleri
+2020	Kapaklar
+2021	Kendi kapakların: /data/DeCast-S4/covers/<oyun dosyası veya seri no>.png
+2022	Menü dilini değiştirmek için X'e bas

@@ -1,0 +1,728 @@
+# Nederlands. <number><TAB><translation>, numbers from lang/keys.txt
+1	Gebruiker %s aangemeld
+2	Aanmelden bij RetroAchievements mislukt
+3	Geen gebruikerstoken ontvangen
+4	RetroAchievements verbinding verbroken
+5	RetroAchievements opnieuw verbonden
+6	Prestatie %s ontgrendeld!
+7	Ranglijst %s gestart
+8	Ranglijst %s mislukt
+9	Ranglijst %s ingediend
+10	%s beheerst
+11	%s voltooid
+12	%d prestaties, %d punten
+13	Je hebt %d van de %d prestaties ontgrendeld.
+14	Deze game heeft geen prestaties.
+15	Hardcore-modus
+16	Hardcore-modus uitgeschakeld
+17	Onbekend medium geplaatst
+18	Wisselen van medium mislukt
+19	WAARSCHUWING: DreamConn losgekoppeld van poort %c
+20	D-pad 2 omhoog
+21	D-pad 2 omlaag
+22	D-pad 2 links
+23	D-pad 2 rechts
+24	VMU1 A
+25	VMU1 B
+26	VMU1 omhoog
+27	VMU1 omlaag
+28	VMU1 links
+29	VMU1 rechts
+30	Verbonden
+31	Niet verbonden
+32	Terug
+33	Guide
+34	Start
+35	D-pad omhoog
+36	D-pad omlaag
+37	D-pad links
+38	D-pad rechts
+39	Overig
+40	Paddle 1
+41	Paddle 2
+42	Paddle 3
+43	Paddle 4
+44	Touchpad
+45	Linkerstick X
+46	Linkerstick Y
+47	Rechterstick X
+48	Rechterstick Y
+49	Standaardmuis
+50	Muis %d
+51	Flycast-fout
+52	Geen geluid
+53	Automatische keuze AAudio / OpenSL
+54	Afbeeldingenbibliotheek niet gevonden
+55	Map %s kan niet worden gelezen
+56	%s kan niet worden opgevraagd
+57	Ongeldig apparaat %s
+58	Kenmerken van %s kunnen niet worden gelezen
+59	Ongeldige bestandsnaam %s
+60	Onbekend schijfformaat
+61	Dit medium kan niet worden geladen
+62	CUE-bestand %s kan niet worden geopend
+63	CUE-fout: CUE-bestand te groot
+64	Ongeldig CUE-bestand
+65	CUE-bestand: track %s kan niet worden geopend
+66	CUE-bestand: track met onbekend sectortype: %s
+67	CUE-fout: bestand ongeldig of zonder tracks
+68	CUE-fout: minder dan 3 tracks
+69	chd: tracktype %s wordt niet ondersteund
+70	CHD-bestand %s kan niet worden geopend
+71	Ongeldig CHD-bestand %s
+72	Ongeldige blokgrootte in CHD-bestand %s
+73	Onverwacht tracknummer
+74	Niet-ondersteund subtype of pre/postgap
+75	Ongeldige CHD: minder dan 3 tracks
+76	Ongeldige CHD: geen track gevonden
+77	GDI-bestand %s kan niet worden geopend
+78	GDI-bestand te groot
+79	Ongeldig GDI-bestand
+80	GDI-bestand: track %s kan niet worden geopend
+81	CDI-bestand %s kan niet worden geopend
+82	Ongeldig CDI-bestand %s
+83	Ongeldige CDI-image
+84	Ongeldige CDI-sectorgrootte
+85	CDI-bestand kan niet opnieuw worden geopend
+86	Kaart uitgeworpen
+87	Snelheid: %3d
+88	Afdruk opgeslagen
+89	SystemSP: CompactFlash-bestand %s kan niet worden geopend
+90	Netwerk gestart
+91	Geheugentoewijzing mislukt
+92	Fout: BIOS %s kan niet worden geladen
+93	Onbekende game
+94	%s of %s kan niet worden geopend
+95	%s kan niet worden geopend
+96	Ongeldige ROM
+97	%s niet gevonden
+98	Ongeldige ROM: %s afgekapt
+99	Fout: BIOS uit naomi.zip kan niet worden geladen
+100	Fout: %s kan niet worden geopend
+101	Fout: ongeldig LST-bestand
+102	Ongeldige lege ROM
+103	Onvoldoende geheugen
+104	Fout: BIN/DAT-bestand laden mislukt
+105	Links
+106	Rechts
+107	Kalibratie voltooid
+108	Stuur wordt gekalibreerd. Houd het in het midden.
+109	Naomi GDROM: %s.chd kan niet worden geopend
+110	Naomi GDROM: het te ontsleutelen bestand is niet gevonden.
+111	Midden
+112	Opnieuw starten in BIOS
+113	ELF %s openen mislukt
+114	Opstartbestand %s niet gevonden
+115	Naomi opstarten mislukt
+116	Ongeldige cartridgegrootte
+117	Ongeldige cheatcode
+118	Waarde ontbreekt
+119	Waarden ontbreken
+120	Adres of waarde ontbreekt
+121	Niet-ondersteund cheattype
+122	Aantal of waarde ontbreekt
+123	Aantal of doeladres ontbreekt
+124	Mastercodes worden niet ondersteund
+125	Niet-ondersteunde voorwaardelijke code
+126	Testadres ontbreekt
+127	Cheatbestand kan niet worden opgeslagen
+128	Grafische API
+129	MoltenVK: een Vulkan-implementatie die werkt op Apple's Metal-graphics
+130	Sortering van transparantie
+131	Per driehoek
+132	Transparante polygonen per driehoek sorteren. Snel, maar kan grafische fouten geven
+133	Per strip
+134	Transparante polygonen per strip sorteren. Sneller, maar kan grafische fouten geven
+135	Per pixel
+136	Transparante polygonen per pixel sorteren. Trager, maar nauwkeurig
+137	Weergaveopties
+138	Half
+139	Origineel
+140	Interne resolutie
+141	Interne renderresolutie. Hoger is beter, maar zwaarder voor de GPU. Waarden boven je schermresolutie (maximaal het dubbele) werken als supersampling: anti-aliasing van hoge kwaliteit zonder verlies aan scherpte.
+142	Schalen met gehele getallen
+143	Schaalt het beeld met de grootste gehele factor die de schermresolutie toelaat.
+144	Lineaire interpolatie
+145	Schaalt het beeld met lineaire interpolatie, anders met naaste buur. Uitschakelen bij schalen met gehele getallen.
+146	VSync
+147	Stemt de framerate af op de verversingssnelheid van het scherm. Aanbevolen
+148	Frame pacing (experimenteel)
+149	Geeft de GPU voor elk frame het weergavemoment door om het originele ritme na te bootsen.
+150	Frames verdubbelen
+151	Frames verdubbelen op monitoren met hoge verversingssnelheid (120 Hz en hoger)
+152	VMU in de game tonen
+153	De VMU-schermpjes tonen tijdens het spelen
+154	Volledige framebufferemulatie
+155	Volledig nauwkeurige emulatie van de VRAM-framebuffer. Helpt games die de framebuffer rechtstreeks gebruiken voor effecten. Erg traag en niet te combineren met opschalen en breedbeeld.
+156	Eigen textures laden
+157	Eigen/hogeresolutietextures laden uit data/textures/<game id>
+158	Eigen textures vooraf laden
+159	Eigen textures bij de start van de game vooraf laden. Kan sneller zijn, maar gebruikt meer geheugen
+160	Beeldverhouding
+161	Breedbeeld
+162	Geometrie buiten het normale 4:3-beeld tekenen. Kan grafische fouten geven in de nieuwe delen.\nPast het beeld in en toont de volledige 16:9-inhoud.
+163	Superbreedbeeld
+164	De volledige breedte van het scherm of venster gebruiken als dat breder is dan 16:9.\nVult het beeld en verwijdert zwarte balken. Niet te combineren met schalen met gehele getallen.
+165	Breedbeeldcheats
+166	De game aanpassen zodat die anamorf in 16:9 wordt getoond, met horizontaal uitrekken. Slechts enkele games worden ondersteund.
+167	Horizontaal uitrekken
+168	Het beeld horizontaal uitrekken
+169	Scherm 90° draaien
+170	Het scherm 90° linksom draaien
+171	Instellingen per pixel
+172	512 MB
+173	1 GB
+174	2 GB
+175	4 GB
+176	Grootte pixelbuffer
+177	De grootte van de pixelbuffer. Moet mogelijk groter bij sterk opschalen.
+178	Maximaal aantal lagen
+179	Maximaal aantal transparante lagen. Moet mogelijk hoger voor sommige complexe scènes. Lager kan de prestaties verbeteren.
+180	Prestaties
+181	Automatisch frames overslaan:
+182	Uit
+183	Geen frames overslaan
+184	Normaal
+185	Een frame overslaan als GPU en CPU allebei te traag zijn
+186	Maximaal
+187	Een frame overslaan als de GPU te traag is
+188	Frames overslaan
+189	Aantal frames dat wordt overgeslagen tussen twee getekende frames
+190	Schaduwen
+191	Modifier volumes inschakelen, meestal gebruikt voor schaduwen
+192	Mist
+193	Misteffecten inschakelen
+194	Geavanceerd
+195	Framewissel vertragen
+196	Helpt tegen knipperend beeld of haperende video's. Niet aanbevolen op trage systemen
+197	Randen bij opschalen herstellen
+198	Helpt tegen doorlopende textures bij opschalen. Uitschakelen kan helpen als pixels vervormen bij opschalen van 2D-games (MVC2, CVS, KOF, enz.)
+199	Originele diepte-interpolatie
+200	Helpt bij beschadigde textures en diepteproblemen op AMD-GPU's. Kan soms ook Intel-GPU's helpen.
+201	Gerenderde textures naar VRAM kopiëren
+202	Gerenderde textures terugkopiëren naar het VRAM. Trager, maar nauwkeurig
+203	Anisotrope filtering
+204	Hogere waarden maken schuin bekeken textures scherper, maar zijn zwaarder voor de GPU. Werkt alleen bij textures met mipmaps.
+205	Texturefiltering:
+206	Standaard
+207	De texturefiltering van de game gebruiken
+208	Naaste buur afdwingen
+209	Naaste-buurfiltering afdwingen voor alle textures. Scherper beeld, maar kan weergavefouten geven. Heeft meestal geen invloed op de prestaties.
+210	Lineair afdwingen
+211	Lineaire filtering afdwingen voor alle textures. Zachter beeld, maar kan weergavefouten geven. Heeft meestal geen invloed op de prestaties.
+212	FPS-teller tonen
+213	Frames per seconde op het scherm tonen
+214	Videoroutering (Syphon)
+215	Videoroutering (Spout)
+216	Videoroutering (alleen met OpenGL of DirectX 11)
+217	Video naar een ander programma sturen
+218	bijv. de GPU-texture rechtstreeks naar OBS Studio sturen in plaats van de CPU-zware scherm-/vensteropname
+219	Verkleinen voor verzenden
+220	Kan sneller zijn met een kleinere texture, afhankelijk van je systeem
+221	Verticale uitvoerresolutie
+222	Grootte uitvoertexture: %d x %d
+223	Instellen
+224	Toevoegen
+225	Kies een inhoudsmap
+226	Systeemstandaard
+227	Taal van de interface
+228	Japans
+229	Engels
+230	Duits
+231	Frans
+232	Spaans
+233	Italiaans
+234	Dreamcast-taal
+235	De taal die in het Dreamcast-BIOS is ingesteld
+236	Tv-norm
+237	Tv-uitzendnorm voor niet-VGA-modi
+238	Japan
+239	VS
+240	Europa
+241	Export
+242	Korea
+243	Regio
+244	BIOS-regio
+245	VGA
+246	RGB-component
+247	Tv-composiet
+248	Kabel
+249	Type videoverbinding
+250	Locatie van de inhoud
+251	Inhoud opnieuw zoeken
+252	De mappen waarin je games staan
+253	Gegevensmap
+254	De map met BIOS-bestanden en opgeslagen VMU's en states
+255	Hoofdmap
+256	Importeren
+257	Exporteren
+258	Tonen in Finder
+259	De map waarin Flycast instellingen en VMU's bewaart. BIOS-bestanden horen in een submap met de naam \"data\"
+260	Gamelijst met hoesjes
+261	Hoesjes tonen in de gamelijst.
+262	Hoesjes ophalen
+263	Hoesafbeeldingen ophalen van TheGamesDB.net.
+264	Schaal van de interface
+265	De grootte van interface-elementen en lettertypen aanpassen.
+266	Toepassen
+267	Donker
+268	Licht
+269	Dreamcast
+270	Hoog contrast
+271	Nintendo
+272	Aqua Chill
+273	Thema van de interface
+274	Het kleurenthema van de interface kiezen.
+275	Oude Naomi-ROM's verbergen
+276	.bin-, .dat- en .lst-bestanden verbergen in de inhoudsbrowser
+277	SAF-bestandskiezer gebruiken
+278	De bestandskiezer van het Android Storage Access Framework gebruiken voor mappen en bestanden. Genegeerd vanaf Android 10.
+279	Automatische state:
+280	Laden
+281	Bij het starten de laatst opgeslagen state van de game laden
+282	Opslaan
+283	Bij het stoppen de state van de game opslaan
+284	Naomi Free Play
+285	Naomi-games instellen in Free Play-modus.
+286	Discord-status
+287	Op Discord tonen welke game je speelt
+288	RetroAchievements inschakelen
+289	Je prestaties bijhouden met RetroAchievements.org
+290	De hardcore-modus van RetroAchievements inschakelen. Cheats en het laden van states zijn in deze modus niet toegestaan.
+291	Gebruikersnaam
+292	Aanmelden gelukt
+293	Afmelden
+294	Wachtwoord
+295	Aanmelden...
+296	Aanmelden
+297	Eigen paden
+298	BIOS-mappen
+299	Kies een BIOS-map
+300	Mappen met BIOS-bestanden (bijv. dc_boot.bin of dc_bios.bin) en arcade-BIOS
+301	VMU-map
+302	Kies de VMU-map
+303	Map waarin VMU-saves (.bin) worden bewaard
+304	Mappen voor states
+305	Kies een map voor states
+306	Mappen voor states. Nieuwe states gaan naar het eerste pad; bij laden wordt in alle mappen gezocht
+307	Map voor gamesaves
+308	Kies de map voor gamesaves
+309	Map voor opgeslagen gamegegevens (bijv. arcade-NVRAM)
+310	Mappen voor texturepakketten
+311	Kies een map voor texturepakketten
+312	Mappen met textures/<gameId> of <gameId> in een submap textures
+313	Map voor texturedumps
+314	Kies de map voor texturedumps
+315	Map waarin texturedumps worden opgeslagen. Submappen per game worden automatisch gemaakt
+316	Map voor hoesjes
+317	Kies de map voor hoesjes
+318	Map met hoesafbeeldingen (png/jpg). Indien leeg gebruikt Flycast Hoofdmap/boxart voor downloads en gemaakte afbeeldingen
+319	Mappen voor controllerindeling
+320	Kies een map voor controllerindeling
+321	Mappen met controllerindelingen (.cfg). De emulator zoekt ook in Hoofdmap/mappings. Indelingen per game eindigen op _<gameId>.cfg
+322	Cheatmappen
+323	Kies een cheatmap
+324	Mappen met cheatbestanden (.cht/.txt) met de game-ID als naam. Flycast laadt passende bestanden automatisch
+325	S2
+326	S1
+327	Dreamcast-BIOS
+328	Geen
+329	Sega-controller
+330	Lichtpistool
+331	Toetsenbord
+332	Muis
+333	Twin Stick
+334	Arcade/Ascii-stick
+335	Maracas-controller
+336	Visserijcontroller
+337	Pop'n Music-controller
+338	Racecontroller
+339	Densha de Go!-controller
+340	Panther DC/Full Controller
+341	DreamParaPara-controller
+342	Sega VMU
+343	Vibration Pack
+344	Microfoon
+345	DreamPotato
+346	Alles
+347	Richtingen
+348	Omhoog
+349	Omlaag
+350	Stick omhoog
+351	Stick omlaag
+352	Stick links
+353	Stick rechts
+354	R-stick omhoog
+355	R-stick omlaag
+356	R-stick links
+357	R-stick rechts
+358	As 3 omhoog
+359	As 3 omlaag
+360	As 3 links
+361	As 3 rechts
+362	Knoppen
+363	Triggers
+364	Linkertrigger
+365	Rechtertrigger
+366	Linkertrigger 2
+367	Rechtertrigger 2
+368	Systeemknoppen
+369	Herladen
+370	Emulator
+371	Menu
+372	Afsluiten
+373	Pauze
+374	Vooruitspoelen
+375	State laden
+376	State opslaan
+377	State laden uit RAM
+378	State opslaan in RAM
+379	Volgende state-plek
+380	Vorige state-plek
+381	Geëmuleerd toetsenbord omzeilen
+382	Schermafbeelding opslaan
+383	Knop 1
+384	Knop 2
+385	Knop 3
+386	Knop 4
+387	Knop 5
+388	Knop 6
+389	Knop 7
+390	Knop 8
+391	Munt
+392	Service
+393	Test
+394	Kaart plaatsen
+395	Besturing toewijzen
+396	Wachten op besturing '%s'...
+397	Time-out over %d s
+398	Huidige invoer:
+399	Bevestigen
+400	Opeenvolgend
+401	Indien aangevinkt werkt deze combinatie alleen als alle toetsen in de opgegeven volgorde worden ingedrukt.\nIndien niet werkt ze zodra alle toetsen in willekeurige volgorde zijn ingedrukt.
+402	Controllerindeling
+403	Toewijzen
+404	Wissen
+405	Klaar
+406	Poort
+407	Dreamcast-besturing
+408	Gameconfiguratie verwijderen
+409	Gameconfiguratie maken
+410	Resetten...
+411	Reset bevestigen
+412	Weet je zeker dat je de indeling wilt terugzetten naar de standaard?
+413	Type controller:
+414	Gamepad
+415	Arcade / Hit Box
+416	Ja
+417	Nee
+418	Arcadebesturing
+419	Gamepadinstellingen
+420	Haptiek
+421	Sterkte
+422	Sterkte van de haptische feedback
+423	Weergave
+424	Transparantie
+425	Transparantie van de knoppen van de virtuele gamepad
+426	Kies een PNG-bestand
+427	Afbeelding kiezen...
+428	Standaard gebruiken
+429	Trillen
+430	Trilsterkte
+431	Sticks
+432	Dode zone
+433	Minimale uitslag die als invoer telt
+434	Verzadiging
+435	Waarde die de game krijgt bij 100% stickuitslag. Boven 100% wordt het maximum eerder bereikt.
+436	Fysieke apparaten
+437	Systeem
+438	Naam
+439	DreamLink: %s
+440	Indeling bewerken
+441	Instellingen
+442	Muisgevoeligheid
+443	Raw Input gebruiken
+444	Ondersteunt meerdere aanwijsapparaten (muizen, lichtpistolen) en toetsenborden
+445	Dreamcast-apparaten
+446	Poort %c
+447	Kleur van het vizier
+448	Vizier
+449	VMU A1 per game
+450	Indien ingeschakeld heeft elke game een eigen VMU op poort 1 van controller A.
+451	Fysieke VMU-opslag gebruiken
+452	Maakt lezen en schrijven op een echte VMU mogelijk via DreamPicoPort of DreamPotato. Niet te combineren met het laden van states.
+453	Grootte van het vizier
+454	Sluiten
+455	Je hebt %d van de %d prestaties en %d van de %d punten ontgrendeld.
+456	Vergrendeld
+457	Actieve uitdagingen
+458	Bijna
+459	Ontgrendeld
+460	Onlangs ontgrendeld
+461	Fout in de renderer:
+462	De game is gepauzeerd, maar het is aan te raden Flycast opnieuw te starten
+463	Starten van de renderer mislukt.\nKies een andere grafische API
+464	Flycast is gestopt.
+465	Hervatten
+466	Cheats
+467	Prestaties
+468	Barcodekaart
+469	Schijf plaatsen
+470	Schijf uitwerpen
+471	Game sluiten
+472	Plek %d
+473	Leeg
+474	OK
+475	Verkeerde locatie van de inhoud?
+476	%d mappen doorzocht, maar geen game gevonden!
+477	Opnieuw kiezen
+478	Annuleren
+479	GAMES
+480	Filter
+481	Laden...
+482	Je gamelijst is leeg
+483	Gamemap toevoegen
+484	Ongeldige keuze:
+485	Flycast kan niet in deze map schrijven.
+486	Kies de hoofdmap van Flycast
+487	Starten...
+488	Netwerk starten...
+489	Druk op Start om de game nu te starten.
+490	Nu starten
+491	Laden...
+492	Eigen textures worden vooraf geladen
+493	Voorbereiden...
+494	State-plek %d
+495	Geen schermafbeelding beschikbaar
+496	Schermafbeelding opgeslagen
+497	Fout bij opslaan van schermafbeelding
+498	DSP inschakelen
+499	De digitale geluidsprocessor van de Dreamcast inschakelen. Alleen aanbevolen op snelle systemen
+500	VMU-geluiden inschakelen
+501	De piepjes van de VMU afspelen.
+502	Volume
+503	Het volume van de emulator aanpassen
+504	Automatische latentie
+505	De audiolatentie automatisch instellen. Aanbevolen
+506	Latentie
+507	Stelt de maximale audiolatentie in. Niet door alle audiostuurprogramma's ondersteund.
+508	Audiostuurprogramma
+509	auto - automatische keuze
+510	Het te gebruiken audiostuurprogramma
+511	CHEAT TOEVOEGEN
+512	Code
+513	Kies een cheatbestand
+514	CHEATS
+515	(Geen cheat geladen)
+516	CPU-modus
+517	Dynarec
+518	De dynamische hercompiler gebruiken. In de meeste gevallen aanbevolen
+519	Interpreter
+520	De interpreter gebruiken. Erg traag, maar kan helpen bij een probleem met de dynarec
+521	SH4-klok
+522	De hoofd-CPU SH4 over- of onderklokken. Standaard is 200 MHz. Andere waarden kunnen crashes, bevriezing of onverwachte kernreacties veroorzaken.
+523	Overig
+524	HLE-BIOS
+525	High-level-emulatie van het BIOS afdwingen
+526	Multithreaded emulatie
+527	De geëmuleerde CPU en GPU in aparte threads uitvoeren
+528	Seriële console
+529	De seriële console van de Dreamcast naar stdout sturen
+530	Dreamcast-mod 32 MB RAM
+531	Schakelt de 32 MB RAM-mod voor de Dreamcast in. Kan de compatibiliteit beïnvloeden
+532	Textures dumpen
+533	Alle textures dumpen naar data/texdump/<game id>
+534	Vervangen textures dumpen
+535	Ook textures dumpen die al door eigen textures zijn vervangen
+536	Video- en animatietextures overslaan
+537	Video (YUV) en al bijgewerkte textures niet dumpen
+538	Loggen naar bestand
+539	Debuginformatie naar flycast.log schrijven
+540	Crashes automatisch melden
+541	Crashrapporten automatisch naar sentry.io sturen om problemen op te lossen. Er gaat geen persoonlijke informatie mee.
+542	Lua-scripts
+543	Lua-bestandsnaam
+544	Het te gebruiken Lua-bestand. Moet in de configuratiemap van Flycast staan. Indien leeg: flycast.lua.
+545	Algemeen
+546	Besturing
+547	Video
+548	Audio
+549	Netwerk
+550	Over
+551	Opslag
+552	.. Naar bovenliggende map
+553	Huidige map kiezen
+554	(?)
+555	Resetten
+556	Netwerktype
+557	De eigen online functies van de Dreamcast gebruiken via modem of breedbandadapter
+558	Netwerk via GGPO inschakelen
+559	Netwerk inschakelen voor ondersteunde Naomi- en Atomiswave-games
+560	Battle Cable
+561	De Taisen-(Battle-)nullmodemkabel emuleren voor games die deze ondersteunen
+562	Configuratie
+563	Spelen als speler 1
+564	Uitvinken om als speler 2 te spelen
+565	Tegenspeler
+566	IP-adres van je tegenspeler en eventueel de poort
+567	Framevertraging
+568	Stelt de framevertraging in, aan te raden bij een ping boven 100 ms
+569	Linkerstick:
+570	Linkerstick niet gebruikt
+571	Horizontaal
+572	Alleen de horizontale as van de linkerstick gebruiken
+573	Volledig
+574	De horizontale en verticale as van de linkerstick gebruiken
+575	Chat inschakelen
+576	Het chatvenster openen als er een bericht binnenkomt
+577	Chatvenster automatisch sluiten
+578	Het chatvenster na 20 seconden automatisch sluiten
+579	Time-out chatvenster (seconden)
+580	Hoe lang het chatvenster open blijft na een nieuw bericht.
+581	Netwerkstatistieken
+582	Netwerkstatistieken op het scherm tonen
+583	Netwerkrol
+584	Master
+585	Een lokale server maken voor Naomi-netwerkgames
+586	Slave
+587	Verbinden met de masterserver
+588	Satelliet
+589	Live monitor voor games die dit ondersteunen (Virtual-On Oratorio Tangram en Club Kart)
+590	Server
+591	De server om mee te verbinden. Leeg laten om automatisch een server te zoeken op de standaardpoort
+592	Lokale poort
+593	De te gebruiken lokale UDP-poort
+594	Matchcode
+595	Kies een uniek woord of getal en deel het met je tegenstander.
+596	Verbinden
+597	Verbinding verbreken
+598	Wachten op het ontmoetingspunt...
+599	Game voorbereiden...
+600	Speelt %s (%s)
+601	Handmatig
+602	De tegenspeler om mee te verbinden. Leeg laten om automatisch een speler te zoeken op de standaardpoort
+603	Als master optreden
+604	Alleen gebruikt voor maximale snelheid. Een van de spelers moet master zijn.
+605	Netwerkopties
+606	UPnP inschakelen
+607	Je router automatisch instellen voor online spelen
+608	Digitale uitgangen uitzenden
+609	Digitale uitgangen en force-feedbackstatus uitzenden op TCP-poort 8000. Compatibel met de MAME-optie \"-output network\". Alleen arcadegames.
+610	Emulatie van de breedbandadapter
+611	De Ethernet-breedbandadapter (BBA) emuleren in plaats van de modem
+612	DCNet gebruiken
+613	De DCNet-clouddienst gebruiken voor internettoegang van de Dreamcast.
+614	ISP-gebruikersnaam
+615	De ISP-gebruikersnaam in het flash-RAM van de console. Sommige online games gebruiken die als spelersnaam. Leeg laten om de huidige waarde te houden.
+616	Naam of IP-adres van de DNS-server
+617	Multiboard-schermen
+618	1 (Twin, satelliet)
+619	Opstelling met één scherm (F355 Twin, Derby Owners Club satelliet)
+620	2+ (Deluxe, hoofdscherm)
+621	Opstelling met twee of drie schermen (Airline Pilot, Derby Owners Club hoofdscherm, F355 Deluxe, Sega Strike Fighter)
+622	Versie: %s
+623	Git-hash: %s
+624	Builddatum: %s
+625	Platform
+626	CPU: %s
+627	Onbekend
+628	Besturingssysteem: %s
+629	Windows Universal Platform
+630	JIT-status: %s
+631	Naam stuurprogramma: %s
+632	Kies een eigen GPU-stuurprogramma
+633	Eigen stuurprogramma:
+634	Standaardstuurprogramma gebruiken
+635	Vulkan resetten
+636	Eigen stuurprogramma uploaden
+637	Wil je Vulkan resetten om het nieuwe stuurprogramma te gebruiken?
+638	State opslaan mislukt - geheugen vol
+639	Opslagbestand kan niet worden geopend
+640	State opgeslagen
+641	Fout bij opslaan van state
+642	State niet gevonden
+643	State laden mislukt
+644	Onvoldoende geheugen
+645	I/O-fout
+646	Verbonden met DCNet via modem
+647	Verbonden met DCNet via Ethernet
+648	Verbinding met DCNet verbroken
+649	Host niet gevonden
+650	Kan geen verbinding maken met DCNet
+651	Verbonden met tegenspeler
+652	Synchroniseren met tegenspeler
+653	Gesynchroniseerd met tegenspeler
+654	Actief
+655	Verbinding met tegenspeler verbroken
+656	Verbinding onderbroken
+657	Verbinding hersteld
+658	Netwerk verbonden
+659	Game niet ondersteund
+660	Verbinding met lobby mislukt:
+661	Verbinding mislukt
+662	Rechtstreeks peer-to-peer
+663	Via relay
+664	NAT
+665	Verbinding verloren
+666	Wachten op spelers...
+667	%d speler verbonden. Wachten... || %d spelers verbonden. Wachten...
+668	Game start
+669	Geen speler verbonden
+670	Verbinden met server
+671	Verbonden als plek %d
+672	DirectX 9 ondersteunt geen Naomi 2-games. Kies een andere grafische API
+673	Zip-bestand kan niet worden geopend
+674	Ongeldig zip-bestand
+675	Bestanden kunnen niet worden opgeslagen
+676	Zip kan niet worden gelezen
+677	Compileren van OpenGL-shader mislukt
+678	Naomi 2 vereist OpenGL ES 3.0 of hoger
+679	Geen BIOS-bestand gevonden in %s
+680	Deze game vereist een echt BIOS
+681	Breedbeeldcheat geactiveerd
+682	Virtuele gamepad
+683	Linkerknop
+684	Rechterknop
+685	Middelste knop
+686	Aanraakmuis
+687	Grafische API kan niet worden gestart
+688	Kan niet werken zonder JIT
+689	D-pad midden
+690	Select
+691	Modus
+692	Hat X
+693	Hat Y
+694	Gas
+695	Rem
+696	Roer
+697	Stuur
+698	Gashendel
+699	Geheugen initialiseren mislukt
+700	Toegang tot opslag mislukt: %s
+701	MFi-gamepad
+702	Opties
+703	Home
+704	Delen
+705	Niet ondersteund op Switch
+2001	Thema: %s
+2002	Baan
+2003	Kanaal
+2004	Plank
+2005	Kruisbalk
+2006	Games
+2007	Thema's
+2008	Taal
+2009	Je bibliotheek is leeg
+2010	Kopieer GDI-, CHD- of CDI-games naar /data/DeCast-S4/games, dan verschijnen ze hier.
+2011	Nog geen games
+2012	Kopieer games naar /data/DeCast-S4/games
+2013	LIVE
+2014	Schijven op een draaiende ring
+2015	Elke game is een tv-zender
+2016	Doosjes op een glanzende plank
+2017	Dit menu
+2018	Emulatorinstellingen
+2019	Video, audio, besturing, BIOS, inhoudsmappen
+2020	Hoesjes
+2021	Je eigen: /data/DeCast-S4/covers/<gamebestand of serienummer>.png
+2022	Druk op X om de menutaal te wijzigen

@@ -1,0 +1,729 @@
+# English texts: Flycast's flycast.pot, then the home screen's (lang/decast-keys.txt).
+# <number><TAB>[context] text || plural. Written by scripts/make-lang.py keys.
+1	User %s authenticated
+2	RetroAchievements authentication failed
+3	No user token returned
+4	RetroAchievements disconnected
+5	RetroAchievements reconnected
+6	Achievement %s unlocked!
+7	Leaderboard %s started
+8	Leaderboard %s failed
+9	Leaderboard %s submitted
+10	Mastered %s
+11	Completed %s
+12	%d achievements, %d points
+13	You have %d of %d achievements unlocked.
+14	This game has no achievements.
+15	Hardcore Mode
+16	Hardcore mode disabled
+17	Unrecognized media inserted
+18	Media change failed
+19	WARNING: DreamConn disconnected from port %c
+20	DPad2 Up
+21	DPad2 Down
+22	DPad2 Left
+23	DPad2 Right
+24	VMU1 A
+25	VMU1 B
+26	VMU1 Up
+27	VMU1 Down
+28	VMU1 Left
+29	VMU1 Right
+30	Connected
+31	Disconnected
+32	Back
+33	Guide
+34	Start
+35	DPad Up
+36	DPad Down
+37	DPad Left
+38	DPad Right
+39	Misc
+40	Paddle 1
+41	Paddle 2
+42	Paddle 3
+43	Paddle 4
+44	Touchpad
+45	Left Stick X
+46	Left Stick Y
+47	Right Stick X
+48	Right Stick Y
+49	Default Mouse
+50	Mouse %d
+51	Flycast Error
+52	No Audio
+53	Automatic AAudio / OpenSL selection
+54	Can't find Pictures library
+55	Can't read directory %s
+56	Cannot stat %s
+57	Invalid device %s
+58	Cannot get attributes of %s
+59	Invalid file name %s
+60	Unknown disk format
+61	This media cannot be loaded
+62	Cannot open CUE file %s
+63	CUE parse error: CUE file too big
+64	Invalid CUE file
+65	CUE file: cannot open track %s
+66	CUE file: track has unknown sector type: %s
+67	CUE parse error: failed to parse or invalid file with 0 tracks
+68	CUE parse error: less than 3 tracks
+69	chd: track type %s is not supported
+70	Cannot open CHD file %s
+71	Invalid CHD file %s
+72	Invalid hunkbytes for CHD file %s
+73	Unexpected track number
+74	Unsupported subtype or pre/postgap
+75	Invalid CHD: less than 3 tracks
+76	Invalid CHD: no track found
+77	Cannot open GDI file %s
+78	GDI file too big
+79	Invalid GDI file
+80	GDI file: Cannot open track %s
+81	Cannot open CDI file %s
+82	Invalid CDI file %s
+83	Invalid CDI image
+84	Invalid CDI sector size
+85	Cannot re-open CDI file
+86	Card ejected
+87	Speed: %3d
+88	Print out saved
+89	SystemSP: Cannot open CompactFlash file %s
+90	Network started
+91	Memory allocation failed
+92	Error: cannot load BIOS %s
+93	Unknown game
+94	Cannot open %s or %s
+95	Cannot open %s
+96	Invalid ROM
+97	Cannot find %s
+98	Invalid ROM: truncated %s
+99	Error: cannot load BIOS from naomi.zip
+100	Error: can't open %s
+101	Error: Invalid LST file
+102	Invalid empty ROM
+103	Out of memory
+104	Error: Failed to load BIN/DAT file
+105	Left
+106	Right
+107	Calibration done
+108	Calibrating the wheel. Keep it centered.
+109	Naomi GDROM: Cannot open %s.chd
+110	Naomi GDROM: Could not find the file to decrypt.
+111	Center
+112	Reboot to BIOS
+113	Failed to open ELF %s
+114	Failed to locate bootfile %s
+115	Naomi boot failure
+116	Invalid cart size
+117	Invalid cheat code
+118	Missing value
+119	Missing values
+120	Missing address or value
+121	Unsupported cheat type
+122	Missing count or value
+123	Missing count or destination address
+124	Master codes aren't supported
+125	Unsupported conditional code
+126	Missing test address
+127	Can't save cheat file
+128	Graphics API
+129	MoltenVK: An implementation of Vulkan that runs on Apple's Metal graphics framework
+130	Transparent Sorting
+131	Per Triangle
+132	Sort transparent polygons per triangle. Fast but may produce graphical glitches
+133	Per Strip
+134	Sort transparent polygons per strip. Faster but may produce graphical glitches
+135	Per Pixel
+136	Sort transparent polygons per pixel. Slower but accurate
+137	Rendering Options
+138	Half
+139	Native
+140	Internal Resolution
+141	Internal render resolution. Higher is better, but more demanding on the GPU. Values higher than your display resolution (but no more than double your display resolution) can be used for supersampling, which provides high-quality antialiasing without reducing sharpness.
+142	Integer Scaling
+143	Scales the output by the maximum integer multiple allowed by the display resolution.
+144	Linear Interpolation
+145	Scales the output with linear interpolation. Will use nearest neighbor interpolation otherwise. Disable with integer scaling.
+146	VSync
+147	Synchronizes the frame rate with the screen refresh rate. Recommended
+148	Frame Pacing (Experimental)
+149	Provide the GPU with presentation timing for each frame to replicate original frame pacing.
+150	Duplicate frames
+151	Duplicate frames on high refresh rate monitors (120 Hz and higher)
+152	Show VMU In-game
+153	Show the VMU LCD screens while in-game
+154	Full Framebuffer Emulation
+155	Fully accurate VRAM framebuffer emulation. Helps games that directly access the framebuffer for special effects. Very slow and incompatible with upscaling and wide screen.
+156	Load Custom Textures
+157	Load custom/high-res textures from data/textures/<game id>
+158	Preload Custom Textures
+159	Preload custom textures at game start. May improve performance but increases memory usage
+160	Aspect Ratio
+161	Widescreen
+162	Draw geometry outside of the normal 4:3 aspect ratio. May produce graphical glitches in the revealed areas.\nAspect Fit and shows the full 16:9 content.
+163	Super Widescreen
+164	Use the full width of the screen or window when its aspect ratio is greater than 16:9.\nAspect Fill and remove black bars. Not compatible with integer scaling.
+165	Widescreen Game Cheats
+166	Modify the game so that it displays in 16:9 anamorphic format and use horizontal screen stretching. Only some games are supported.
+167	Horizontal Stretching
+168	Stretch the screen horizontally
+169	Rotate Screen 90°
+170	Rotate the screen 90° counterclockwise
+171	Per Pixel Settings
+172	512 MB
+173	1 GB
+174	2 GB
+175	4 GB
+176	Pixel Buffer Size
+177	The size of the pixel buffer. May need to be increased when upscaling by a large factor.
+178	Maximum Layers
+179	Maximum number of transparent layers. May need to be increased for some complex scenes. Decreasing it may improve performance.
+180	Performance
+181	Automatic Frame Skipping:
+182	Disabled
+183	No frame skipping
+184	Normal
+185	Skip a frame when the GPU and CPU are both running slow
+186	Maximum
+187	Skip a frame when the GPU is running slow
+188	Frame Skipping
+189	Number of frames to skip between two actually rendered frames
+190	Shadows
+191	Enable modifier volumes, usually used for shadows
+192	Fog
+193	Enable fog effects
+194	Advanced
+195	Delay Frame Swapping
+196	Useful to avoid flashing screen or glitchy videos. Not recommended on slow platforms
+197	Fix Upscale Bleeding Edge
+198	Helps with texture bleeding case when upscaling. Disabling it can help if pixels are warping when upscaling in 2D games (MVC2, CVS, KOF, etc.)
+199	Native Depth Interpolation
+200	Helps with texture corruption and depth issues on AMD GPUs. Can also help Intel GPUs in some cases.
+201	Copy Rendered Textures to VRAM
+202	Copy rendered-to textures back to VRAM. Slower but accurate
+203	Anisotropic Filtering
+204	Higher values make textures viewed at oblique angles look sharper, but are more demanding on the GPU. This option only has a visible impact on mipmapped textures.
+205	Texture Filtering:
+206	Default
+207	Use the game's default texture filtering
+208	Force Nearest-Neighbor
+209	Force nearest-neighbor filtering for all textures. Crisper appearance, but may cause various rendering issues. This option usually does not affect performance.
+210	Force Linear
+211	Force linear filtering for all textures. Smoother appearance, but may cause various rendering issues. This option usually does not affect performance.
+212	Show FPS Counter
+213	Show on-screen frame/sec counter
+214	Video Routing (Syphon)
+215	Video Routing (Spout)
+216	Video Routing (Only available with OpenGL or DirectX 11)
+217	Send video content to another program
+218	e.g. Route GPU texture to OBS Studio directly instead of using CPU intensive Display/Window Capture
+219	Scale down before sending
+220	Could increase performance when sharing a smaller texture, YMMV
+221	Output vertical resolution
+222	Output texture size: %d x %d
+223	Set
+224	Add
+225	Select a Content Folder
+226	System Default
+227	UI Language
+228	Japanese
+229	English
+230	German
+231	French
+232	Spanish
+233	Italian
+234	Dreamcast Language
+235	The language as configured in the Dreamcast BIOS
+236	Broadcast
+237	TV broadcasting standard for non-VGA modes
+238	Japan
+239	USA
+240	Europe
+241	[region] Export
+242	Korea
+243	Region
+244	BIOS region
+245	VGA
+246	RGB Component
+247	TV Composite
+248	Cable
+249	Video connection type
+250	Content Location
+251	Rescan Content
+252	The folders where your games are stored
+253	Data Folder
+254	The folder containing BIOS files, as well as saved VMUs and states
+255	Home Folder
+256	[action] Import
+257	[action] Export
+258	Reveal in Finder
+259	The folder where Flycast saves configuration files and VMUs. BIOS files should be in a subfolder named \"data\"
+260	Box Art Game List
+261	Display game cover art in the game list.
+262	Fetch Box Art
+263	Fetch cover images from TheGamesDB.net.
+264	UI Scaling
+265	Adjust the size of UI elements and fonts.
+266	Apply
+267	Dark
+268	Light
+269	Dreamcast
+270	High Contrast
+271	Nintendo
+272	Aqua Chill
+273	UI Theme
+274	Select the UI color theme.
+275	Hide Legacy Naomi Roms
+276	Hide .bin, .dat and .lst files from the content browser
+277	Use SAF File Picker
+278	Use Android Storage Access Framework file picker to select folders and files. Ignored on Android 10 and later.
+279	Automatic State:
+280	Load
+281	Load the last saved state of the game when starting
+282	Save
+283	Save the state of the game when stopping
+284	Naomi Free Play
+285	Configure Naomi games in Free Play mode.
+286	Discord Presence
+287	Show which game you are playing on Discord
+288	Enable RetroAchievements
+289	Track your game achievements using RetroAchievements.org
+290	Enable RetroAchievements hardcore mode. Using cheats and loading a state are not allowed in this mode.
+291	Username
+292	Authentication successful
+293	Logout
+294	Password
+295	Authenticating...
+296	Login
+297	Custom Paths
+298	BIOS Folders
+299	Select a BIOS folder
+300	Folders containing BIOS files (e.g. dc_boot.bin or dc_bios.bin) and arcade BIOS
+301	VMU Folder
+302	Select the VMU folder
+303	Folder where VMU (.bin) saves are stored
+304	Savestate Folders
+305	Select a savestate folder
+306	Folders for save states. First path is used for new states; all are searched when loading
+307	Game Save Folder
+308	Select the game save folder
+309	Folder for game save data (e.g. arcade NVRAM)
+310	Texture Pack Folders
+311	Select a texture pack folder
+312	Folders containing textures/<gameId> or <gameId> under a textures subfolder
+313	Texture Dump Folder
+314	Select the texture dump folder
+315	Folder where texture dumps are saved. Game-specific subfolders will be created automatically
+316	Box Art Folder
+317	Select the box art folder
+318	Folder containing box art images (png/jpg). If empty, Flycast will use the default Home Folder/boxart for downloads and generated art
+319	Controller Mapping Folders
+320	Select a controller mapping folder
+321	Folders containing controller mapping files (.cfg). The emulator also looks in Home Folder/mappings. Per-game mappings are suffixed with _<gameId>.cfg
+322	Cheat Folders
+323	Select a cheat folder
+324	Folders containing cheat files (.cht/.txt) named with the game ID. Flycast will auto-load matching files if present
+325	P2
+326	P1
+327	Dreamcast BIOS
+328	None
+329	Sega Controller
+330	Light Gun
+331	Keyboard
+332	Mouse
+333	Twin Stick
+334	Arcade/Ascii Stick
+335	Maracas Controller
+336	Fishing Controller
+337	Pop'n Music controller
+338	Racing Controller
+339	Densha de Go! Controller
+340	Panther DC/Full Controller
+341	DreamParaPara Controller
+342	Sega VMU
+343	Vibration Pack
+344	Microphone
+345	DreamPotato
+346	All
+347	Directions
+348	Up
+349	Down
+350	Thumbstick Up
+351	Thumbstick Down
+352	Thumbstick Left
+353	Thumbstick Right
+354	R.Thumbstick Up
+355	R.Thumbstick Down
+356	R.Thumbstick Left
+357	R.Thumbstick Right
+358	Axis 3 Up
+359	Axis 3 Down
+360	Axis 3 Left
+361	Axis 3 Right
+362	Buttons
+363	Triggers
+364	Left Trigger
+365	Right Trigger
+366	Left Trigger 2
+367	Right Trigger 2
+368	System Buttons
+369	Reload
+370	Emulator
+371	Menu
+372	Exit
+373	Pause
+374	Fast-forward
+375	Load State
+376	Save State
+377	Load State in RAM
+378	Save State in RAM
+379	Next Save State Slot
+380	Previous Save State Slot
+381	Bypass Emulated Keyboard
+382	Save Screenshot
+383	Button 1
+384	Button 2
+385	Button 3
+386	Button 4
+387	Button 5
+388	Button 6
+389	Button 7
+390	Button 8
+391	Coin
+392	Service
+393	Test
+394	Insert Card
+395	Map Control
+396	Waiting for control '%s'...
+397	Time out in %d s
+398	Current inputs:
+399	Confirm
+400	Sequential
+401	When checked, this combo will only activate when all keys are pressed in the given sequence.\nWhen not checked, the combo will activate when all keys are pressed in any order.
+402	Controller Mapping
+403	Map
+404	Unmap
+405	Done
+406	Port
+407	Dreamcast Controls
+408	Delete Game Config
+409	Make Game Config
+410	Reset...
+411	Confirm Reset
+412	Are you sure you want to reset the mappings to default?
+413	Controller Type:
+414	Gamepad
+415	Arcade / Hit Box
+416	Yes
+417	No
+418	Arcade Controls
+419	Gamepad Settings
+420	Haptic
+421	Power
+422	Haptic feedback power
+423	View
+424	Transparency
+425	Virtual gamepad buttons transparency
+426	Select a PNG file
+427	Choose Image...
+428	Use Default
+429	Rumble
+430	Rumble power
+431	Thumbsticks
+432	Dead zone
+433	Minimum deflection to register as input
+434	Saturation
+435	Value sent to the game at 100% thumbstick deflection. Values greater than 100% will saturate before full deflection of the thumbstick.
+436	Physical Devices
+437	System
+438	Name
+439	DreamLink: %s
+440	Edit Layout
+441	Settings
+442	Mouse sensitivity
+443	Use Raw Input
+444	Supports multiple pointing devices (mice, light guns) and keyboards
+445	Dreamcast Devices
+446	Port %c
+447	Crosshair color
+448	Crosshair
+449	Per Game VMU A1
+450	When enabled, each game has its own VMU on port 1 of controller A.
+451	Use Physical VMU Storage
+452	Enables read and write access to physical VMU storage via DreamPicoPort or DreamPotato. This is not compatible with load state events.
+453	Crosshair Size
+454	Close
+455	You have unlocked %d of %d achievements and %d of %d points.
+456	Locked
+457	Active Challenges
+458	Almost There
+459	Unlocked
+460	Recently Unlocked
+461	Renderer error:
+462	The game has been paused but it is recommended to restart Flycast
+463	Renderer initialization failed.\nPlease select a different graphics API
+464	Flycast has stopped.
+465	Resume
+466	Cheats
+467	Achievements
+468	Barcode Card
+469	Insert Disk
+470	Eject Disk
+471	Close Game
+472	Slot %d
+473	Empty
+474	OK
+475	Incorrect Content Location?
+476	Scanned %d folders but no game can be found!
+477	Reselect
+478	Cancel
+479	GAMES
+480	Filter
+481	Load...
+482	Your game list is empty
+483	Add Game Folder
+484	Invalid selection:
+485	Flycast cannot write to this folder.
+486	Select Flycast Home Folder
+487	Starting...
+488	Starting Network...
+489	Press Start to start the game now.
+490	Start Now
+491	Loading...
+492	Preloading custom textures
+493	Preparing...
+494	Save state slot %d
+495	No screenshot available
+496	Screenshot saved
+497	Error saving screenshot
+498	Enable DSP
+499	Enable the Dreamcast Digital Sound Processor. Only recommended on fast platforms
+500	Enable VMU Sounds
+501	Play VMU beeps when enabled.
+502	Volume Level
+503	Adjust the emulator's audio level
+504	Automatic Latency
+505	Automatically set audio latency. Recommended
+506	Latency
+507	Sets the maximum audio latency. Not supported by all audio drivers.
+508	Audio Driver
+509	auto - Automatic driver selection
+510	The audio driver to use
+511	ADD CHEAT
+512	Code
+513	Select a cheat file
+514	CHEATS
+515	(No cheat loaded)
+516	CPU Mode
+517	Dynarec
+518	Use the dynamic recompiler. Recommended in most cases
+519	Interpreter
+520	Use the interpreter. Very slow but may help in case of a dynarec problem
+521	SH4 Clock
+522	Over/Underclock the main SH4 CPU. Default is 200 MHz. Other values may crash, freeze or trigger unexpected nuclear reactions.
+523	Other
+524	HLE BIOS
+525	Force high-level BIOS emulation
+526	Multi-threaded emulation
+527	Run the emulated CPU and GPU on different threads
+528	Serial Console
+529	Dump the Dreamcast serial console to stdout
+530	Dreamcast 32MB RAM Mod
+531	Enables 32MB RAM Mod for Dreamcast. May affect compatibility
+532	Dump Textures
+533	Dump all textures into data/texdump/<game id>
+534	Dump Replaced Textures
+535	Always dump textures that are already replaced by custom textures
+536	Discard Video and Animated Textures
+537	Skip dumping video (YUV) and already updated textures
+538	Log to File
+539	Log debug information to flycast.log
+540	Automatically Report Crashes
+541	Automatically upload crash reports to sentry.io to help in troubleshooting. No personal information is included.
+542	Lua Scripting
+543	Lua Filename
+544	Specify lua filename to use. Should be located in Flycast config folder. Defaults to flycast.lua when empty.
+545	General
+546	Controls
+547	Video
+548	Audio
+549	Network
+550	About
+551	Storage
+552	.. Up to Parent Folder
+553	Select Current Folder
+554	(?)
+555	Reset
+556	Network Type
+557	Use native Dreamcast online features using the modem or Broadband Adapter
+558	Enable networking using GGPO
+559	Enable networking for supported Naomi and Atomiswave games
+560	Battle Cable
+561	Emulate the Taisen (Battle) null modem cable for games that support it
+562	Configuration
+563	Play as Player 1
+564	Deselect to play as player 2
+565	Peer
+566	Your peer IP address and optional port
+567	Frame Delay
+568	Sets Frame Delay, advisable for sessions with ping >100 ms
+569	Left Thumbstick:
+570	Left thumbstick not used
+571	Horizontal
+572	Use the left thumbstick horizontal axis only
+573	Full
+574	Use the left thumbstick horizontal and vertical axes
+575	Enable Chat
+576	Open the chat window when a chat message is received
+577	Enable Chat Window Timeout
+578	Automatically close chat window after 20 seconds
+579	Chat Window Timeout (seconds)
+580	Sets duration that chat window stays open after new message is received.
+581	Network Statistics
+582	Display network statistics on screen
+583	Network Role
+584	Master
+585	Create a local server for Naomi network games
+586	Slave
+587	Connect to the master server
+588	Satellite
+589	Live monitor for games that support it (Virtual-On Oratorio Tangram and Club Kart)
+590	Server
+591	The server to connect to. Leave blank to find a server automatically on the default port
+592	Local Port
+593	The local UDP port to use
+594	Match Code
+595	Choose a unique word or number and share it with your opponent.
+596	Connect
+597	Disconnect
+598	Waiting at meeting point...
+599	Preparing game...
+600	Playing %s (%s)
+601	Manual
+602	The peer to connect to. Leave blank to find a player automatically on the default port
+603	Act as Master
+604	Only used for Maximum Speed. One of the peer must be master.
+605	Network Options
+606	Enable UPnP
+607	Automatically configure your network router for netplay
+608	Broadcast Digital Outputs
+609	Broadcast digital outputs and force-feedback state on TCP port 8000. Compatible with the \"-output network\" MAME option. Arcade games only.
+610	Broadband Adapter Emulation
+611	Emulate the Ethernet Broadband Adapter (BBA) instead of the Modem
+612	Use DCNet
+613	Use the DCNet cloud service for Dreamcast Internet access.
+614	ISP User Name
+615	The ISP user name stored in the console Flash RAM. Used by some online games as the player name. Leave blank to keep the current Flash RAM value.
+616	DNS server name or IP address
+617	Multiboard Screens
+618	1 (Twin, Satellite)
+619	One screen configuration (F355 Twin, Derby Owners Club satellite)
+620	2+ (Deluxe, Main screen)
+621	Two or three screens configuration (Airline Pilot, Derby Owners Club main screen, F355 Deluxe, Sega Strike Fighter)
+622	Version: %s
+623	Git Hash: %s
+624	Build Date: %s
+625	Platform
+626	CPU: %s
+627	Unknown
+628	Operating System: %s
+629	Windows Universal Platform
+630	JIT Status: %s
+631	Driver Name: %s
+632	Select a custom GPU driver
+633	Custom Driver:
+634	Use Default Driver
+635	Reset Vulkan
+636	Upload Custom Driver
+637	Do you want to reset Vulkan to use new driver?
+638	Save state failed - memory full
+639	Cannot open save file
+640	State saved
+641	Error saving state
+642	Save state not found
+643	Failed to load state
+644	Not enough memory
+645	I/O error
+646	Connected to DCNet with modem
+647	Connected to DCNet with Ethernet
+648	DCNet disconnected
+649	Host not found
+650	Can't connect to DCNet
+651	Connected to peer
+652	Synchronizing with peer
+653	Synchronized with peer
+654	Running
+655	Disconnected from peer
+656	Connection interrupted
+657	Connection resumed
+658	Network connected
+659	Game not supported
+660	Connection to lobby failed:
+661	Connection failed
+662	Direct peer to peer
+663	Using relay
+664	NAT
+665	Connection lost
+666	Waiting for players...
+667	%d player connected. Waiting... || %d players connected. Waiting...
+668	Starting game
+669	No player connected
+670	Connecting to server
+671	Connected as slot %d
+672	DirectX 9 doesn't support Naomi 2 games. Select a different graphics API
+673	Can't open zip file
+674	Invalid zip file
+675	Can't save files
+676	Can't read zip
+677	OpenGL shader compilation failed
+678	OpenGL ES 3.0+ required for Naomi 2
+679	No BIOS file found in %s
+680	This game requires a real BIOS
+681	Widescreen cheat activated
+682	Virtual Gamepad
+683	Left Button
+684	Right Button
+685	Middle Button
+686	Touch Mouse
+687	Cannot initialize the graphics API
+688	Cannot run without JIT
+689	DPad Center
+690	Select
+691	Mode
+692	Hat X
+693	Hat Y
+694	Gas
+695	Brake
+696	Rudder
+697	Wheel
+698	Throttle
+699	Memory initialization failed
+700	Storage access failed: %s
+701	MFi Gamepad
+702	Options
+703	Home
+704	Share
+705	Not supported on Switch
+2001	Theme: %s
+2002	Orbit
+2003	Channel
+2004	Shelf
+2005	Cross bar
+2006	Games
+2007	Themes
+2008	Language
+2009	Your library is empty
+2010	Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here.
+2011	No games yet
+2012	Copy games to /data/DeCast-S4/games
+2013	LIVE
+2014	Discs on a turning ring
+2015	Every game is a TV channel
+2016	Box art on a glossy shelf
+2017	This menu
+2018	Emulator settings
+2019	Video, audio, controls, BIOS, content folders
+2020	Covers
+2021	Your own: /data/DeCast-S4/covers/<game file or serial>.png
+2022	Press X to change the menu language
