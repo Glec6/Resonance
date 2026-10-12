@@ -795,3 +795,18 @@
 2088	Nie można pobrać kodów: %s
 2089	Nie znaleziono kodów do tej gry
 2090	Brak kodów
+2091	Karta pamięci
+2092	Karty pamięci
+2093	Zapisy na VMU: podgląd, kopiowanie, usuwanie
+2094	Wolne bloki: %d z %d
+2095	Krzyżyk: zapisy na tej karcie
+2096	Brak kart pamięci
+2097	Gra tworzy je przy zapisie
+2098	Naciśnij X jeszcze raz, aby usunąć ten zapis
+2099	Usunięto zapis
+2100	Skopiowano na %s
+2101	Zamknij grę, aby zmieniać karty pamięci
+2102	Kopiuj na
+2103	Usuń
+2104	Ta karta pamięci jest pusta
+2105	Bloki: %d

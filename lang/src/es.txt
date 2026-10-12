@@ -795,3 +795,18 @@
 2088	No se pudieron descargar los trucos: %s
 2089	No hay trucos para este juego
 2090	Aún no hay trucos
+2091	Tarjeta de memoria
+2092	Tarjetas de memoria
+2093	Las partidas de las VMU: ver, copiar, borrar
+2094	%d de %d bloques libres
+2095	Equis: las partidas de esta tarjeta
+2096	Aún no hay tarjetas de memoria
+2097	Los juegos las crean al guardar
+2098	Pulsa X otra vez para borrar esta partida
+2099	Partida borrada
+2100	Copiada a %s
+2101	Cierra el juego para cambiar las tarjetas de memoria
+2102	Copiar a
+2103	Borrar
+2104	Esta tarjeta de memoria está vacía
+2105	%d bloques

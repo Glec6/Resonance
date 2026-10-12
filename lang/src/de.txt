@@ -795,3 +795,18 @@
 2088	Cheats konnten nicht geladen werden: %s
 2089	Keine Cheats für dieses Spiel gefunden
 2090	Noch keine Cheats
+2091	Speicherkarte
+2092	Speicherkarten
+2093	Die Spielstände der VMUs: ansehen, kopieren, löschen
+2094	%d von %d Blöcken frei
+2095	Kreuz: die Spielstände auf dieser Karte
+2096	Noch keine Speicherkarten
+2097	Ein Spiel legt sie beim Speichern an
+2098	Zum Löschen noch einmal X drücken
+2099	Spielstand gelöscht
+2100	Kopiert nach %s
+2101	Schließe das Spiel, um Speicherkarten zu ändern
+2102	Kopieren nach
+2103	Löschen
+2104	Diese Speicherkarte ist leer
+2105	%d Blöcke

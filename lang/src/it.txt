@@ -795,3 +795,18 @@
 2088	Impossibile scaricare i trucchi: %s
 2089	Nessun trucco trovato per questo gioco
 2090	Ancora nessun trucco
+2091	Scheda di memoria
+2092	Schede di memoria
+2093	I salvataggi delle VMU: guarda, copia, elimina
+2094	%d blocchi liberi su %d
+2095	Croce: i salvataggi di questa scheda
+2096	Ancora nessuna scheda di memoria
+2097	I giochi le creano quando salvano
+2098	Premi di nuovo X per eliminare questo salvataggio
+2099	Salvataggio eliminato
+2100	Copiato su %s
+2101	Chiudi il gioco per modificare le schede di memoria
+2102	Copia su
+2103	Elimina
+2104	Questa scheda di memoria è vuota
+2105	%d blocchi

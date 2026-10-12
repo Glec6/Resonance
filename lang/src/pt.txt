@@ -105,3 +105,18 @@
 2088	Não foi possível baixar as trapaças: %s
 2089	Nenhuma trapaça encontrada para este jogo
 2090	Ainda não há trapaças
+2091	Cartão de memória
+2092	Cartões de memória
+2093	Os saves das VMUs: ver, copiar, apagar
+2094	%d de %d blocos livres
+2095	X: os saves deste cartão
+2096	Ainda não há cartões de memória
+2097	Os jogos os criam ao salvar
+2098	Pressione X de novo para apagar este save
+2099	Save apagado
+2100	Copiado para %s
+2101	Feche o jogo para alterar os cartões de memória
+2102	Copiar para
+2103	Apagar
+2104	Este cartão de memória está vazio
+2105	%d blocos

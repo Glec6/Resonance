@@ -796,3 +796,18 @@
 2088	Hileler indirilemedi: %s
 2089	Bu oyun için hile bulunamadı
 2090	Henüz hile yok
+2091	Hafıza kartı
+2092	Hafıza kartları
+2093	VMU kayıtları: göster, kopyala, sil
+2094	%d / %d blok boş
+2095	Çarpı: bu karttaki kayıtlar
+2096	Henüz hafıza kartı yok
+2097	Oyunlar kaydederken oluşturur
+2098	Bu kaydı silmek için X'e tekrar bas
+2099	Kayıt silindi
+2100	%s kartına kopyalandı
+2101	Hafıza kartlarını değiştirmek için oyunu kapat
+2102	Kopyala:
+2103	Sil
+2104	Bu hafıza kartı boş
+2105	%d blok

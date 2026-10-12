@@ -795,3 +795,18 @@
 2088	Kan de cheats niet downloaden: %s
 2089	Geen cheats gevonden voor deze game
 2090	Nog geen cheats
+2091	Geheugenkaart
+2092	Geheugenkaarten
+2093	De saves op de VMU's: bekijken, kopiëren, verwijderen
+2094	%d van %d blokken vrij
+2095	Kruisje: de saves op deze kaart
+2096	Nog geen geheugenkaarten
+2097	Een game maakt ze aan bij het opslaan
+2098	Druk nog eens op X om deze save te verwijderen
+2099	Save verwijderd
+2100	Gekopieerd naar %s
+2101	Sluit de game om geheugenkaarten te wijzigen
+2102	Kopiëren naar
+2103	Verwijderen
+2104	Deze geheugenkaart is leeg
+2105	%d blokken

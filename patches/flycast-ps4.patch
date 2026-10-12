@@ -80,7 +80,7 @@ index c5ac6f6e8..257ab0937 100644
  
  if(NOT LIBRETRO)
 diff --git a/core/hw/pvr/Renderer_if.cpp b/core/hw/pvr/Renderer_if.cpp
-index 49c3f720f..aafef3abd 100644
+index 49c3f720f..061445ade 100644
 --- a/core/hw/pvr/Renderer_if.cpp
 +++ b/core/hw/pvr/Renderer_if.cpp
 @@ -1,4 +1,7 @@
@@ -91,17 +91,29 @@ index 49c3f720f..aafef3abd 100644
  #include "spg.h"
  #include "rend/texconv.h"
  #include "rend/transform_matrix.h"
-@@ -544,6 +547,10 @@ void rend_start_render()
+@@ -544,6 +547,12 @@ void rend_start_render()
  	FillBGP(ctx);
  
  	ctx->rend.isRTT = (FB_W_SOF1 & 0x1000000) != 0;
 +#ifdef __ORBIS__
 +	if (ctx->rend.isRTT)
-+		decast_fault_count[ps4fault::RttRender]++;	// DeCast-S4 perf monitor
++		decast_fault_count[ps4fault::RttRender]++;	// Resonance perf monitor
++	else
++		decast_fault_count[ps4fault::TaRender]++;
 +#endif
  	ctx->rend.fb_W_SOF1 = FB_W_SOF1;
  	ctx->rend.fb_W_CTRL.full = FB_W_CTRL.full;
  
+@@ -617,6 +626,9 @@ void rend_vblank()
+ 		{
+ 			FramebufferInfo fbInfo;
+ 			fbInfo.update();
++#ifdef __ORBIS__
++			decast_fault_count[ps4fault::FbRender]++;	// the game drew this frame itself, in VRAM
++#endif
+ 			pvrQueue.enqueue(PvrMessageQueue::RenderFramebuffer, fbInfo);
+ 			pvrQueue.enqueue(PvrMessageQueue::Present);
+ 			if (!config::EmulateFramebuffer)
 diff --git a/core/hw/pvr/spg.cpp b/core/hw/pvr/spg.cpp
 index f2f0cca50..2cac65b91 100755
 --- a/core/hw/pvr/spg.cpp
@@ -947,6 +959,140 @@ index b78ffc9e4..8b7cb8be2 100644
  		call(rax);
  		mov(rax, (uintptr_t)&sh4ctx.cycle_counter);
  		mov(ecx, dword[rax]);
+diff --git a/core/rend/TexCache.cpp b/core/rend/TexCache.cpp
+index fbf4c582e..928ab5641 100644
+--- a/core/rend/TexCache.cpp
++++ b/core/rend/TexCache.cpp
+@@ -79,12 +79,57 @@ static void vramlock_list_add(vram_block* block)
+  
+ static std::mutex vramlist_lock;
+ 
++#ifdef __ORBIS__
++// Hot pages. A page fault costs the PS4 a signal (about a millisecond with the protection changes),
++// and its pages are 16 KiB: a page a game keeps writing (a texture it animates, data next to
++// textures) can fault hundreds of times a second. A page faulting more than kHotFaults times in a
++// second stops being protected for kHotMs; its textures are checked by hash when used instead.
++namespace
++{
++constexpr u32 kHotFaults = 6;
++constexpr u64 kHotMs = 10000;
++constexpr size_t kMaxPages = 16 * 1024 * 1024 / PAGE_SIZE;
++u32 pageFaults[kMaxPages];
++u64 pageWindow[kMaxPages];
++u64 pageHotUntil[kMaxPages];
++
++void notePageFault(size_t page)
++{
++	if (page >= kMaxPages)
++		return;
++	const u64 now = getTimeMs();
++	if (now - pageWindow[page] > 1000)
++	{
++		pageWindow[page] = now;
++		pageFaults[page] = 0;
++	}
++	if (++pageFaults[page] >= kHotFaults && pageHotUntil[page] < now)
++	{
++		pageHotUntil[page] = now + kHotMs;
++		DEBUG_LOG(RENDERER, "VRAM page %x is hot: hash-checked for %d s", (u32)(page * PAGE_SIZE), (int)(kHotMs / 1000));
++	}
++}
++
++bool rangeHot(u32 start, u32 end)
++{
++	const u64 now = getTimeMs();
++	for (size_t page = start / PAGE_SIZE; page <= end / PAGE_SIZE && page < kMaxPages; page++)
++		if (pageHotUntil[page] > now)
++			return true;
++	return false;
++}
++}
++#endif
++
+ bool VramLockedWriteOffset(size_t offset)
+ {
+ 	if (offset >= VRAM_SIZE || VramLocks == nullptr)
+ 		return false;
+ 
+ 	size_t addr_hash = offset / PAGE_SIZE;
++#ifdef __ORBIS__
++	notePageFault(addr_hash);
++#endif
+ 	std::vector<vram_block *>& list = VramLocks[addr_hash];
+ 
+ 	{
+@@ -227,8 +272,27 @@ void BaseTextureCacheData::PrintTextureName()
+ }
+ 
+ //true if : dirty or paletted texture and hashes don't match
++u32 BaseTextureCacheData::currentDataHash() const
++{
++	u32 h = XXH32(&vram[mmStartAddress], size, 11);
++	if (tcw.VQ_Comp)
++		h ^= XXH32(&vram[startAddress], VQ_CODEBOOK_SIZE, 13);
++	return h;
++}
++
+ bool BaseTextureCacheData::NeedsUpdate() {
+ 	bool rc = dirty != 0;
++#ifdef __ORBIS__
++	if (hashWatched && !rc && lock_block == nullptr && watchFrame != FrameCount)
++	{
++		watchFrame = FrameCount;
++		if (currentDataHash() != watchHash)
++			rc = true;
++		else if (!rangeHot(mmStartAddress, mmStartAddress + size - 1))
++			// the page cooled down: protected again
++			protectVRam();
++	}
++#endif
+ 	if (tex_type != TextureType::_8)
+ 	{
+ 		if (tcw.PixelFmt == PixelPal4 && palette_hash != pal_hash_16[tcw.PalSelect])
+@@ -248,6 +312,16 @@ void BaseTextureCacheData::protectVRam()
+ 		WARN_LOG(PVR, "protectVRam: end >= VRAM_SIZE. Tried to lock area out of vram");
+ 		end = VRAM_SIZE - 1;
+ 	}
++#ifdef __ORBIS__
++	if (rangeHot(startAddress, end))
++	{
++		hashWatched = true;
++		watchHash = currentDataHash();
++		watchFrame = FrameCount;
++		return;
++	}
++	hashWatched = false;
++#endif
+ 
+ 	if (startAddress > end)
+ 	{
+diff --git a/core/rend/TexCache.h b/core/rend/TexCache.h
+index 65f5ed9d1..4df3396f4 100644
+--- a/core/rend/TexCache.h
++++ b/core/rend/TexCache.h
+@@ -78,6 +78,9 @@ public:
+ 		custom_load_in_progress = 0;
+ 		gpuPalette = other.gpuPalette;
+ 		area = other.area;
++		hashWatched = other.hashWatched;
++		watchHash = other.watchHash;
++		watchFrame = other.watchFrame;
+ 	}
+ 
+ 	TSP tsp;        	//dreamcast texture parameters
+@@ -89,6 +92,12 @@ public:
+ 
+ 	u32 dirty;			// frame number at which texture was overwritten
+ 	vram_block* lock_block;
++	// PS4 (16 KiB pages, costly faults): on a VRAM page the game keeps writing, the texture isn't
++	// write-protected but checked by its hash when used (TexCache.cpp, hot pages)
++	bool hashWatched = false;
++	u32 watchHash = 0;
++	u32 watchFrame = 0;
++	u32 currentDataHash() const;
+ 
+ 	u32 mmStartAddress; // pixel data start address of max level mipmap
+ 	u16 width, height;	// width & height of the texture
 diff --git a/core/rend/vulkan/compiler.cpp b/core/rend/vulkan/compiler.cpp
 index a58394e53..0193b056e 100644
 --- a/core/rend/vulkan/compiler.cpp
@@ -1292,7 +1438,7 @@ index d2096c491..87f7b411b 100644
 +#endif
  };
 diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
-index 614739abc..db7c04058 100644
+index 614739abc..796c1fa7d 100644
 --- a/core/ui/gui.cpp
 +++ b/core/ui/gui.cpp
 @@ -17,6 +17,7 @@
@@ -1313,7 +1459,7 @@ index 614739abc..db7c04058 100644
  #include "profiler/fc_profiler.h"
  #include "hw/naomi/card_reader.h"
  #include "oslib/resources.h"
-@@ -451,6 +455,41 @@ void gui_open_settings()
+@@ -451,6 +455,45 @@ void gui_open_settings()
  	}
  }
  
@@ -1340,8 +1486,12 @@ index 614739abc..db7c04058 100644
 +	}
 +}
 +
++void ps4_plug_pad_ports();	// shell/ps4/ps4_gamepad.cpp
++
 +void gui_ps4_start_game(const std::string& path, const std::string& title)
 +{
++	// every player's PS4 pad gets a Dreamcast controller
++	ps4_plug_pad_ports();
 +	settings.content.title = title;
 +	gui_start_game(path);
 +}
@@ -1355,7 +1505,7 @@ index 614739abc..db7c04058 100644
  void gui_start_game(const std::string& path)
  {
  	const LockGuard lock(guiMutex);
-@@ -1345,6 +1384,9 @@ void gui_display_ui()
+@@ -1345,6 +1388,9 @@ void gui_display_ui()
  		}
  	}
  
@@ -1365,7 +1515,7 @@ index 614739abc..db7c04058 100644
  	gui_newFrame();
  	ImGui::NewFrame();
  	error_msg_shown = false;
-@@ -1353,9 +1395,19 @@ void gui_display_ui()
+@@ -1353,9 +1399,19 @@ void gui_display_ui()
  	switch (gui_state)
  	{
  	case GuiState::Settings:
@@ -1385,7 +1535,7 @@ index 614739abc..db7c04058 100644
  		gui_display_commands();
  		break;
  	case GuiState::Pause:
-@@ -1364,6 +1416,11 @@ void gui_display_ui()
+@@ -1364,6 +1420,11 @@ void gui_display_ui()
  		break;
  	case GuiState::Main:
  		//gui_display_demo();
@@ -1397,7 +1547,7 @@ index 614739abc..db7c04058 100644
  		gui_display_content();
  		break;
  	case GuiState::Closed:
-@@ -1408,6 +1465,10 @@ void gui_display_ui()
+@@ -1408,6 +1469,10 @@ void gui_display_ui()
  		emu.start();
  }
  
@@ -1408,7 +1558,7 @@ index 614739abc..db7c04058 100644
  static u64 LastFPSTime;
  static int lastFrameCount = 0;
  static float fps = -1;
-@@ -1422,6 +1483,25 @@ static std::string getFPSNotification()
+@@ -1422,6 +1487,25 @@ static std::string getFPSNotification()
  			LastFPSTime = now;
  			lastFrameCount = MainFrameCount;
  		}
@@ -1434,7 +1584,7 @@ index 614739abc..db7c04058 100644
  		if (fps >= 0.f && fps < 9999.f) {
  			char text[32];
  			snprintf(text, sizeof(text), "F:%4.1f%s", fps, settings.input.fastForwardMode ? " >>" : "");
-@@ -1669,6 +1749,25 @@ void gui_runOnUiThread(std::function<void()> function) {
+@@ -1669,6 +1753,25 @@ void gui_runOnUiThread(std::function<void()> function) {
  	uiThreadRunner.runOnThread(function);
  }
  
@@ -1460,7 +1610,7 @@ index 614739abc..db7c04058 100644
  void gui_takeScreenshot()
  {
  	if (!game_started)
-@@ -1705,3 +1804,99 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
+@@ -1705,3 +1808,99 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
  	return false;
  }
  #endif
@@ -1657,10 +1807,10 @@ index 8f3b8733e..b98e14d43 100644
  	// Determine the preview text
 diff --git a/resources/i18n/ar.po b/resources/i18n/ar.po
 new file mode 100644
-index 000000000..6cc5bd1bd
+index 000000000..69b2f8a3b
 --- /dev/null
 +++ b/resources/i18n/ar.po
-@@ -0,0 +1,2403 @@
+@@ -0,0 +1,2448 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -4064,11 +4214,56 @@ index 000000000..6cc5bd1bd
 +
 +msgid "No cheats yet"
 +msgstr "لا يوجد غش بعد"
++
++msgid "Memory Card"
++msgstr "بطاقة الذاكرة"
++
++msgid "Memory Cards"
++msgstr "بطاقات الذاكرة"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "حفظ VMU: عرض ونسخ وحذف"
++
++msgid "%d of %d blocks free"
++msgstr "%d من %d كتلة فارغة"
++
++msgid "Cross: the saves on this card"
++msgstr "X: الحفظ على هذه البطاقة"
++
++msgid "No memory cards yet"
++msgstr "لا توجد بطاقات ذاكرة بعد"
++
++msgid "A game creates them when it saves"
++msgstr "تنشئها اللعبة عند الحفظ"
++
++msgid "Press X again to delete this save"
++msgstr "اضغط X مرة أخرى لحذف هذا الحفظ"
++
++msgid "Save deleted"
++msgstr "تم حذف الحفظ"
++
++msgid "Copied to %s"
++msgstr "تم النسخ إلى %s"
++
++msgid "Close the game to change memory cards"
++msgstr "أغلق اللعبة لتعديل بطاقات الذاكرة"
++
++msgid "Copy to"
++msgstr "نسخ إلى"
++
++msgid "Delete"
++msgstr "حذف"
++
++msgid "This memory card is empty"
++msgstr "بطاقة الذاكرة هذه فارغة"
++
++msgid "%d blocks"
++msgstr "%d كتلة"
 diff --git a/resources/i18n/de.po b/resources/i18n/de.po
-index fb8203ba2..31154a9a8 100644
+index fb8203ba2..610c01678 100644
 --- a/resources/i18n/de.po
 +++ b/resources/i18n/de.po
-@@ -1,2963 +1,2399 @@
+@@ -1,2963 +1,2444 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -8011,14 +8206,59 @@ index fb8203ba2..31154a9a8 100644
 +
 +msgid "No cheats found for this game"
 +msgstr "Keine Cheats für dieses Spiel gefunden"
- 
++
 +msgid "No cheats yet"
 +msgstr "Noch keine Cheats"
++
++msgid "Memory Card"
++msgstr "Speicherkarte"
++
++msgid "Memory Cards"
++msgstr "Speicherkarten"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "Die Spielstände der VMUs: ansehen, kopieren, löschen"
++
++msgid "%d of %d blocks free"
++msgstr "%d von %d Blöcken frei"
++
++msgid "Cross: the saves on this card"
++msgstr "Kreuz: die Spielstände auf dieser Karte"
++
++msgid "No memory cards yet"
++msgstr "Noch keine Speicherkarten"
++
++msgid "A game creates them when it saves"
++msgstr "Ein Spiel legt sie beim Speichern an"
++
++msgid "Press X again to delete this save"
++msgstr "Zum Löschen noch einmal X drücken"
++
++msgid "Save deleted"
++msgstr "Spielstand gelöscht"
++
++msgid "Copied to %s"
++msgstr "Kopiert nach %s"
++
++msgid "Close the game to change memory cards"
++msgstr "Schließe das Spiel, um Speicherkarten zu ändern"
++
++msgid "Copy to"
++msgstr "Kopieren nach"
++
++msgid "Delete"
++msgstr "Löschen"
++
++msgid "This memory card is empty"
++msgstr "Diese Speicherkarte ist leer"
+ 
++msgid "%d blocks"
++msgstr "%d Blöcke"
 diff --git a/resources/i18n/es.po b/resources/i18n/es.po
-index 2735f014b..2e2d2b482 100644
+index 2735f014b..f010a3ac3 100644
 --- a/resources/i18n/es.po
 +++ b/resources/i18n/es.po
-@@ -1,2964 +1,2399 @@
+@@ -1,2964 +1,2444 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -11956,14 +12196,59 @@ index 2735f014b..2e2d2b482 100644
 +
 +msgid "No cheats found for this game"
 +msgstr "No hay trucos para este juego"
- 
++
 +msgid "No cheats yet"
 +msgstr "Aún no hay trucos"
++
++msgid "Memory Card"
++msgstr "Tarjeta de memoria"
++
++msgid "Memory Cards"
++msgstr "Tarjetas de memoria"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "Las partidas de las VMU: ver, copiar, borrar"
++
++msgid "%d of %d blocks free"
++msgstr "%d de %d bloques libres"
++
++msgid "Cross: the saves on this card"
++msgstr "Equis: las partidas de esta tarjeta"
++
++msgid "No memory cards yet"
++msgstr "Aún no hay tarjetas de memoria"
++
++msgid "A game creates them when it saves"
++msgstr "Los juegos las crean al guardar"
++
++msgid "Press X again to delete this save"
++msgstr "Pulsa X otra vez para borrar esta partida"
++
++msgid "Save deleted"
++msgstr "Partida borrada"
++
++msgid "Copied to %s"
++msgstr "Copiada a %s"
++
++msgid "Close the game to change memory cards"
++msgstr "Cierra el juego para cambiar las tarjetas de memoria"
++
++msgid "Copy to"
++msgstr "Copiar a"
++
++msgid "Delete"
++msgstr "Borrar"
++
++msgid "This memory card is empty"
++msgstr "Esta tarjeta de memoria está vacía"
+ 
++msgid "%d blocks"
++msgstr "%d bloques"
 diff --git a/resources/i18n/fr.po b/resources/i18n/fr.po
-index f3754825e..627f2e446 100644
+index f3754825e..139ed8b93 100644
 --- a/resources/i18n/fr.po
 +++ b/resources/i18n/fr.po
-@@ -1,2967 +1,2399 @@
+@@ -1,2967 +1,2444 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -15211,11 +15496,56 @@ index f3754825e..627f2e446 100644
 +
 +msgid "No cheats yet"
 +msgstr "Pas encore de codes"
++
++msgid "Memory Card"
++msgstr "Carte mémoire"
++
++msgid "Memory Cards"
++msgstr "Cartes mémoire"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "Les sauvegardes des VMU : voir, copier, supprimer"
++
++msgid "%d of %d blocks free"
++msgstr "%d blocs libres sur %d"
++
++msgid "Cross: the saves on this card"
++msgstr "Croix : les sauvegardes de cette carte"
++
++msgid "No memory cards yet"
++msgstr "Pas encore de carte mémoire"
++
++msgid "A game creates them when it saves"
++msgstr "Un jeu en crée une quand il sauvegarde"
++
++msgid "Press X again to delete this save"
++msgstr "Appuie encore sur X pour supprimer cette sauvegarde"
++
++msgid "Save deleted"
++msgstr "Sauvegarde supprimée"
++
++msgid "Copied to %s"
++msgstr "Copiée sur %s"
++
++msgid "Close the game to change memory cards"
++msgstr "Ferme le jeu pour modifier les cartes mémoire"
++
++msgid "Copy to"
++msgstr "Copier sur"
++
++msgid "Delete"
++msgstr "Supprimer"
++
++msgid "This memory card is empty"
++msgstr "Cette carte mémoire est vide"
++
++msgid "%d blocks"
++msgstr "%d blocs"
 diff --git a/resources/i18n/it.po b/resources/i18n/it.po
-index ee92eb28e..7a8904bbb 100644
+index ee92eb28e..fa83d81f1 100644
 --- a/resources/i18n/it.po
 +++ b/resources/i18n/it.po
-@@ -1,2963 +1,2399 @@
+@@ -1,2963 +1,2444 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -19158,14 +19488,59 @@ index ee92eb28e..7a8904bbb 100644
 +
 +msgid "No cheats found for this game"
 +msgstr "Nessun trucco trovato per questo gioco"
- 
++
 +msgid "No cheats yet"
 +msgstr "Ancora nessun trucco"
++
++msgid "Memory Card"
++msgstr "Scheda di memoria"
++
++msgid "Memory Cards"
++msgstr "Schede di memoria"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "I salvataggi delle VMU: guarda, copia, elimina"
++
++msgid "%d of %d blocks free"
++msgstr "%d blocchi liberi su %d"
++
++msgid "Cross: the saves on this card"
++msgstr "Croce: i salvataggi di questa scheda"
++
++msgid "No memory cards yet"
++msgstr "Ancora nessuna scheda di memoria"
++
++msgid "A game creates them when it saves"
++msgstr "I giochi le creano quando salvano"
++
++msgid "Press X again to delete this save"
++msgstr "Premi di nuovo X per eliminare questo salvataggio"
++
++msgid "Save deleted"
++msgstr "Salvataggio eliminato"
++
++msgid "Copied to %s"
++msgstr "Copiato su %s"
++
++msgid "Close the game to change memory cards"
++msgstr "Chiudi il gioco per modificare le schede di memoria"
++
++msgid "Copy to"
++msgstr "Copia su"
++
++msgid "Delete"
++msgstr "Elimina"
++
++msgid "This memory card is empty"
++msgstr "Questa scheda di memoria è vuota"
+ 
++msgid "%d blocks"
++msgstr "%d blocchi"
 diff --git a/resources/i18n/ja.po b/resources/i18n/ja.po
-index a79c6a14b..86dd6e4c2 100644
+index a79c6a14b..8b9ea133e 100644
 --- a/resources/i18n/ja.po
 +++ b/resources/i18n/ja.po
-@@ -1,2966 +1,2398 @@
+@@ -1,2966 +1,2443 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -22412,11 +22787,56 @@ index a79c6a14b..86dd6e4c2 100644
 +
 +msgid "No cheats yet"
 +msgstr "まだチートがありません"
++
++msgid "Memory Card"
++msgstr "メモリーカード"
++
++msgid "Memory Cards"
++msgstr "メモリーカード"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "ビジュアルメモリのセーブ: 表示、コピー、削除"
++
++msgid "%d of %d blocks free"
++msgstr "空き %d / %d ブロック"
++
++msgid "Cross: the saves on this card"
++msgstr "×ボタン: このカードのセーブ"
++
++msgid "No memory cards yet"
++msgstr "まだメモリーカードがありません"
++
++msgid "A game creates them when it saves"
++msgstr "ゲームがセーブすると作られます"
++
++msgid "Press X again to delete this save"
++msgstr "もう一度 X を押すとこのセーブを削除します"
++
++msgid "Save deleted"
++msgstr "セーブを削除しました"
++
++msgid "Copied to %s"
++msgstr "%s にコピーしました"
++
++msgid "Close the game to change memory cards"
++msgstr "メモリーカードを変更するにはゲームを終了してください"
++
++msgid "Copy to"
++msgstr "コピー先"
++
++msgid "Delete"
++msgstr "削除"
++
++msgid "This memory card is empty"
++msgstr "このメモリーカードは空です"
++
++msgid "%d blocks"
++msgstr "%d ブロック"
 diff --git a/resources/i18n/ko.po b/resources/i18n/ko.po
-index a5e70db54..15e455f0e 100644
+index a5e70db54..6d7de5fd6 100644
 --- a/resources/i18n/ko.po
 +++ b/resources/i18n/ko.po
-@@ -1,2962 +1,2398 @@
+@@ -1,2962 +1,2443 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -26357,15 +26777,60 @@ index a5e70db54..15e455f0e 100644
 +
 +msgid "No cheats found for this game"
 +msgstr "이 게임의 치트를 찾을 수 없습니다"
- 
++
 +msgid "No cheats yet"
 +msgstr "아직 치트가 없습니다"
++
++msgid "Memory Card"
++msgstr "메모리 카드"
++
++msgid "Memory Cards"
++msgstr "메모리 카드"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "VMU 저장 데이터: 보기, 복사, 삭제"
++
++msgid "%d of %d blocks free"
++msgstr "%d / %d 블록 남음"
++
++msgid "Cross: the saves on this card"
++msgstr "X: 이 카드의 저장 데이터"
++
++msgid "No memory cards yet"
++msgstr "아직 메모리 카드가 없습니다"
++
++msgid "A game creates them when it saves"
++msgstr "게임이 저장할 때 만들어집니다"
++
++msgid "Press X again to delete this save"
++msgstr "X를 한 번 더 누르면 이 저장 데이터를 삭제합니다"
++
++msgid "Save deleted"
++msgstr "저장 데이터를 삭제했습니다"
++
++msgid "Copied to %s"
++msgstr "%s(으)로 복사했습니다"
++
++msgid "Close the game to change memory cards"
++msgstr "메모리 카드를 바꾸려면 게임을 닫으세요"
++
++msgid "Copy to"
++msgstr "복사 대상"
++
++msgid "Delete"
++msgstr "삭제"
++
++msgid "This memory card is empty"
++msgstr "이 메모리 카드는 비어 있습니다"
+ 
++msgid "%d blocks"
++msgstr "%d 블록"
 diff --git a/resources/i18n/nl.po b/resources/i18n/nl.po
 new file mode 100644
-index 000000000..aa945f0c5
+index 000000000..2b0e8773b
 --- /dev/null
 +++ b/resources/i18n/nl.po
-@@ -0,0 +1,2399 @@
+@@ -0,0 +1,2444 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -28765,11 +29230,56 @@ index 000000000..aa945f0c5
 +
 +msgid "No cheats yet"
 +msgstr "Nog geen cheats"
++
++msgid "Memory Card"
++msgstr "Geheugenkaart"
++
++msgid "Memory Cards"
++msgstr "Geheugenkaarten"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "De saves op de VMU's: bekijken, kopiëren, verwijderen"
++
++msgid "%d of %d blocks free"
++msgstr "%d van %d blokken vrij"
++
++msgid "Cross: the saves on this card"
++msgstr "Kruisje: de saves op deze kaart"
++
++msgid "No memory cards yet"
++msgstr "Nog geen geheugenkaarten"
++
++msgid "A game creates them when it saves"
++msgstr "Een game maakt ze aan bij het opslaan"
++
++msgid "Press X again to delete this save"
++msgstr "Druk nog eens op X om deze save te verwijderen"
++
++msgid "Save deleted"
++msgstr "Save verwijderd"
++
++msgid "Copied to %s"
++msgstr "Gekopieerd naar %s"
++
++msgid "Close the game to change memory cards"
++msgstr "Sluit de game om geheugenkaarten te wijzigen"
++
++msgid "Copy to"
++msgstr "Kopiëren naar"
++
++msgid "Delete"
++msgstr "Verwijderen"
++
++msgid "This memory card is empty"
++msgstr "Deze geheugenkaart is leeg"
++
++msgid "%d blocks"
++msgstr "%d blokken"
 diff --git a/resources/i18n/pl.po b/resources/i18n/pl.po
-index 548cbb44d..a9f1f56f9 100644
+index 548cbb44d..8d4643ff1 100644
 --- a/resources/i18n/pl.po
 +++ b/resources/i18n/pl.po
-@@ -1,2965 +1,2400 @@
+@@ -1,2965 +1,2445 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -32716,14 +33226,59 @@ index 548cbb44d..a9f1f56f9 100644
 +
 +msgid "No cheats found for this game"
 +msgstr "Nie znaleziono kodów do tej gry"
- 
++
 +msgid "No cheats yet"
 +msgstr "Brak kodów"
++
++msgid "Memory Card"
++msgstr "Karta pamięci"
++
++msgid "Memory Cards"
++msgstr "Karty pamięci"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "Zapisy na VMU: podgląd, kopiowanie, usuwanie"
++
++msgid "%d of %d blocks free"
++msgstr "Wolne bloki: %d z %d"
++
++msgid "Cross: the saves on this card"
++msgstr "Krzyżyk: zapisy na tej karcie"
++
++msgid "No memory cards yet"
++msgstr "Brak kart pamięci"
++
++msgid "A game creates them when it saves"
++msgstr "Gra tworzy je przy zapisie"
++
++msgid "Press X again to delete this save"
++msgstr "Naciśnij X jeszcze raz, aby usunąć ten zapis"
++
++msgid "Save deleted"
++msgstr "Usunięto zapis"
++
++msgid "Copied to %s"
++msgstr "Skopiowano na %s"
++
++msgid "Close the game to change memory cards"
++msgstr "Zamknij grę, aby zmieniać karty pamięci"
++
++msgid "Copy to"
++msgstr "Kopiuj na"
++
++msgid "Delete"
++msgstr "Usuń"
++
++msgid "This memory card is empty"
++msgstr "Ta karta pamięci jest pusta"
+ 
++msgid "%d blocks"
++msgstr "Bloki: %d"
 diff --git a/resources/i18n/pt_BR.po b/resources/i18n/pt_BR.po
-index 6ec100a1e..8ed9936c9 100644
+index 6ec100a1e..8e5fc0dbb 100644
 --- a/resources/i18n/pt_BR.po
 +++ b/resources/i18n/pt_BR.po
-@@ -1,2966 +1,2399 @@
+@@ -1,2966 +1,2444 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -35985,12 +36540,57 @@ index 6ec100a1e..8ed9936c9 100644
 +
 +msgid "No cheats yet"
 +msgstr "Ainda não há trapaças"
++
++msgid "Memory Card"
++msgstr "Cartão de memória"
++
++msgid "Memory Cards"
++msgstr "Cartões de memória"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "Os saves das VMUs: ver, copiar, apagar"
++
++msgid "%d of %d blocks free"
++msgstr "%d de %d blocos livres"
++
++msgid "Cross: the saves on this card"
++msgstr "X: os saves deste cartão"
++
++msgid "No memory cards yet"
++msgstr "Ainda não há cartões de memória"
++
++msgid "A game creates them when it saves"
++msgstr "Os jogos os criam ao salvar"
++
++msgid "Press X again to delete this save"
++msgstr "Pressione X de novo para apagar este save"
++
++msgid "Save deleted"
++msgstr "Save apagado"
++
++msgid "Copied to %s"
++msgstr "Copiado para %s"
++
++msgid "Close the game to change memory cards"
++msgstr "Feche o jogo para alterar os cartões de memória"
++
++msgid "Copy to"
++msgstr "Copiar para"
++
++msgid "Delete"
++msgstr "Apagar"
++
++msgid "This memory card is empty"
++msgstr "Este cartão de memória está vazio"
++
++msgid "%d blocks"
++msgstr "%d blocos"
 diff --git a/resources/i18n/ru.po b/resources/i18n/ru.po
 new file mode 100644
-index 000000000..6a93c4e6f
+index 000000000..b6e814866
 --- /dev/null
 +++ b/resources/i18n/ru.po
-@@ -0,0 +1,2400 @@
+@@ -0,0 +1,2445 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -38391,11 +38991,56 @@ index 000000000..6a93c4e6f
 +
 +msgid "No cheats yet"
 +msgstr "Читов пока нет"
++
++msgid "Memory Card"
++msgstr "Карта памяти"
++
++msgid "Memory Cards"
++msgstr "Карты памяти"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "Сохранения на VMU: просмотр, копирование, удаление"
++
++msgid "%d of %d blocks free"
++msgstr "Свободно блоков: %d из %d"
++
++msgid "Cross: the saves on this card"
++msgstr "Крест: сохранения на этой карте"
++
++msgid "No memory cards yet"
++msgstr "Карт памяти пока нет"
++
++msgid "A game creates them when it saves"
++msgstr "Игра создаёт их при сохранении"
++
++msgid "Press X again to delete this save"
++msgstr "Нажмите X ещё раз, чтобы удалить это сохранение"
++
++msgid "Save deleted"
++msgstr "Сохранение удалено"
++
++msgid "Copied to %s"
++msgstr "Скопировано на %s"
++
++msgid "Close the game to change memory cards"
++msgstr "Закройте игру, чтобы менять карты памяти"
++
++msgid "Copy to"
++msgstr "Копировать на"
++
++msgid "Delete"
++msgstr "Удалить"
++
++msgid "This memory card is empty"
++msgstr "Эта карта памяти пуста"
++
++msgid "%d blocks"
++msgstr "Блоков: %d"
 diff --git a/resources/i18n/tr.po b/resources/i18n/tr.po
-index 8c8d8bc08..214236176 100644
+index 8c8d8bc08..c840ffec5 100644
 --- a/resources/i18n/tr.po
 +++ b/resources/i18n/tr.po
-@@ -1,2965 +1,2399 @@
+@@ -1,2965 +1,2444 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -42043,14 +42688,59 @@ index 8c8d8bc08..214236176 100644
 +
 +msgid "No cheats found for this game"
 +msgstr "Bu oyun için hile bulunamadı"
- 
++
 +msgid "No cheats yet"
 +msgstr "Henüz hile yok"
++
++msgid "Memory Card"
++msgstr "Hafıza kartı"
++
++msgid "Memory Cards"
++msgstr "Hafıza kartları"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "VMU kayıtları: göster, kopyala, sil"
++
++msgid "%d of %d blocks free"
++msgstr "%d / %d blok boş"
++
++msgid "Cross: the saves on this card"
++msgstr "Çarpı: bu karttaki kayıtlar"
++
++msgid "No memory cards yet"
++msgstr "Henüz hafıza kartı yok"
++
++msgid "A game creates them when it saves"
++msgstr "Oyunlar kaydederken oluşturur"
++
++msgid "Press X again to delete this save"
++msgstr "Bu kaydı silmek için X'e tekrar bas"
++
++msgid "Save deleted"
++msgstr "Kayıt silindi"
++
++msgid "Copied to %s"
++msgstr "%s kartına kopyalandı"
++
++msgid "Close the game to change memory cards"
++msgstr "Hafıza kartlarını değiştirmek için oyunu kapat"
++
++msgid "Copy to"
++msgstr "Kopyala:"
++
++msgid "Delete"
++msgstr "Sil"
++
++msgid "This memory card is empty"
++msgstr "Bu hafıza kartı boş"
+ 
++msgid "%d blocks"
++msgstr "%d blok"
 diff --git a/resources/i18n/zh_CN.po b/resources/i18n/zh_CN.po
-index 3ecabd349..c2f41bccf 100644
+index 3ecabd349..4bb8f2bd8 100644
 --- a/resources/i18n/zh_CN.po
 +++ b/resources/i18n/zh_CN.po
-@@ -1,2962 +1,2398 @@
+@@ -1,2962 +1,2443 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -45991,9 +46681,54 @@ index 3ecabd349..c2f41bccf 100644
 +
 +msgid "No cheats found for this game"
 +msgstr "没有找到此游戏的金手指"
- 
++
 +msgid "No cheats yet"
 +msgstr "还没有金手指"
++
++msgid "Memory Card"
++msgstr "记忆卡"
++
++msgid "Memory Cards"
++msgstr "记忆卡"
++
++msgid "The VMUs' saves: look, copy, delete"
++msgstr "VMU 存档：查看、复制、删除"
++
++msgid "%d of %d blocks free"
++msgstr "剩余 %d / %d 块"
++
++msgid "Cross: the saves on this card"
++msgstr "叉键：此卡上的存档"
++
++msgid "No memory cards yet"
++msgstr "还没有记忆卡"
++
++msgid "A game creates them when it saves"
++msgstr "游戏存档时会自动创建"
++
++msgid "Press X again to delete this save"
++msgstr "再按一次 X 删除此存档"
++
++msgid "Save deleted"
++msgstr "已删除存档"
++
++msgid "Copied to %s"
++msgstr "已复制到 %s"
++
++msgid "Close the game to change memory cards"
++msgstr "请先关闭游戏再修改记忆卡"
++
++msgid "Copy to"
++msgstr "复制到"
++
++msgid "Delete"
++msgstr "删除"
++
++msgid "This memory card is empty"
++msgstr "此记忆卡是空的"
+ 
++msgid "%d blocks"
++msgstr "%d 块"
 diff --git a/resources/resources.cmake b/resources/resources.cmake
 index 9bf4830a7..1ed162421 100644
 --- a/resources/resources.cmake
@@ -46018,10 +46753,10 @@ index 9bf4830a7..1ed162421 100644
 +endif()
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
-index 000000000..045d481fd
+index 000000000..522b3aff5
 --- /dev/null
 +++ b/shell/ps4/CMakeLists.txt
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,53 @@
 +# Resonance: Flycast on PS4 homebrew. Built with the Resonance toolchain (toolchain/ps4-decast.cmake,
 +# ps4-love-style.cmake: PS4_RUNTIME_SOURCES, ps4_link_mesa, ps4_add_eboot).
 +target_sources(${PROJECT_NAME} PRIVATE
@@ -46047,6 +46782,8 @@ index 000000000..045d481fd
 +	launcher/keyboard.cpp
 +	launcher/quick_menu.cpp
 +	launcher/settings_menu.cpp
++	launcher/vmu.cpp
++	launcher/vmu_viewer.cpp
 +	launcher/xmb_style.cpp
 +	launcher/libretro_scraper.h
 +	launcher/sound.cpp
@@ -48985,10 +49722,10 @@ index 000000000..0e648b80a
 +void launcher_open_quick_menu();
 diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
 new file mode 100644
-index 000000000..d300c749f
+index 000000000..79268f977
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher_internal.h
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,266 @@
 +/*
 +	Resonance launcher internals: what the core (launcher.cpp) shares with the themes
 +	(theme_*.cpp), covers (covers.cpp) and sounds (sound.cpp).
@@ -49206,6 +49943,37 @@ index 000000000..d300c749f
 +void cheatsOpen(float t);
 +bool cheatsInput(const MenuInput& in, float t);
 +void cheatsDraw(Frame& f, float alpha, float x0, float x1);
++
++// vmu.cpp: memory cards (Flycast's VMU images)
++struct VmuSave
++{
++	std::string fileName, title, description;
++	bool game = false, copyProtected = false;
++	int blocks = 0, firstBlock = 0, headerBlock = 0;
++	int year = 0, month = 0, day = 0, hour = 0, minute = 0;
++	int frames = 0, speed = 0;
++	u32 palette[16] {};				// ImU32 colours
++	std::vector<std::vector<u8>> icons;	// 32x32, 4 bits a pixel, per frame
++	int dirBlock = 0, dirOffset = 0;
++};
++struct VmuCard
++{
++	std::string path;
++	std::vector<u8> image;
++	int totalBlocks = 200, freeBlocks = 0;
++	std::vector<VmuSave> saves;
++};
++bool readVmu(const std::string& path, VmuCard& card);
++std::string deleteSave(VmuCard& card, int index);			// "" when done
++std::string copySave(const VmuCard& from, int index, VmuCard& to);
++std::vector<std::string> vmuFiles();	// the VMU images in Flycast's data folder
++// vmu_viewer.cpp: a card's saves over the settings panel; vmuViewerInput false = closed
++void vmuViewerOpen(const std::string& path, float t);
++bool vmuViewerActive();
++bool vmuViewerInput(const MenuInput& in, float t);
++void vmuViewerDraw(Frame& f, float alpha);
++// "Sonic Adventure  A1" for <serial>_vmu_save_A1.bin, "A2" for vmu_save_A2.bin
++std::string vmuLabel(const std::string& path);
 +
 +// The cover of the game being played, for the quick menu (the launcher sets it when starting one)
 +extern std::string currentGameCover;
@@ -49588,10 +50356,10 @@ index 000000000..edb1ccd3b
 +}
 diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_menu.cpp
 new file mode 100644
-index 000000000..92e3e1f74
+index 000000000..2b0391bbb
 --- /dev/null
 +++ b/shell/ps4/launcher/settings_menu.cpp
-@@ -0,0 +1,858 @@
+@@ -0,0 +1,901 @@
 +/*
 +	Resonance's settings, PS3 style, in place of Flycast's settings window: five groups (Video,
 +	Audio, Controllers, System, Home Screen); a group lists its options with the current value on the
@@ -49832,6 +50600,7 @@ index 000000000..92e3e1f74
 +			[] { return introEnabled() ? 1 : 0; },
 +			[](int v) { setIntroEnabled(v != 0); } });
 +		groups.push_back(std::move(home));
++		groups.push_back(cardsGroup());
 +		groups.push_back(networkGroup());
 +		groups.push_back(aboutGroup());
 +	}
@@ -50060,6 +50829,31 @@ index 000000000..92e3e1f74
 +		});
 +	}
 +
++	Group cardsGroup()
++	{
++		Group cards { ICON_FA_SD_CARD, T("Memory Cards"), T("The VMUs' saves: look, copy, delete"), {} };
++		for (const std::string& path : vmuFiles())
++		{
++			VmuCard card;
++			const bool ok = readVmu(path, card);
++			char buf[96];
++			snprintf(buf, sizeof(buf), T("%d of %d blocks free"), card.freeBlocks, card.totalBlocks);
++			Setting item { vmuLabel(path), T("Cross: the saves on this card"), {}, [] { return 0; }, [](int) {} };
++			const std::string value = ok ? std::string(buf) : std::string("?");
++			item.value = [value] { return value; };
++			item.action = [this, path] { vmuViewerOpen(path, now); };
++			cards.items.push_back(item);
++		}
++		if (cards.items.empty())
++		{
++			Setting none { T("No memory cards yet"), T("A game creates them when it saves"), {}, [] { return 0; }, [](int) {} };
++			none.action = [] {};
++			none.value = [] { return std::string(); };
++			cards.items.push_back(none);
++		}
++		return cards;
++	}
++
 +	Group networkGroup()
 +	{
 +		Group net { ICON_FA_NETWORK_WIRED, T("Network Library"), T("Games on NFS and SMB shares"), {} };
@@ -50175,6 +50969,18 @@ index 000000000..92e3e1f74
 +	m.pollUpdate();
 +	if (!m.open || keyboardOpen())
 +		return;
++	if (vmuViewerActive())
++	{
++		if (!vmuViewerInput(in, t))
++		{
++			// back from the viewer: the cards' free space again
++			const int g = m.group, s = m.sel;
++			m.build();
++			m.group = g;
++			m.sel = s;
++		}
++		return;
++	}
 +	std::vector<Setting>& items = m.groups[m.group].items;
 +	if (m.dropOpen)
 +	{
@@ -50262,6 +51068,11 @@ index 000000000..92e3e1f74
 +	Impl& m = *impl;
 +	if (!m.open || alpha <= 0)
 +		return;
++	if (vmuViewerActive())
++	{
++		vmuViewerDraw(f, alpha);
++		return;
++	}
 +	ImDrawList *dl = f.dl;
 +	const Group& g = m.groups[m.group];
 +	const float in = easeOut((f.t - m.openedAt) / .3f) * alpha;
@@ -51799,6 +52610,643 @@ index 000000000..bbbc87d0a
 +}
 +
 +} // namespace launcher
+diff --git a/shell/ps4/launcher/vmu.cpp b/shell/ps4/launcher/vmu.cpp
+new file mode 100644
+index 000000000..63936e689
+--- /dev/null
++++ b/shell/ps4/launcher/vmu.cpp
+@@ -0,0 +1,295 @@
++/*
++	Resonance's memory cards: Flycast's VMU images (128 KiB of flash, 256 blocks of 512 bytes) read
++	and changed the way the Dreamcast's BIOS does. Block 255 is the root (where the FAT and the
++	directory are), the FAT chains each file's blocks, the directory has 32-byte entries; a save's
++	first block (its second for a game) starts with the VMS header: descriptions, the animated
++	32x32 icon (16 colours, ARGB4444).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "stdclass.h"
++
++#include <algorithm>
++#include <cstdio>
++#include <cstring>
++#include <dirent.h>
++
++namespace launcher
++{
++namespace
++{
++constexpr int BLOCK = 512, BLOCKS = 256;
++constexpr u16 FREE = 0xFFFC, END = 0xFFFA;
++
++u16 rd16(const u8 *p) { return p[0] | (p[1] << 8); }
++u32 rd32(const u8 *p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((u32)p[3] << 24); }
++void wr16(u8 *p, u16 v) { p[0] = v & 0xFF; p[1] = v >> 8; }
++int bcd(u8 v) { return (v >> 4) * 10 + (v & 15); }
++
++std::string text(const u8 *p, size_t n)
++{
++	std::string s;
++	for (size_t i = 0; i < n; i++)
++		s += p[i] >= 0x20 && p[i] < 0x7F ? (char)p[i] : ' ';
++	while (!s.empty() && s.back() == ' ')
++		s.pop_back();
++	while (!s.empty() && s.front() == ' ')
++		s.erase(0, 1);
++	return s;
++}
++
++struct Layout { int fat, dir, dirBlocks, userBlocks; };
++
++Layout layout(const std::vector<u8>& img)
++{
++	const u8 *root = &img[255 * BLOCK];
++	Layout l { rd16(root + 0x46), rd16(root + 0x4A), rd16(root + 0x4C), rd16(root + 0x50) };
++	// an unformatted card: the standard layout
++	if (l.fat >= BLOCKS || l.dir >= BLOCKS || l.dirBlocks == 0 || l.dirBlocks > 32 || l.userBlocks == 0 || l.userBlocks > 241)
++		l = { 254, 253, 13, 200 };
++	return l;
++}
++
++u16 fat(const std::vector<u8>& img, const Layout& l, int block) {
++	return rd16(&img[l.fat * BLOCK + block * 2]);
++}
++
++void setFat(std::vector<u8>& img, const Layout& l, int block, u16 v) {
++	wr16(&img[l.fat * BLOCK + block * 2], v);
++}
++
++// A save's blocks in order: its FAT chain. Some games leave the FAT behind (their saves'
++// blocks still marked free): the BIOS allocates downward from the first block, so a chain that
++// stops short is taken as that run (the saves' CRCs agree)
++std::vector<int> chain(const std::vector<u8>& img, const Layout& l, int first, int count)
++{
++	std::vector<int> out;
++	int b = first;
++	while (b >= 0 && b < BLOCKS && (int)out.size() < count)
++	{
++		out.push_back(b);
++		const u16 next = fat(img, l, b);
++		if (next == END || next == FREE)
++			break;
++		b = next;
++	}
++	if ((int)out.size() < count && first - count + 1 >= 0)
++	{
++		out.clear();
++		for (int i = 0; i < count; i++)
++			out.push_back(first - i);
++	}
++	return out;
++}
++
++// the blocks the card's saves take, whatever its FAT says
++std::vector<bool> usedBlocks(const std::vector<u8>& img, const Layout& l, const std::vector<VmuSave>& saves)
++{
++	std::vector<bool> used(BLOCKS, false);
++	for (int b = 0; b < l.userBlocks; b++)
++		used[b] = fat(img, l, b) != FREE;
++	for (const VmuSave& s : saves)
++		for (int b : chain(img, l, s.firstBlock, s.blocks))
++			used[b] = true;
++	return used;
++}
++
++// the directory entries: (block, offset in it)
++std::vector<std::pair<int, int>> entries(const Layout& l)
++{
++	std::vector<std::pair<int, int>> out;
++	for (int i = 0; i < l.dirBlocks; i++)
++		for (int e = 0; e < BLOCK / 32; e++)
++			out.emplace_back(l.dir - i, e * 32);
++	return out;
++}
++} // namespace
++
++bool readVmu(const std::string& path, VmuCard& card)
++{
++	card = VmuCard();
++	card.path = path;
++	FILE *f = nowide::fopen(path.c_str(), "rb");
++	if (f == nullptr)
++		return false;
++	card.image.resize(BLOCKS * BLOCK);
++	const size_t n = fread(card.image.data(), 1, card.image.size(), f);
++	fclose(f);
++	if (n != card.image.size())
++		return false;
++	const std::vector<u8>& img = card.image;
++	const Layout l = layout(img);
++	card.totalBlocks = l.userBlocks;
++	card.freeBlocks = 0;
++	for (const auto& [block, offset] : entries(l))
++	{
++		const u8 *e = &img[block * BLOCK + offset];
++		if (e[0] != 0x33 && e[0] != 0xCC)
++			continue;
++		VmuSave s;
++		s.game = e[0] == 0xCC;
++		s.copyProtected = e[1] == 0xFF;
++		s.firstBlock = rd16(e + 2);
++		s.fileName = text(e + 4, 12);
++		s.year = bcd(e[0x10]) * 100 + bcd(e[0x11]);
++		s.month = bcd(e[0x12]);
++		s.day = bcd(e[0x13]);
++		s.hour = bcd(e[0x14]);
++		s.minute = bcd(e[0x15]);
++		s.blocks = rd16(e + 0x18);
++		s.headerBlock = rd16(e + 0x1A);
++		s.dirBlock = block;
++		s.dirOffset = offset;
++		// the file's bytes, in order
++		std::vector<u8> data;
++		for (int b : chain(img, l, s.firstBlock, s.blocks))
++			data.insert(data.end(), img.begin() + b * BLOCK, img.begin() + (b + 1) * BLOCK);
++		const size_t h = (size_t)s.headerBlock * BLOCK;
++		if (data.size() >= h + 0x80)
++		{
++			const u8 *hd = &data[h];
++			s.title = text(hd, 16);
++			s.description = text(hd + 0x10, 32);
++			s.frames = std::min<int>(rd16(hd + 0x40), 3);
++			s.speed = rd16(hd + 0x42);
++			for (int i = 0; i < 16; i++)
++			{
++				const u16 c = rd16(hd + 0x60 + i * 2);
++				s.palette[i] = ((c >> 12) & 15) * 17 << 24 | ((c >> 8) & 15) * 17 | ((c >> 4) & 15) * 17 << 8 | (c & 15) * 17 << 16;
++			}
++			for (int fr = 0; fr < s.frames && data.size() >= h + 0x80 + (fr + 1) * 512; fr++)
++				s.icons.emplace_back(data.begin() + h + 0x80 + fr * 512, data.begin() + h + 0x80 + (fr + 1) * 512);
++			(void)rd32;
++		}
++		if (s.title.empty())
++			s.title = s.fileName;
++		card.saves.push_back(s);
++	}
++	// free: neither in the FAT nor under a save
++	const std::vector<bool> used = usedBlocks(img, l, card.saves);
++	for (int b = 0; b < l.userBlocks; b++)
++		card.freeBlocks += !used[b];
++	return true;
++}
++
++std::string writeVmu(const VmuCard& card)
++{
++	FILE *f = nowide::fopen(card.path.c_str(), "wb");
++	if (f == nullptr)
++		return "can't write " + card.path;
++	const bool ok = fwrite(card.image.data(), 1, card.image.size(), f) == card.image.size();
++	fclose(f);
++	return ok ? "" : "can't write " + card.path;
++}
++
++std::string deleteSave(VmuCard& card, int index)
++{
++	if (index < 0 || index >= (int)card.saves.size())
++		return "no such save";
++	const VmuSave s = card.saves[index];
++	const Layout l = layout(card.image);
++	for (int b : chain(card.image, l, s.firstBlock, s.blocks))
++		setFat(card.image, l, b, FREE);
++	memset(&card.image[s.dirBlock * BLOCK + s.dirOffset], 0, 32);
++	const std::string error = writeVmu(card);
++	if (error.empty())
++		readVmu(card.path, card);
++	return error;
++}
++
++std::string copySave(const VmuCard& from, int index, VmuCard& to)
++{
++	if (index < 0 || index >= (int)from.saves.size())
++		return "no such save";
++	const VmuSave& s = from.saves[index];
++	if (s.game)
++		return "mini-games can't be copied";	// they must start at block 0
++	if (s.copyProtected)
++		return "this save is copy protected";
++	const Layout lf = layout(from.image), lt = layout(to.image);
++	for (const VmuSave& other : to.saves)
++		if (other.fileName == s.fileName)
++			return "the other card already has " + s.fileName;
++	const std::vector<int> src = chain(from.image, lf, s.firstBlock, s.blocks);
++	if ((int)src.size() < s.blocks)
++		return "this save's blocks can't be found";
++	// free blocks from the top down, as the BIOS saves, a run if possible (games that skip the FAT
++	// expect their save in one piece)
++	const std::vector<bool> used = usedBlocks(to.image, lt, to.saves);
++	std::vector<int> dst;
++	for (int top = lt.userBlocks - 1; top - s.blocks + 1 >= 0 && dst.empty(); top--)
++	{
++		bool run = true;
++		for (int i = 0; i < s.blocks && run; i++)
++			run = !used[top - i];
++		if (run)
++			for (int i = 0; i < s.blocks; i++)
++				dst.push_back(top - i);
++	}
++	if (dst.empty())
++		// no run that long: any free blocks, chained in the FAT
++		for (int b = lt.userBlocks - 1; b >= 0 && dst.size() < src.size(); b--)
++			if (!used[b])
++				dst.push_back(b);
++	if (dst.size() < src.size())
++		return "not enough free blocks on the other card";
++	int slotBlock = -1, slotOffset = 0;
++	for (const auto& [block, offset] : entries(lt))
++	{
++		const u8 t = to.image[block * BLOCK + offset];
++		if (t != 0x33 && t != 0xCC)
++		{
++			slotBlock = block;
++			slotOffset = offset;
++			break;
++		}
++	}
++	if (slotBlock < 0)
++		return "the other card's directory is full";
++	for (size_t i = 0; i < src.size(); i++)
++	{
++		memcpy(&to.image[dst[i] * BLOCK], &from.image[src[i] * BLOCK], BLOCK);
++		setFat(to.image, lt, dst[i], i + 1 < dst.size() ? (u16)dst[i + 1] : END);
++	}
++	u8 *e = &to.image[slotBlock * BLOCK + slotOffset];
++	memcpy(e, &from.image[s.dirBlock * BLOCK + s.dirOffset], 32);
++	wr16(e + 2, (u16)dst[0]);
++	const std::string error = writeVmu(to);
++	if (error.empty())
++		readVmu(to.path, to);
++	return error;
++}
++
++std::vector<std::string> vmuFiles()
++{
++	std::vector<std::string> out;
++	const std::string dir = get_writable_data_path("");
++	if (DIR *d = opendir(dir.c_str()))
++	{
++		while (dirent *e = readdir(d))
++		{
++			const std::string name = e->d_name;
++			if (name.find("vmu_save_") != std::string::npos && name.size() > 4 && name.compare(name.size() - 4, 4, ".bin") == 0)
++				out.push_back(dir + name);
++		}
++		closedir(d);
++	}
++	std::sort(out.begin(), out.end());
++	return out;
++}
++
++} // namespace launcher
+diff --git a/shell/ps4/launcher/vmu_viewer.cpp b/shell/ps4/launcher/vmu_viewer.cpp
+new file mode 100644
+index 000000000..43bc91cfb
+--- /dev/null
++++ b/shell/ps4/launcher/vmu_viewer.cpp
+@@ -0,0 +1,330 @@
++/*
++	Resonance's memory card viewer (Settings > Memory Cards): a card's saves with their animated
++	icons, titles, sizes and dates; Cross on one: copy it to another card, or delete it (twice, to
++	be sure). Not while a game runs: the emulator has the cards open.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "ui/imgui_driver.h"
++#include "ui/IconsFontAwesome6.h"
++
++#include <map>
++
++using i18n::T;
++
++namespace launcher
++{
++namespace
++{
++bool gOpen;
++VmuCard gCard;
++std::vector<std::string> gOthers;		// the other cards (copy targets)
++int gSel;
++float gPos, gVel, gOpenedAt;
++bool gMenu;								// the actions list
++int gMenuSel;
++std::vector<std::pair<std::string, int>> gActions;	// label, action (-1 delete, i: copy to gOthers[i])
++bool gConfirmDelete;
++std::string gStatus;
++bool gStatusBad;
++float gStatusAt = -10, gNow;
++int gTextureGeneration;
++
++void say(const std::string& s, bool bad)
++{
++	gStatus = s;
++	gStatusBad = bad;
++	gStatusAt = gNow;
++	playSound(bad ? Sound::Error : Sound::Confirm);
++}
++
++std::string alnum(const std::string& s)
++{
++	std::string out;
++	for (char c : s)
++		if (isalnum((unsigned char)c))
++			out += (char)toupper((unsigned char)c);
++	return out;
++}
++
++// One texture per save: its frames side by side (32x32 each)
++ImTextureID iconTexture(const VmuSave& s, int index)
++{
++	if (s.icons.empty() || imguiDriver == nullptr)
++		return {};
++	const std::string name = "vmu:" + gCard.path + ":" + s.fileName + ":" + std::to_string(gTextureGeneration) + ":" + std::to_string(index);
++	ImTextureID id = imguiDriver->getTexture(name);
++	if (id != ImTextureID())
++		return id;
++	const int frames = (int)s.icons.size();
++	std::vector<u8> rgba(32 * frames * 32 * 4);
++	for (int fr = 0; fr < frames; fr++)
++		for (int y = 0; y < 32; y++)
++			for (int x = 0; x < 32; x++)
++			{
++				const u8 byte = s.icons[fr][y * 16 + x / 2];
++				const u32 c = s.palette[x & 1 ? byte & 15 : byte >> 4];
++				u8 *p = &rgba[((y * 32 * frames) + fr * 32 + x) * 4];
++				p[0] = c & 0xFF;
++				p[1] = (c >> 8) & 0xFF;
++				p[2] = (c >> 16) & 0xFF;
++				p[3] = c >> 24;
++			}
++	try {
++		id = imguiDriver->updateTexture(name, rgba.data(), 32 * frames, 32, true);
++	} catch (...) {
++	}
++	return id;
++}
++
++void reload()
++{
++	readVmu(gCard.path, gCard);
++	gTextureGeneration++;
++	gSel = std::clamp(gSel, 0, std::max(0, (int)gCard.saves.size() - 1));
++}
++} // namespace
++
++std::string vmuLabel(const std::string& path)
++{
++	std::string name = path.substr(path.find_last_of('/') + 1);
++	const size_t at = name.find("vmu_save_");
++	if (at == std::string::npos)
++		return name;
++	std::string port = name.substr(at + 9);
++	port = port.substr(0, port.find('.'));
++	if (at == 0)
++		return T("Memory Card") + std::string(" ") + port;
++	// a game's own card: <serial>_vmu_save_A1.bin
++	const std::string serial = alnum(name.substr(0, at));
++	static std::map<std::string, std::string> titles;
++	if (titles.empty())
++	{
++		std::vector<LauncherEntry> games;
++		gui_ps4_list_games(games);
++		for (const LauncherEntry& g : games)
++			if (!g.productId.empty())
++				titles[alnum(g.productId)] = g.title;
++	}
++	auto it = titles.find(serial);
++	return (it != titles.end() ? it->second : name.substr(0, at - 1)) + "  " + port;
++}
++
++void vmuViewerOpen(const std::string& path, float t)
++{
++	gNow = t;
++	gOpen = true;
++	gSel = 0;
++	gPos = 0;
++	gMenu = false;
++	gConfirmDelete = false;
++	gStatus.clear();
++	gOpenedAt = t;
++	readVmu(path, gCard);
++	gTextureGeneration++;
++	gOthers.clear();
++	for (const std::string& p : vmuFiles())
++		if (p != path)
++			gOthers.push_back(p);
++	playSound(Sound::Confirm);
++}
++
++bool vmuViewerActive() {
++	return gOpen;
++}
++
++bool vmuViewerInput(const MenuInput& in, float t)
++{
++	gNow = t;
++	if (!gOpen)
++		return false;
++	const int n = (int)gCard.saves.size();
++	if (gMenu)
++	{
++		if (in.dy != 0)
++		{
++			gMenuSel = std::clamp(gMenuSel + in.dy, 0, (int)gActions.size() - 1);
++			gConfirmDelete = false;
++			playSound(Sound::Move);
++		}
++		if (in.circle)
++		{
++			gMenu = false;
++			playSound(Sound::Back);
++		}
++		else if (in.cross)
++		{
++			const int action = gActions[gMenuSel].second;
++			if (action < 0)
++			{
++				if (!gConfirmDelete)
++				{
++					gConfirmDelete = true;
++					say(T("Press X again to delete this save"), false);
++					return true;
++				}
++				const std::string error = deleteSave(gCard, gSel);
++				reload();
++				gMenu = false;
++				if (error.empty())
++					say(T("Save deleted"), false);
++				else
++					say(error, true);
++			}
++			else
++			{
++				VmuCard target;
++				std::string error = readVmu(gOthers[action], target) ? copySave(gCard, gSel, target) : "can't read the other card";
++				gMenu = false;
++				if (error.empty())
++				{
++					char buf[256];
++					snprintf(buf, sizeof(buf), T("Copied to %s"), vmuLabel(gOthers[action]).c_str());
++					say(buf, false);
++				}
++				else
++					say(error, true);
++			}
++		}
++		return true;
++	}
++	if (in.dy != 0 && n > 0)
++	{
++		gSel = std::clamp(gSel + in.dy, 0, n - 1);
++		playSound(Sound::Move);
++	}
++	if (in.circle)
++	{
++		gOpen = false;
++		playSound(Sound::Back);
++		return false;
++	}
++	if (in.cross && n > 0)
++	{
++		if (gui_ps4_game_running())
++		{
++			say(T("Close the game to change memory cards"), true);
++			return true;
++		}
++		gActions.clear();
++		for (int i = 0; i < (int)gOthers.size(); i++)
++			gActions.push_back({ std::string(T("Copy to")) + "  " + vmuLabel(gOthers[i]), i });
++		gActions.push_back({ T("Delete"), -1 });
++		gMenu = true;
++		gMenuSel = 0;
++		gConfirmDelete = false;
++		playSound(Sound::Confirm);
++	}
++	return true;
++}
++
++void vmuViewerDraw(Frame& f, float alpha)
++{
++	if (!gOpen)
++		return;
++	ImDrawList *dl = f.dl;
++	const float in = easeOut((f.t - gOpenedAt) / .25f) * alpha;
++	const Color tone = xmbTone();
++
++	// the card: its name and how full it is
++	const float x0 = f.w * .07f, x1 = f.w * .93f;
++	xmbText(dl, bodyFont(), f.h * .04f, ImVec2(x0, f.h * .08f), in, ICON_FA_SD_CARD);
++	xmbText(dl, bodyFont(), f.h * .034f, ImVec2(x0 + f.h * .06f, f.h * .085f), in, vmuLabel(gCard.path));
++	char buf[160];
++	snprintf(buf, sizeof(buf), T("%d of %d blocks free"), gCard.freeBlocks, gCard.totalBlocks);
++	xmbText(dl, bodyFont(), f.h * .024f, ImVec2(x1, f.h * .09f), in, buf, 1.f);
++	const float barY = f.h * .14f, used = 1.f - (float)gCard.freeBlocks / std::max(1, gCard.totalBlocks);
++	dl->AddRectFilled(ImVec2(x0, barY), ImVec2(x1, barY + 6), IM_COL32(255, 255, 255, (int)(40 * in)), 3.f);
++	dl->AddRectFilled(ImVec2(x0, barY), ImVec2(x0 + (x1 - x0) * used, barY + 6), tone.u32(.9f * in), 3.f);
++
++	// the saves
++	const int n = (int)gCard.saves.size();
++	if (n == 0)
++		xmbText(dl, bodyFont(), f.h * .03f, ImVec2(f.w * .5f, f.h * .45f), in * .8f, T("This memory card is empty"), .5f);
++	spring(gPos, gVel, (float)gSel, 170.f, 26.f, f.dt);
++	const float top = f.h * .19f, rowH = f.h * .1f;
++	const int visible = (int)((f.h * .66f) / rowH);
++	const float scroll = std::clamp(gPos - visible * .4f, 0.f, std::max(0.f, (float)n - visible));
++	dl->PushClipRect(ImVec2(0, top), ImVec2(f.w, top + visible * rowH), true);
++	const float hy = top + (gPos - scroll) * rowH;
++	if (n > 0)
++		dl->AddRectFilledMultiColor(ImVec2(x0 - 10, hy), ImVec2(x1 + 10, hy + rowH), tone.u32(.45f * in), tone.u32(.1f * in),
++				tone.u32(.1f * in), tone.u32(.45f * in));
++	for (int i = 0; i < n; i++)
++	{
++		const float y = top + (i - scroll) * rowH;
++		if (y < top - rowH || y > top + visible * rowH)
++			continue;
++		const VmuSave& s = gCard.saves[i];
++		const float a = in * (i == gSel ? 1.f : .8f);
++		const float icon = rowH * .78f;
++		const ImVec2 ip(x0, y + (rowH - icon) / 2);
++		dl->AddRectFilled(ip, ImVec2(ip.x + icon, ip.y + icon), IM_COL32(20, 24, 34, (int)(200 * a)), 6.f);
++		const ImTextureID tex = iconTexture(s, i);
++		if (tex != ImTextureID())
++		{
++			// the icon's animation: speed in 1/30 s per frame
++			const int frames = (int)s.icons.size();
++			const float period = std::max(1, s.speed) / 30.f;
++			const int fr = frames > 1 ? (int)(f.t / period) % frames : 0;
++			dl->AddImage(tex, ip, ImVec2(ip.x + icon, ip.y + icon), ImVec2((float)fr / frames, 0), ImVec2((float)(fr + 1) / frames, 1),
++					IM_COL32(255, 255, 255, (int)(255 * a)));
++		}
++		else
++			xmbText(dl, bodyFont(), icon * .5f, ImVec2(ip.x + icon / 2, ip.y + icon * .2f), a, s.game ? ICON_FA_GAMEPAD : ICON_FA_FLOPPY_DISK, .5f);
++		const float tx = ip.x + icon + f.w * .015f;
++		xmbText(dl, bodyFont(), f.h * .029f, ImVec2(tx, y + rowH * .14f), a, s.title, 0, x1 - tx - f.w * .12f);
++		std::string line = s.description.empty() ? s.fileName : s.description;
++		xmbText(dl, bodyFont(), f.h * .021f, ImVec2(tx, y + rowH * .55f), a * .85f, line, 0, x1 - tx - f.w * .12f, IM_COL32(210, 220, 235, 255));
++		snprintf(buf, sizeof(buf), T("%d blocks"), s.blocks);
++		xmbText(dl, bodyFont(), f.h * .024f, ImVec2(x1, y + rowH * .14f), a, buf, 1.f);
++		if (s.year > 0)
++		{
++			snprintf(buf, sizeof(buf), "%02d/%02d/%04d  %02d:%02d", s.day, s.month, s.year, s.hour, s.minute);
++			xmbText(dl, bodyFont(), f.h * .021f, ImVec2(x1, y + rowH * .55f), a * .8f, buf, 1.f, 0, IM_COL32(210, 220, 235, 255));
++		}
++	}
++	dl->PopClipRect();
++
++	// the actions beside the save
++	if (gMenu)
++	{
++		const float ch = f.h * .052f, cs = f.h * .026f;
++		float w = f.w * .22f;
++		for (const auto& a : gActions)
++			w = std::max(w, textWidth(bodyFont(), cs, a.first) + cs * 2.5f);
++		const float panelH = gActions.size() * ch + ch * .4f;
++		float py = std::clamp(hy + rowH / 2 - panelH / 2, f.h * .1f, f.h * .86f - panelH);
++		const float px = x1 - w;
++		dl->AddRectFilled(ImVec2(px, py), ImVec2(px + w, py + panelH), IM_COL32(12, 16, 26, (int)(230 * in)), ch * .2f);
++		dl->AddRect(ImVec2(px, py), ImVec2(px + w, py + panelH), IM_COL32(255, 255, 255, (int)(70 * in)), ch * .2f, 0, 1.5f);
++		for (int i = 0; i < (int)gActions.size(); i++)
++		{
++			const float y = py + ch * .2f + i * ch;
++			if (i == gMenuSel)
++				dl->AddRectFilled(ImVec2(px + 4, y), ImVec2(px + w - 4, y + ch), (gActions[i].second < 0 && gConfirmDelete
++						? Color { .8f, .2f, .2f } : tone).u32(.6f * in), ch * .15f);
++			xmbText(dl, bodyFont(), cs, ImVec2(px + cs, y + (ch - cs) / 2), in, gActions[i].first, 0, w - cs * 1.5f);
++		}
++	}
++	if (!gStatus.empty() && f.t - gStatusAt < 6.f)
++		xmbText(dl, bodyFont(), f.h * .024f, ImVec2(x0, f.h * .875f), in, gStatus, 0, x1 - x0,
++				gStatusBad ? IM_COL32(255, 150, 140, 255) : IM_COL32(170, 240, 190, 255));
++	xmbHints(f, { { 'x', T("Select") }, { 'o', T("Back") } }, in);
++}
++
++} // namespace launcher
 diff --git a/shell/ps4/launcher/xmb_style.cpp b/shell/ps4/launcher/xmb_style.cpp
 new file mode 100644
 index 000000000..0506dd1cb
@@ -52973,10 +54421,10 @@ index 000000000..6735da5ed
 +}
 diff --git a/shell/ps4/ps4_gamepad.cpp b/shell/ps4/ps4_gamepad.cpp
 new file mode 100644
-index 000000000..a7c2fd3ee
+index 000000000..5167af91e
 --- /dev/null
 +++ b/shell/ps4/ps4_gamepad.cpp
-@@ -0,0 +1,397 @@
+@@ -0,0 +1,420 @@
 +/*
 +	Resonance: DualShock 4 input through ScePad.
 +
@@ -53002,6 +54450,7 @@ index 000000000..a7c2fd3ee
 +#include "launcher/launcher.h"
 +#include "oslib/i18n.h"
 +#include "stdclass.h"
++#include "cfg/option.h"
 +
 +#include <orbis/UserService.h>
 +
@@ -53362,24 +54811,46 @@ index 000000000..a7c2fd3ee
 +
 +bool ps4_pad_state(u32& buttons, float& lx, float& ly)
 +{
-+	for (const auto& pad : gamepads)
-+		if (pad->maple_port() == 0)
-+		{
-+			buttons = pad->buttons();
-+			lx = pad->axis(ps4pad::AXIS_LX) / 32768.f;
-+			ly = pad->axis(ps4pad::AXIS_LY) / 32768.f;
-+			return true;
-+		}
++	// every player's pad drives the menus: their buttons together, the stick pushed furthest
 +	buttons = 0;
 +	lx = ly = 0.f;
-+	return false;
++	for (const auto& pad : gamepads)
++	{
++		buttons |= pad->buttons();
++		const float x = pad->axis(ps4pad::AXIS_LX) / 32768.f, y = pad->axis(ps4pad::AXIS_LY) / 32768.f;
++		if (x * x + y * y > lx * lx + ly * ly)
++		{
++			lx = x;
++			ly = y;
++		}
++	}
++	return !gamepads.empty();
++}
++
++void ps4_plug_pad_ports()
++{
++	// a PS4 pad on a Dreamcast port with nothing plugged in: a controller there, with a VMU and a
++	// rumble pack (Flycast leaves ports B to D empty by default; ports set in the settings stay)
++	for (const auto& pad : gamepads)
++	{
++		const int port = pad->maple_port();
++		if (port < 0 || port > 3 || config::MapleMainDevices[port] != MDT_None)
++			continue;
++		config::MapleMainDevices[port] = MDT_SegaController;
++		if (config::MapleExpansionDevices[port][0] == MDT_None && config::MapleExpansionDevices[port][1] == MDT_None)
++		{
++			config::MapleExpansionDevices[port][0] = MDT_SegaVMU;
++			config::MapleExpansionDevices[port][1] = MDT_PurupuruPack;
++		}
++		NOTICE_LOG(INPUT, "PS4: a Dreamcast controller on port %c for %s", 'A' + port, pad->name().c_str());
++	}
 +}
 diff --git a/shell/ps4/ps4_gamepad.h b/shell/ps4/ps4_gamepad.h
 new file mode 100644
-index 000000000..8cf0835cc
+index 000000000..30c0fc58d
 --- /dev/null
 +++ b/shell/ps4/ps4_gamepad.h
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,84 @@
 +/*
 +	Resonance: DualShock 4 input through ScePad.
 +
@@ -53459,15 +54930,17 @@ index 000000000..8cf0835cc
 +void input_ps4_term();
 +// The first DualShock 4's handle (the frontend reads it before Flycast starts), or -1.
 +int ps4_first_pad_handle();
-+// The first pad's latest state for the home screen (shell/ps4/launcher): ScePad button bits and
-+// the left stick in -1..1. False when there is no pad.
++// The pads' latest state for the menus (shell/ps4/launcher), all players together: ScePad button
++// bits and the left stick in -1..1. False when there is no pad.
 +bool ps4_pad_state(u32& buttons, float& lx, float& ly);
++// Before a game starts: a Dreamcast controller on every port that has a PS4 pad and nothing else
++void ps4_plug_pad_ports();
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..ac2f344f9
+index 000000000..760ef5e7d
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
-@@ -0,0 +1,368 @@
+@@ -0,0 +1,369 @@
 +/*
 +	Resonance: Flycast's PS4 frontend.
 +
@@ -53632,12 +55105,13 @@ index 000000000..ac2f344f9
 +				pipelinesSinceSave = 0;
 +			}
 +			char line[1100];
-+			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | faults/s: memwatch %.0f code %.0f vram %.0f fpcb %.0f rewrite %.0f other %.0f, protect %.0f unprotect %.0f, rtt %.0f/s%s | %s",
++			snprintf(line, sizeof(line), "perf: fps %.1f, speed %.0f%%, gpu %llu%% | faults/s: memwatch %.0f code %.0f vram %.0f fpcb %.0f rewrite %.0f other %.0f, protect %.0f unprotect %.0f, rtt %.0f/s, ta %.0f/s, fb %.0f/s%s | %s",
 +					(frames - lastFrames) / secs, (vblanks - lastVblanks) / secs / ps4_vblank_rate() * 100.0,
 +					span > lastSpan ? (unsigned long long)((busy - lastBusy) * 100 / (span - lastSpan)) : 0ull,
 +					faults[ps4fault::MemWatch] / secs, faults[ps4fault::CodePage] / secs, faults[ps4fault::Vram] / secs,
 +					faults[ps4fault::Fpcb] / secs, faults[ps4fault::Rewrite] / secs, faults[ps4fault::Unhandled] / secs,
-+					faults[ps4fault::Protect] / secs, faults[ps4fault::Unprotect] / secs, faults[ps4fault::RttRender] / secs, compiles, threads);
++					faults[ps4fault::Protect] / secs, faults[ps4fault::Unprotect] / secs, faults[ps4fault::RttRender] / secs,
++					faults[ps4fault::TaRender] / secs, faults[ps4fault::FbRender] / secs, compiles, threads);
 +			ps4_boot_trace(line);
 +			// screens.txt: the emulated picture every 5 s (screenshots/frame-<seconds>.png)
 +			if (access((kDataRoot + "/screens.txt").c_str(), F_OK) == 0)
@@ -53838,7 +55312,7 @@ index 000000000..ac2f344f9
 +}
 diff --git a/shell/ps4/ps4_stats.h b/shell/ps4/ps4_stats.h
 new file mode 100644
-index 000000000..d0ad34db7
+index 000000000..1811c4664
 --- /dev/null
 +++ b/shell/ps4/ps4_stats.h
 @@ -0,0 +1,46 @@
@@ -53870,7 +55344,7 @@ index 000000000..d0ad34db7
 +// RttRender: render-to-texture passes started (hw/pvr/Renderer_if.cpp)
 +// Shader*: GLSL compiled by glslang / loaded from the SPIR-V disk cache (rend/vulkan/compiler.cpp)
 +// Pipeline*: Vulkan pipelines built (rend/vulkan/pipeline.cpp); *Us: microseconds spent
-+enum : int { MemWatch, CodePage, Vram, Fpcb, Rewrite, Unhandled, Protect, Unprotect, RttRender,
++enum : int { MemWatch, CodePage, Vram, Fpcb, Rewrite, Unhandled, Protect, Unprotect, RttRender, TaRender, FbRender,
 +	ShaderCompiles, ShaderCompileUs, ShaderCacheHits, Pipelines, PipelineUs, Count };
 +}
 +extern std::atomic<u64> decast_fault_count[ps4fault::Count];

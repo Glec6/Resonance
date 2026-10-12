@@ -795,3 +795,18 @@
 2088	Couldn't download the cheats: %s
 2089	No cheats found for this game
 2090	No cheats yet
+2091	Memory Card
+2092	Memory Cards
+2093	The VMUs' saves: look, copy, delete
+2094	%d of %d blocks free
+2095	Cross: the saves on this card
+2096	No memory cards yet
+2097	A game creates them when it saves
+2098	Press X again to delete this save
+2099	Save deleted
+2100	Copied to %s
+2101	Close the game to change memory cards
+2102	Copy to
+2103	Delete
+2104	This memory card is empty
+2105	%d blocks

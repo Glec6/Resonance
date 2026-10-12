@@ -90,3 +90,18 @@
 2088	Impossible de télécharger les codes : %s
 2089	Aucun code trouvé pour ce jeu
 2090	Pas encore de codes
+2091	Carte mémoire
+2092	Cartes mémoire
+2093	Les sauvegardes des VMU : voir, copier, supprimer
+2094	%d blocs libres sur %d
+2095	Croix : les sauvegardes de cette carte
+2096	Pas encore de carte mémoire
+2097	Un jeu en crée une quand il sauvegarde
+2098	Appuie encore sur X pour supprimer cette sauvegarde
+2099	Sauvegarde supprimée
+2100	Copiée sur %s
+2101	Ferme le jeu pour modifier les cartes mémoire
+2102	Copier sur
+2103	Supprimer
+2104	Cette carte mémoire est vide
+2105	%d blocs
