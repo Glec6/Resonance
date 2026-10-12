@@ -80,18 +80,20 @@ index c5ac6f6e8..257ab0937 100644
  
  if(NOT LIBRETRO)
 diff --git a/core/hw/pvr/Renderer_if.cpp b/core/hw/pvr/Renderer_if.cpp
-index 49c3f720f..7d2c3e69c 100644
+index 49c3f720f..e9e7eadff 100644
 --- a/core/hw/pvr/Renderer_if.cpp
 +++ b/core/hw/pvr/Renderer_if.cpp
-@@ -1,4 +1,7 @@
+@@ -1,5 +1,9 @@
  #include "Renderer_if.h"
 +#ifdef __ORBIS__
 +#include "ps4_stats.h"
 +#endif
  #include "spg.h"
++#include "pvr_mem.h"
  #include "rend/texconv.h"
  #include "rend/transform_matrix.h"
-@@ -40,6 +43,69 @@ static bool rendererEnabled = true;
+ #include "cfg/option.h"
+@@ -40,6 +44,81 @@ static bool rendererEnabled = true;
  static bool presented;
  static u32 fbAddrHistory[2] { 1, 1 };
  
@@ -132,7 +134,7 @@ index 49c3f720f..7d2c3e69c 100644
 +		{
 +			if (n++ >= 600)
 +				break;
-+			float x0 = 1e9f, y0 = 1e9f, z0 = 1e9f, x1 = -1e9f, y1 = -1e9f, z1 = -1e9f;
++			float x0 = 1e9f, y0 = 1e9f, z0 = 1e9f, x1 = -1e9f, y1 = -1e9f, z1 = -1e9f, u0 = 1e9f, v0 = 1e9f, u1 = -1e9f, v1 = -1e9f;
 +			u32 c = 0;
 +			for (u32 i = pp.first; i < pp.first + pp.count && i < rc.idx.size(); i++)
 +			{
@@ -143,25 +145,37 @@ index 49c3f720f..7d2c3e69c 100644
 +				x0 = std::min(x0, v.x); x1 = std::max(x1, v.x);
 +				y0 = std::min(y0, v.y); y1 = std::max(y1, v.y);
 +				z0 = std::min(z0, v.z); z1 = std::max(z1, v.z);
++				u0 = std::min(u0, v.u); u1 = std::max(u1, v.u);
++				v0 = std::min(v0, v.v); v1 = std::max(v1, v.v);
 +				if (i == pp.first)
 +					memcpy(&c, v.col, 4);
 +			}
-+			fprintf(f, "%4d n %4u pcw %08x isp %08x tsp %08x tcw %08x tex %d clip %08x mv %d | x %.1f..%.1f y %.1f..%.1f z %g..%g col %08x\n",
++			fprintf(f, "%4d n %4u pcw %08x isp %08x tsp %08x tcw %08x tex %d clip %08x mv %d | x %.1f..%.1f y %.1f..%.1f z %g..%g uv %.3f..%.3f,%.3f..%.3f col %08x\n",
 +					n - 1, pp.count, pp.pcw.full, pp.isp.full, pp.tsp.full, pp.tcw.full, pp.texture != nullptr, pp.tileclip, pp.mvMatrix,
-+					x0, x1, y0, y1, z0, z1, c);
++					x0, x1, y0, y1, z0, z1, u0, u1, v0, v1, c);
 +		}
 +	};
 +	list("opaque", rc.global_param_op);
 +	list("punch-through", rc.global_param_pt);
 +	list("translucent", rc.global_param_tr);
 +	fclose(f);
++	if (FILE *v = fopen("/data/Resonance/tadump-vram.bin", "wb"))
++	{
++		fwrite(&vram[0], 1, VRAM_SIZE, v);
++		fclose(v);
++	}
++	if (FILE *v = fopen("/data/Resonance/tadump-palette.bin", "wb"))
++	{
++		fwrite(PALETTE_RAM, 4, 1024, v);
++		fclose(v);
++	}
 +}
 +#endif
 +
  class PvrMessageQueue
  {
  	using lock_guard = std::lock_guard<std::mutex>;
-@@ -216,6 +282,9 @@ private:
+@@ -216,6 +295,9 @@ private:
  			FC_PROFILE_SCOPE_NAMED("Renderer::Process");
  			try {
  				renderer->Process(taContext);
@@ -171,7 +185,7 @@ index 49c3f720f..7d2c3e69c 100644
  			} catch (...) {
  				renderEnd.Set();
  				rend_allow_rollback();
-@@ -544,6 +613,12 @@ void rend_start_render()
+@@ -544,6 +626,12 @@ void rend_start_render()
  	FillBGP(ctx);
  
  	ctx->rend.isRTT = (FB_W_SOF1 & 0x1000000) != 0;
@@ -184,7 +198,7 @@ index 49c3f720f..7d2c3e69c 100644
  	ctx->rend.fb_W_SOF1 = FB_W_SOF1;
  	ctx->rend.fb_W_CTRL.full = FB_W_CTRL.full;
  
-@@ -617,6 +692,9 @@ void rend_vblank()
+@@ -617,6 +705,9 @@ void rend_vblank()
  		{
  			FramebufferInfo fbInfo;
  			fbInfo.update();
@@ -48926,10 +48940,10 @@ index 000000000..d8426aabd
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
 new file mode 100644
-index 000000000..159c9466a
+index 000000000..297177b5c
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.cpp
-@@ -0,0 +1,915 @@
+@@ -0,0 +1,940 @@
 +/*
 +	Resonance launcher core: the library, covers and colours, DualShock 4 input, theme switching
 +	and starting games. The themes draw; this file decides what they draw.
@@ -48992,6 +49006,10 @@ index 000000000..159c9466a
 +float gSelectedAt = -10.f, gLaunchAt = -1.f;
 +float gTime;
 +Game gLaunched;		// the game started last (its launch card)
++// its cover decoded at the start: the swap chain is rebuilt as the game starts (the UI's textures go
++// with it), and reading the file again while the disc loads takes seconds
++std::vector<u8> gLaunchedPixels;
++int gLaunchedW, gLaunchedH;
 +std::chrono::steady_clock::time_point gLast;
 +float gNextRefresh;
 +std::string gSelectedPath;
@@ -49682,10 +49700,20 @@ index 000000000..159c9466a
 +	// shadow, then the cover (or a plain case in the game's colours)
 +	dl->AddRectFilled(ImVec2(p0.x + s * .025f, p0.y + s * .035f), ImVec2(p1.x + s * .025f, p1.y + s * .035f),
 +			IM_COL32(0, 0, 0, (int)(110 * alpha)), s * .02f);
-+	const ImTextureID tex = coverTexture(g);
++	ImTextureID tex = imguiDriver != nullptr && !g.cover.empty() ? imguiDriver->getTexture(g.cover) : ImTextureID();
++	const bool kept = g.cover == gLaunched.cover && !gLaunchedPixels.empty();
++	if (tex == ImTextureID() && kept)
++	{
++		try {
++			tex = imguiDriver->updateTexture(g.cover, gLaunchedPixels.data(), gLaunchedW, gLaunchedH, false);
++		} catch (...) {
++		}
++	}
++	else if (tex == ImTextureID())
++		tex = coverTexture(g);
 +	if (tex != ImTextureID())
 +		dl->AddImageRounded(tex, p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, (int)(255 * alpha)), s * .015f);
-+	else
++	else if (!kept)
 +	{
 +		dl->AddRectFilledMultiColor(p0, p1, g.c1.u32(alpha), g.c1.u32(alpha), g.c2.u32(alpha), g.c2.u32(alpha));
 +		drawText(dl, fontFor(displayFont(), g.e.title), s * .07f, ImVec2(c.x, c.y - s * .04f), IM_COL32(255, 255, 255, (int)(230 * alpha)),
@@ -49840,6 +49868,17 @@ index 000000000..159c9466a
 +			soundStop();
 +			currentGameCover = g.cover;
 +			gLaunched = g;
++			gLaunchedPixels.clear();
++			if (FILE *cf = g.cover.empty() ? nullptr : nowide::fopen(g.cover.c_str(), "rb"))
++			{
++				int n;
++				if (u8 *data = stbi_load_from_file(cf, &gLaunchedW, &gLaunchedH, &n, 4))
++				{
++					gLaunchedPixels.assign(data, data + (size_t)gLaunchedW * gLaunchedH * 4);
++					stbi_image_free(data);
++				}
++				fclose(cf);
++			}
 +			gui_ps4_start_game(g.e.path, g.e.title);
 +		}
 +	}
