@@ -3,7 +3,9 @@
 # app's name on the PS4; the project is DeCast-S4), DCST00001 (IV0000-DCST00001_00-DECASTS400000000.pkg:
 # the IDs stay, so an update installs over the earlier builds and keeps /data/DeCast-S4).
 #   DECAST_VERSION=01.00 package-decast.sh [upload]
-# upload: puts the pkg in the console's /data/pkg (install it with GoldHEN's Package Installer).
+# upload: puts the pkg in the console's /data/pkg as Resonance-vXX.YY.pkg (install it with GoldHEN's
+# Package Installer). Older builds of this app are deleted, on the PC (out/) and on the console
+# (DeCast-S4-v*, Resonance-v*, IV0000-DCST00001*); other apps' packages are left alone.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/ps4-env.sh"
@@ -29,12 +31,18 @@ PKG="$(SFO_STYLE=plain NO_RIGHT_SPRX=1 DOLPHIN_PS4_MODULES_DIR=/nonexistent "$HE
 ls -la "$PKG"
 # a copy next to the repo (E:\PS4 Projects\DeCast-S4\out), easy to find from Windows; *.pkg is ignored by git
 mkdir -p "$HERE/../out"
-cp "$PKG" "$HERE/../out/Resonance-v$VERSION.pkg"
+NAME="Resonance-v$VERSION.pkg"
+cp "$PKG" "$HERE/../out/$NAME"
+find "$HERE/../out" -maxdepth 1 -name '*.pkg' ! -name "$NAME" -print -delete | sed 's|^|removed old |'
+rm -f /tmp/DeCast-S4-v*.pkg /tmp/Resonance-v*.pkg
 # Keep the symbols of every packaged build: crash logs must be symbolized against the exact binary.
 mkdir -p "$PS4_BUILD_ROOT/oelf"
 cp "$BUILD/shell/ps4/flycast_eboot/flycast.oelf" "$PS4_BUILD_ROOT/oelf/v$VERSION.oelf"
 cp "$BUILD/flycast" "$PS4_BUILD_ROOT/oelf/v$VERSION.elf"
 if [ "${1:-}" = upload ]; then
-    curl -sS -T "$PKG" "$HOST/data/pkg/"
-    echo "uploaded $(basename "$PKG")"
+    for old in $(curl -sS --list-only "$HOST/data/pkg/" | tr -d '\r' | grep -E '^(DeCast-S4-v[0-9.]+|Resonance-v[0-9.]+|IV0000-DCST00001_00-[A-Z0-9]+)[.]pkg$' | grep -vx "$NAME"); do
+        curl -sS "$HOST/" -Q "DELE /data/pkg/$old" > /dev/null && echo "console: removed old $old"
+    done
+    curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
+    echo "uploaded $NAME"
 fi
