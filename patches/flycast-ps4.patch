@@ -80,7 +80,7 @@ index c5ac6f6e8..257ab0937 100644
  
  if(NOT LIBRETRO)
 diff --git a/core/hw/pvr/Renderer_if.cpp b/core/hw/pvr/Renderer_if.cpp
-index 49c3f720f..061445ade 100644
+index 49c3f720f..7d2c3e69c 100644
 --- a/core/hw/pvr/Renderer_if.cpp
 +++ b/core/hw/pvr/Renderer_if.cpp
 @@ -1,4 +1,7 @@
@@ -91,7 +91,87 @@ index 49c3f720f..061445ade 100644
  #include "spg.h"
  #include "rend/texconv.h"
  #include "rend/transform_matrix.h"
-@@ -544,6 +547,12 @@ void rend_start_render()
+@@ -40,6 +43,69 @@ static bool rendererEnabled = true;
+ static bool presented;
+ static u32 fbAddrHistory[2] { 1, 1 };
+ 
++#ifdef __ORBIS__
++#include <unistd.h>
++// Resonance diagnostics: with /data/Resonance/tadump.txt present, the next frame's display lists
++// go to /data/Resonance/tadump.log (one frame; the trigger file is removed)
++static void ps4DumpFrame(const rend_context& rc)
++{
++	static int countdown;
++	if (--countdown > 0)
++		return;
++	countdown = 30;
++	const char *trigger = "/data/Resonance/tadump.txt";
++	if (access(trigger, F_OK) != 0)
++		return;
++	unlink(trigger);
++	FILE *f = fopen("/data/Resonance/tadump.log", "w");
++	if (f == nullptr)
++		return;
++	fprintf(f, "rtt %d clear %d globClip %dx%d fbClip %d,%d %dx%d fb %ux%u sof1 %08x wctrl %08x stride %u scaler %08x\n",
++			rc.isRTT, rc.clearFramebuffer, rc.globClip.x, rc.globClip.y, rc.fbClip.origin.x, rc.fbClip.origin.y,
++			rc.fbClip.size.x, rc.fbClip.size.y, rc.framebufferWidth, rc.framebufferHeight, rc.fb_W_SOF1, rc.fb_W_CTRL.full,
++			rc.fb_W_LINESTRIDE, rc.scaler_ctl.full);
++	fprintf(f, "fZ_max %g verts %zu idx %zu modtrig %zu mvo %zu mvo_tr %zu passes %zu matrices %zu\n", rc.fZ_max, rc.verts.size(),
++			rc.idx.size(), rc.modtrig.size(), rc.global_param_mvo.size(), rc.global_param_mvo_tr.size(), rc.render_passes.size(),
++			rc.matrices.size());
++	fprintf(f, "ISP_BACKGND_T %08x ISP_BACKGND_D %g FPU_PARAM_CFG %08x ISP_FEED_CFG %08x FOG_COL_RAM %08x FOG_COL_VERT %08x FOG_DENSITY %08x PAL_RAM_CTRL %08x\n",
++			ISP_BACKGND_T.full, ISP_BACKGND_D.f, FPU_PARAM_CFG, ISP_FEED_CFG, FOG_COL_RAM, FOG_COL_VERT, FOG_DENSITY.full,
++			PAL_RAM_CTRL);
++	for (const RenderPass& p : rc.render_passes)
++		fprintf(f, "pass autosort %d zclear %d op %u mvo %u pt %u tr %u mvo_tr %u sorted %u\n", p.autosort, p.z_clear, p.op_count,
++				p.mvo_count, p.pt_count, p.tr_count, p.mvo_tr_count, p.sorted_tr_count);
++	auto list = [&](const char *name, const std::vector<PolyParam>& polys) {
++		fprintf(f, "== %s %zu\n", name, polys.size());
++		int n = 0;
++		for (const PolyParam& pp : polys)
++		{
++			if (n++ >= 600)
++				break;
++			float x0 = 1e9f, y0 = 1e9f, z0 = 1e9f, x1 = -1e9f, y1 = -1e9f, z1 = -1e9f;
++			u32 c = 0;
++			for (u32 i = pp.first; i < pp.first + pp.count && i < rc.idx.size(); i++)
++			{
++				const u32 vi = rc.idx[i];
++				if (vi >= rc.verts.size())
++					continue;
++				const Vertex& v = rc.verts[vi];
++				x0 = std::min(x0, v.x); x1 = std::max(x1, v.x);
++				y0 = std::min(y0, v.y); y1 = std::max(y1, v.y);
++				z0 = std::min(z0, v.z); z1 = std::max(z1, v.z);
++				if (i == pp.first)
++					memcpy(&c, v.col, 4);
++			}
++			fprintf(f, "%4d n %4u pcw %08x isp %08x tsp %08x tcw %08x tex %d clip %08x mv %d | x %.1f..%.1f y %.1f..%.1f z %g..%g col %08x\n",
++					n - 1, pp.count, pp.pcw.full, pp.isp.full, pp.tsp.full, pp.tcw.full, pp.texture != nullptr, pp.tileclip, pp.mvMatrix,
++					x0, x1, y0, y1, z0, z1, c);
++		}
++	};
++	list("opaque", rc.global_param_op);
++	list("punch-through", rc.global_param_pt);
++	list("translucent", rc.global_param_tr);
++	fclose(f);
++}
++#endif
++
+ class PvrMessageQueue
+ {
+ 	using lock_guard = std::lock_guard<std::mutex>;
+@@ -216,6 +282,9 @@ private:
+ 			FC_PROFILE_SCOPE_NAMED("Renderer::Process");
+ 			try {
+ 				renderer->Process(taContext);
++#ifdef __ORBIS__
++				ps4DumpFrame(taContext->rend);
++#endif
+ 			} catch (...) {
+ 				renderEnd.Set();
+ 				rend_allow_rollback();
+@@ -544,6 +613,12 @@ void rend_start_render()
  	FillBGP(ctx);
  
  	ctx->rend.isRTT = (FB_W_SOF1 & 0x1000000) != 0;
@@ -104,7 +184,7 @@ index 49c3f720f..061445ade 100644
  	ctx->rend.fb_W_SOF1 = FB_W_SOF1;
  	ctx->rend.fb_W_CTRL.full = FB_W_CTRL.full;
  
-@@ -617,6 +626,9 @@ void rend_vblank()
+@@ -617,6 +692,9 @@ void rend_vblank()
  		{
  			FramebufferInfo fbInfo;
  			fbInfo.update();
@@ -1438,7 +1518,7 @@ index d2096c491..87f7b411b 100644
 +#endif
  };
 diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
-index 614739abc..796c1fa7d 100644
+index 614739abc..ba6990ab7 100644
 --- a/core/ui/gui.cpp
 +++ b/core/ui/gui.cpp
 @@ -17,6 +17,7 @@
@@ -1505,7 +1585,65 @@ index 614739abc..796c1fa7d 100644
  void gui_start_game(const std::string& path)
  {
  	const LockGuard lock(guiMutex);
-@@ -1345,6 +1388,9 @@ void gui_display_ui()
+@@ -1233,8 +1276,57 @@ static bool checkUWPProtocolActivation()
+ }
+ #endif
+ 
++#ifdef __ORBIS__
++// Resonance: the started game's cover (shell/ps4/launcher) instead of Flycast's loading window
++static void gui_ps4_loadscreen()
++{
++	const char *label = nullptr;
++	float progress = -1.f;
++	try {
++		label = gameLoader.getProgress().label;
++		if (!gameLoader.ready())
++		{
++			progress = gameLoader.getProgress().progress;
++			if (progress <= 0.f)
++				progress = -1.f;
++		}
++		else if (custom_texture.isPreloading())
++		{
++			int texLoaded = 0, texTotal = 0;
++			size_t loaded = 0;
++			custom_texture.getPreloadProgress(texLoaded, texTotal, loaded);
++			label = T("Preloading custom textures");
++			progress = texTotal > 0 ? (float)texLoaded / texTotal : -1.f;
++		}
++		else
++		{
++			label = T("Starting...");
++			progress = 1.f;
++			if (NetworkHandshake::instance != nullptr)
++			{
++				networkStatus = NetworkHandshake::instance->start();
++				gui_setState(GuiState::NetworkStart);
++			}
++			else
++				gui_setState(GuiState::Closed);
++		}
++		if (label == nullptr)
++			label = T("Loading...");
++	} catch (const FlycastException& ex) {
++		ERROR_LOG(BOOT, "%s", ex.what());
++		gui_stop_game(ex.what());
++		return;
++	}
++	launcher_loading_draw(label, progress);
++}
++#endif
++
+ static void gui_display_loadscreen()
+ {
++#ifdef __ORBIS__
++	gui_ps4_loadscreen();
++	return;
++#endif
+ 	drawBoxartBackground();
+ 	centerNextWindow();
+ 	ImGui::SetNextWindowSize(ScaledVec2(330, 0));
+@@ -1345,6 +1437,9 @@ void gui_display_ui()
  		}
  	}
  
@@ -1515,7 +1653,7 @@ index 614739abc..796c1fa7d 100644
  	gui_newFrame();
  	ImGui::NewFrame();
  	error_msg_shown = false;
-@@ -1353,9 +1399,19 @@ void gui_display_ui()
+@@ -1353,9 +1448,19 @@ void gui_display_ui()
  	switch (gui_state)
  	{
  	case GuiState::Settings:
@@ -1535,7 +1673,7 @@ index 614739abc..796c1fa7d 100644
  		gui_display_commands();
  		break;
  	case GuiState::Pause:
-@@ -1364,6 +1420,11 @@ void gui_display_ui()
+@@ -1364,6 +1469,11 @@ void gui_display_ui()
  		break;
  	case GuiState::Main:
  		//gui_display_demo();
@@ -1547,7 +1685,7 @@ index 614739abc..796c1fa7d 100644
  		gui_display_content();
  		break;
  	case GuiState::Closed:
-@@ -1408,6 +1469,10 @@ void gui_display_ui()
+@@ -1408,6 +1518,10 @@ void gui_display_ui()
  		emu.start();
  }
  
@@ -1558,7 +1696,7 @@ index 614739abc..796c1fa7d 100644
  static u64 LastFPSTime;
  static int lastFrameCount = 0;
  static float fps = -1;
-@@ -1422,6 +1487,25 @@ static std::string getFPSNotification()
+@@ -1422,6 +1536,25 @@ static std::string getFPSNotification()
  			LastFPSTime = now;
  			lastFrameCount = MainFrameCount;
  		}
@@ -1584,7 +1722,7 @@ index 614739abc..796c1fa7d 100644
  		if (fps >= 0.f && fps < 9999.f) {
  			char text[32];
  			snprintf(text, sizeof(text), "F:%4.1f%s", fps, settings.input.fastForwardMode ? " >>" : "");
-@@ -1669,6 +1753,25 @@ void gui_runOnUiThread(std::function<void()> function) {
+@@ -1669,6 +1802,25 @@ void gui_runOnUiThread(std::function<void()> function) {
  	uiThreadRunner.runOnThread(function);
  }
  
@@ -1610,7 +1748,7 @@ index 614739abc..796c1fa7d 100644
  void gui_takeScreenshot()
  {
  	if (!game_started)
-@@ -1705,3 +1808,99 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
+@@ -1705,3 +1857,99 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
  	return false;
  }
  #endif
@@ -48788,10 +48926,10 @@ index 000000000..d8426aabd
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
 new file mode 100644
-index 000000000..f554bd739
+index 000000000..159c9466a
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.cpp
-@@ -0,0 +1,853 @@
+@@ -0,0 +1,915 @@
 +/*
 +	Resonance launcher core: the library, covers and colours, DualShock 4 input, theme switching
 +	and starting games. The themes draw; this file decides what they draw.
@@ -48853,6 +48991,7 @@ index 000000000..f554bd739
 +int gSel, gGoal;
 +float gSelectedAt = -10.f, gLaunchAt = -1.f;
 +float gTime;
++Game gLaunched;		// the game started last (its launch card)
 +std::chrono::steady_clock::time_point gLast;
 +float gNextRefresh;
 +std::string gSelectedPath;
@@ -49527,6 +49666,66 @@ index 000000000..f554bd739
 +	}
 +}
 +
++void launcher::drawLaunchCard(Frame& f, const Game& g, float alpha, float progress, const std::string& label)
++{
++	alpha = clamp01(alpha);
++	if (alpha <= 0.f)
++		return;
++	ImDrawList *dl = f.dl;
++	const Color black;
++	const Color top = mix(g.c2, black, .45f), bottom = mix(g.c2, black, .9f);
++	dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(f.w, f.h), top.u32(alpha), top.u32(alpha), bottom.u32(alpha), bottom.u32(alpha));
++	const float s = f.h * .5f;
++	const ImVec2 c(f.w * .5f, f.h * .43f);
++	drawBlob(dl, c, s * 1.05f, g.c1.u32(.28f * alpha));
++	const ImVec2 p0(c.x - s / 2, c.y - s / 2), p1(c.x + s / 2, c.y + s / 2);
++	// shadow, then the cover (or a plain case in the game's colours)
++	dl->AddRectFilled(ImVec2(p0.x + s * .025f, p0.y + s * .035f), ImVec2(p1.x + s * .025f, p1.y + s * .035f),
++			IM_COL32(0, 0, 0, (int)(110 * alpha)), s * .02f);
++	const ImTextureID tex = coverTexture(g);
++	if (tex != ImTextureID())
++		dl->AddImageRounded(tex, p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, (int)(255 * alpha)), s * .015f);
++	else
++	{
++		dl->AddRectFilledMultiColor(p0, p1, g.c1.u32(alpha), g.c1.u32(alpha), g.c2.u32(alpha), g.c2.u32(alpha));
++		drawText(dl, fontFor(displayFont(), g.e.title), s * .07f, ImVec2(c.x, c.y - s * .04f), IM_COL32(255, 255, 255, (int)(230 * alpha)),
++				g.e.title, .5f, s * .9f);
++	}
++	dl->AddRect(p0, p1, IM_COL32(255, 255, 255, (int)(40 * alpha)), s * .015f, 0, 1.5f);
++	drawText(dl, fontFor(displayFont(), g.e.title), f.h * .034f, ImVec2(c.x, p1.y + f.h * .045f), IM_COL32(255, 255, 255, (int)(240 * alpha)),
++			g.e.title, .5f, f.w * .8f);
++	if (progress < 0.f && label.empty())
++		return;
++	const float bw = f.w * .26f, by = f.h * .87f;
++	if (!label.empty())
++		drawText(dl, bodyFont(), f.h * .024f, ImVec2(c.x, by - f.h * .042f), IM_COL32(220, 225, 235, (int)(220 * alpha)), label, .5f, f.w * .6f);
++	dl->AddRectFilled(ImVec2(c.x - bw / 2, by), ImVec2(c.x + bw / 2, by + 4), IM_COL32(255, 255, 255, (int)(45 * alpha)), 2.f);
++	if (progress >= 0.f)
++		dl->AddRectFilled(ImVec2(c.x - bw / 2, by), ImVec2(c.x - bw / 2 + bw * clamp01(progress), by + 4),
++				IM_COL32(255, 255, 255, (int)(230 * alpha)), 2.f);
++	else
++	{
++		// no figure yet: a light running along the bar
++		const float x = c.x - bw / 2 + bw * (std::fmod(f.t * .8f, 1.3f) - .15f);
++		dl->PushClipRect(ImVec2(c.x - bw / 2, by - 2), ImVec2(c.x + bw / 2, by + 6), true);
++		dl->AddRectFilledMultiColor(ImVec2(x - bw * .12f, by), ImVec2(x + bw * .12f, by + 4), IM_COL32(255, 255, 255, 0),
++				IM_COL32(255, 255, 255, (int)(230 * alpha)), IM_COL32(255, 255, 255, (int)(230 * alpha)), IM_COL32(255, 255, 255, 0));
++		dl->PopClipRect();
++	}
++}
++
++void launcher_loading_draw(const char *label, float progress)
++{
++	if (imguiDriver == nullptr)
++		return;
++	const auto now = std::chrono::steady_clock::now();
++	gTime += std::min(.05f, std::chrono::duration<float>(now - gLast).count());
++	gLast = now;
++	Frame f = makeFrame();
++	f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 255));
++	drawLaunchCard(f, gLaunched, 1.f, progress, label != nullptr ? label : "");
++}
++
 +bool launcher_draw()
 +{
 +	if (imguiDriver == nullptr)
@@ -49640,6 +49839,7 @@ index 000000000..f554bd739
 +			ps4_boot_trace(line);
 +			soundStop();
 +			currentGameCover = g.cover;
++			gLaunched = g;
 +			gui_ps4_start_game(g.e.path, g.e.title);
 +		}
 +	}
@@ -49647,10 +49847,10 @@ index 000000000..f554bd739
 +}
 diff --git a/shell/ps4/launcher/launcher.h b/shell/ps4/launcher/launcher.h
 new file mode 100644
-index 000000000..0e648b80a
+index 000000000..e74d98a9f
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.h
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,72 @@
 +/*
 +	Resonance: the PS4 home screen (launcher) that replaces Flycast's game list.
 +
@@ -49720,12 +49920,15 @@ index 000000000..0e648b80a
 +bool launcher_quick_menu_draw();
 +// L3+R3 or the touchpad during a game: the quick menu
 +void launcher_open_quick_menu();
++// GuiState::Loading: the started game's cover until its first picture (label: what's going on,
++// progress 0..1 or < 0)
++void launcher_loading_draw(const char *label, float progress);
 diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
 new file mode 100644
-index 000000000..79268f977
+index 000000000..5dddd6b41
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher_internal.h
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,269 @@
 +/*
 +	Resonance launcher internals: what the core (launcher.cpp) shares with the themes
 +	(theme_*.cpp), covers (covers.cpp) and sounds (sound.cpp).
@@ -49861,6 +50064,9 @@ index 000000000..79268f977
 +void drawQuad(ImDrawList *dl, ImTextureID tex, const ImVec2 p[4], const ImVec2 uv[4], const ImU32 col[4]);
 +// Library empty: the message in the middle of the screen
 +void drawEmptyLibrary(Frame& f);
++// The game being started: its cover on the game's colours, title below; the themes' start
++// animations end on it and it stays up while the game loads (progress < 0: no figure yet)
++void drawLaunchCard(Frame& f, const Game& g, float alpha, float progress = -1.f, const std::string& label = "");
 +float easeOut(float t);
 +float clamp01(float t);
 +// Spring toward goal (critically damped-ish); returns the new position
@@ -51463,10 +51669,10 @@ index 000000000..d08d62690
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_channel.cpp b/shell/ps4/launcher/theme_channel.cpp
 new file mode 100644
-index 000000000..bb102f16b
+index 000000000..42d649490
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_channel.cpp
-@@ -0,0 +1,326 @@
+@@ -0,0 +1,329 @@
 +/*
 +	Resonance launcher, theme "Channel": every game is a TV channel. The cover fills the screen
 +	like a broadcast with a slow camera drift (a synthwave scene in the game's colours when there
@@ -51530,6 +51736,9 @@ index 000000000..bb102f16b
 +		if (launch > 0)
 +		{
 +			drawPowerOff(f, g, launch);
++			// the set comes back on with the game's card
++			if (launch > .8f)
++				drawLaunchCard(f, g, (launch - .8f) / .2f);
 +			return;
 +		}
 +
@@ -51795,7 +52004,7 @@ index 000000000..bb102f16b
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_orbit.cpp b/shell/ps4/launcher/theme_orbit.cpp
 new file mode 100644
-index 000000000..12f382dab
+index 000000000..56a5cee1b
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_orbit.cpp
 @@ -0,0 +1,315 @@
@@ -51960,7 +52169,7 @@ index 000000000..12f382dab
 +		drawInfo(f, games[f.sel], 1.f - launch);
 +		drawHints(f, 1.f - launch);
 +		if (launch > .75f)
-+			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * clamp01((launch - .75f) / .25f))));
++			drawLaunchCard(f, games[f.sel], (launch - .75f) / .25f);
 +	}
 +
 +private:
@@ -52116,7 +52325,7 @@ index 000000000..12f382dab
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_shelf.cpp b/shell/ps4/launcher/theme_shelf.cpp
 new file mode 100644
-index 000000000..ffb01c986
+index 000000000..a813db854
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_shelf.cpp
 @@ -0,0 +1,267 @@
@@ -52222,7 +52431,7 @@ index 000000000..ffb01c986
 +		drawInfo(f, games[f.sel], uiAlpha);
 +		drawHints(f, uiAlpha);
 +		if (launch > .78f)
-+			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * clamp01((launch - .78f) / .22f))));
++			drawLaunchCard(f, (*f.games)[f.sel], (launch - .78f) / .22f);
 +	}
 +
 +private:
@@ -52389,7 +52598,7 @@ index 000000000..ffb01c986
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_xmb.cpp b/shell/ps4/launcher/theme_xmb.cpp
 new file mode 100644
-index 000000000..bbbc87d0a
+index 000000000..b8541c337
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_xmb.cpp
 @@ -0,0 +1,217 @@
@@ -52506,8 +52715,8 @@ index 000000000..bbbc87d0a
 +		}
 +		panel.draw(f, clamp01(aside));
 +		xmbClock(f, 1 - easeOut(launch / .5f));
-+		if (launch > 0)
-+			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * easeOut(launch))));
++		if (launch > 0 && n > 0)
++			drawLaunchCard(f, (*f.games)[f.sel], easeOut(launch));
 +	}
 +
 +private:
