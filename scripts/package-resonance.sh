@@ -45,24 +45,28 @@ cp "$BUILD/shell/ps4/flycast_eboot/flycast.oelf" "$PS4_BUILD_ROOT/oelf/v$VERSION
 cp "$BUILD/flycast" "$PS4_BUILD_ROOT/oelf/v$VERSION.elf"
 if [ "${1:-}" = upload ]; then
     listing() { curl -sS --list-only "$HOST/data/pkg/" | tr -d '\r'; }
-    # the new build first; the console's FTP server has lost a file deleted right before an upload
-    curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
-    echo "uploaded $NAME"
-    sleep 2
+    # The console's FTP server (GoldHEN v2.2) loses a big upload when a delete follows it within
+    # seconds (the old file comes back, the new one goes, even after a listing showed them right):
+    # the new build first, the old ones only once it has stood for 30 s, then 45 s more of checks
+    SIZE="$(stat -c %s "$HERE/../out/$NAME")"
+    present() { curl -sS "$HOST/data/pkg/" | tr -d '\r' | awk -v n="$NAME" -v s="$SIZE" '$NF == n && $5 == s { f = 1 } END { exit !f }'; }
+    settled() { for _ in 1 2 3; do sleep 10; present || return 1; done; }
+    for try in 1 2 3; do
+        curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
+        echo "uploaded $NAME"
+        settled && break
+        echo "console: $NAME didn't stay, uploading again"
+    done
     for old in $(listing | grep -E '^(Resonance-v[0-9.]+|DeCast-S4-v[0-9.]+|IV0000-DCST00001_00-[A-Z0-9]+)[.]pkg$' | grep -vx "$NAME"); do
         if curl -sS "$HOST/" -Q "DELE /data/pkg/$old" > /dev/null; then echo "console: removed old $old"; else echo "console: could not remove $old"; fi
-        sleep 1
+        sleep 15
     done
-    # the server has also shown the new file and then lost it a while later: check its size after a
-    # pause, and upload again until it stays
-    SIZE="$(stat -c %s "$HERE/../out/$NAME")"
     for try in 1 2 3; do
-        sleep 10
-        if curl -sS "$HOST/data/pkg/" | tr -d '\r' | awk -v n="$NAME" -v s="$SIZE" '$NF == n && $5 == s { f = 1 } END { exit !f }'; then
-            break
-        fi
-        echo "console: $NAME missing or short, uploading again ($try)"
+        sleep 15
+        settled && break
+        echo "console: $NAME went missing after the cleanup, uploading again"
         curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
+        sleep 30
     done
     listing | grep -E '^(Resonance|DeCast)' | sed 's/^/console has: /'
 fi
