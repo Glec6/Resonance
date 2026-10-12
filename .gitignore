@@ -6,3 +6,4 @@ tests/out/
 out/
 build/
 art/preview/
+*.tar

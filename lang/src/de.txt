@@ -770,3 +770,28 @@
 2064	Erstellt von
 370	Emulator
 2065	Bibliotheken
+2066	Nach Updates suchen
+2067	Beim Start suchen
+2068	Sucht beim Start der App auf GitHub nach einem neueren Resonance
+2069	Suche...
+2070	Resonance ist aktuell
+2071	Noch keine Versionen
+2072	Update v%s verfügbar: X drücken zum Installieren
+2073	Lade herunter: %d%%
+2074	Update bereit: Resonance neu starten, um es zu nutzen
+2075	In /data/pkg gespeichert: mit dem Package Installer installieren
+2076	Update fehlgeschlagen: %s
+2077	Suche nach Updates fehlgeschlagen: %s
+2078	Update v%s verfügbar: Einstellungen > Info
+2079	Neustart zum Abschließen
+2080	Cheat-Quelle
+2081	Automatisch herunterladen
+2082	Nur Cheat-Ordner
+2083	Lege .cht-Dateien in /data/Resonance/cheats
+2084	Cheats holen
+2085	Cheats geladen: %s
+2086	Suche nach Cheats...
+2087	Lade herunter...
+2088	Cheats konnten nicht geladen werden: %s
+2089	Keine Cheats für dieses Spiel gefunden
+2090	Noch keine Cheats

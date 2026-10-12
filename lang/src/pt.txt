@@ -80,3 +80,28 @@
 2064	Criado por
 370	Emulador
 2065	Bibliotecas
+2066	Procurar atualizações
+2067	Procurar ao iniciar
+2068	Procura uma versão mais nova do Resonance no GitHub ao abrir o app
+2069	Procurando...
+2070	O Resonance está atualizado
+2071	Ainda não há versões
+2072	Atualização v%s disponível: pressione X para instalar
+2073	Baixando %d%%
+2074	Atualização pronta: reinicie o Resonance para usá-la
+2075	Salva em /data/pkg: instale com o Package Installer
+2076	Falha na atualização: %s
+2077	Não foi possível procurar atualizações: %s
+2078	Atualização v%s disponível: Configurações > Sobre
+2079	Reinicie para concluir
+2080	Origem das trapaças
+2081	Baixar automaticamente
+2082	Só a pasta de trapaças
+2083	Coloque arquivos .cht em /data/Resonance/cheats
+2084	Obter trapaças
+2085	Trapaças carregadas: %s
+2086	Procurando trapaças...
+2087	Baixando...
+2088	Não foi possível baixar as trapaças: %s
+2089	Nenhuma trapaça encontrada para este jogo
+2090	Ainda não há trapaças

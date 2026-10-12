@@ -770,3 +770,28 @@
 2063	Dreamcast for PlayStation 4
 2064	Made by
 2065	Libraries
+2066	Check for Updates
+2067	Check at Startup
+2068	Looks for a newer Resonance on GitHub when the app starts
+2069	Checking...
+2070	Resonance is up to date
+2071	No releases yet
+2072	Update v%s available: press X to install it
+2073	Downloading %d%%
+2074	Update ready: restart Resonance to use it
+2075	Saved in /data/pkg: install it with the Package Installer
+2076	Update failed: %s
+2077	Couldn't check for updates: %s
+2078	Update v%s available: Settings > About
+2079	Restart to finish
+2080	Cheat Source
+2081	Download automatically
+2082	Cheats folder only
+2083	Put .cht files in /data/Resonance/cheats
+2084	Get Cheats
+2085	Cheats loaded: %s
+2086	Searching for cheats...
+2087	Downloading...
+2088	Couldn't download the cheats: %s
+2089	No cheats found for this game
+2090	No cheats yet

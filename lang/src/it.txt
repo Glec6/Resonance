@@ -770,3 +770,28 @@
 2064	Creato da
 370	Emulatore
 2065	Librerie
+2066	Cerca aggiornamenti
+2067	Cerca all'avvio
+2068	Cerca su GitHub una versione più recente di Resonance all'avvio dell'app
+2069	Ricerca...
+2070	Resonance è aggiornato
+2071	Ancora nessuna versione
+2072	Aggiornamento v%s disponibile: premi X per installarlo
+2073	Download %d%%
+2074	Aggiornamento pronto: riavvia Resonance per usarlo
+2075	Salvato in /data/pkg: installalo con il Package Installer
+2076	Aggiornamento non riuscito: %s
+2077	Impossibile cercare aggiornamenti: %s
+2078	Aggiornamento v%s disponibile: Impostazioni > Informazioni
+2079	Riavvia per completare
+2080	Fonte dei trucchi
+2081	Scarica automaticamente
+2082	Solo la cartella dei trucchi
+2083	Metti i file .cht in /data/Resonance/cheats
+2084	Ottieni trucchi
+2085	Trucchi caricati: %s
+2086	Ricerca trucchi...
+2087	Download...
+2088	Impossibile scaricare i trucchi: %s
+2089	Nessun trucco trovato per questo gioco
+2090	Ancora nessun trucco

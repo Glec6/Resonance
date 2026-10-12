@@ -771,3 +771,28 @@
 2064	Yapan
 370	Öykünücü
 2065	Kitaplıklar
+2066	Güncellemeleri denetle
+2067	Açılışta denetle
+2068	Uygulama açılırken GitHub'da daha yeni bir Resonance arar
+2069	Denetleniyor...
+2070	Resonance güncel
+2071	Henüz sürüm yok
+2072	v%s güncellemesi var: kurmak için X'e bas
+2073	İndiriliyor %%%d
+2074	Güncelleme hazır: kullanmak için Resonance'ı yeniden başlat
+2075	/data/pkg içine kaydedildi: Package Installer ile kur
+2076	Güncelleme başarısız: %s
+2077	Güncellemeler denetlenemedi: %s
+2078	v%s güncellemesi var: Ayarlar > Hakkında
+2079	Bitirmek için yeniden başlat
+2080	Hile kaynağı
+2081	Otomatik indir
+2082	Yalnızca hile klasörü
+2083	.cht dosyalarını /data/Resonance/cheats içine koy
+2084	Hile al
+2085	Hileler yüklendi: %s
+2086	Hileler aranıyor...
+2087	İndiriliyor...
+2088	Hileler indirilemedi: %s
+2089	Bu oyun için hile bulunamadı
+2090	Henüz hile yok

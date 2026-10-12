@@ -65,3 +65,28 @@
 2064	Créé par
 370	Émulateur
 2065	Bibliothèques
+2066	Rechercher des mises à jour
+2067	Rechercher au démarrage
+2068	Cherche une version plus récente de Resonance sur GitHub au lancement
+2069	Recherche...
+2070	Resonance est à jour
+2071	Pas encore de version publiée
+2072	Mise à jour v%s disponible : appuie sur X pour l'installer
+2073	Téléchargement %d%%
+2074	Mise à jour prête : redémarre Resonance pour l'utiliser
+2075	Enregistrée dans /data/pkg : installe-la avec le Package Installer
+2076	Échec de la mise à jour : %s
+2077	Impossible de rechercher les mises à jour : %s
+2078	Mise à jour v%s disponible : Paramètres > À propos
+2079	Redémarre pour terminer
+2080	Source des codes
+2081	Télécharger automatiquement
+2082	Dossier des codes seulement
+2083	Mets des fichiers .cht dans /data/Resonance/cheats
+2084	Obtenir des codes
+2085	Codes chargés : %s
+2086	Recherche de codes...
+2087	Téléchargement...
+2088	Impossible de télécharger les codes : %s
+2089	Aucun code trouvé pour ce jeu
+2090	Pas encore de codes

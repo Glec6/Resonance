@@ -33,7 +33,11 @@ ls -la "$PKG"
 mkdir -p "$HERE/../out"
 NAME="Resonance-v$VERSION.pkg"
 cp "$PKG" "$HERE/../out/$NAME"
-find "$HERE/../out" -maxdepth 1 -name '*.pkg' ! -name "$NAME" -print -delete | sed 's|^|removed old |'
+# the update archive for a GitHub release (shell/ps4/updater.cpp): the installed app runs it from
+# /data/Resonance/app; ustar, which the updater unpacks
+UPDATE="Resonance-v$VERSION-update.tar"
+tar --format=ustar -C "$STAGE" -cf "$HERE/../out/$UPDATE" eboot.bin version.txt launcher
+find "$HERE/../out" -maxdepth 1 \( -name '*.pkg' -o -name '*-update.tar' \) ! -name "$NAME" ! -name "$UPDATE" -print -delete | sed 's|^|removed old |'
 rm -f /tmp/DeCast-S4-v*.pkg /tmp/Resonance-v*.pkg
 # Keep the symbols of every packaged build: crash logs must be symbolized against the exact binary.
 mkdir -p "$PS4_BUILD_ROOT/oelf"

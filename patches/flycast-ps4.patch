@@ -328,16 +328,26 @@ index 03a31db18..84893986b 100644
          oslib.h
          resources.cpp
 diff --git a/core/oslib/http_client.cpp b/core/oslib/http_client.cpp
-index 6a250597e..64cd3bb95 100644
+index 6a250597e..d357b0c1d 100644
 --- a/core/oslib/http_client.cpp
 +++ b/core/oslib/http_client.cpp
-@@ -362,6 +362,10 @@ static CURL *makeCurlEasy(const std::string& url)
+@@ -18,6 +18,9 @@
+  */
+ #include "build.h"
+ #include "http_client.h"
++#ifdef __ORBIS__
++const char *ps4_app_dir();	// shell/ps4/updater.cpp
++#endif
+ #include "stdclass.h"
+ 
+ namespace http
+@@ -362,6 +365,10 @@ static CURL *makeCurlEasy(const std::string& url)
  	curl_easy_setopt(curl, CURLOPT_AUTOREFERER, 1);
  	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
  	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30);	// default is 300 s so 5 min
 +#ifdef __ORBIS__
 +	// the PS4 has no system certificate store: Resonance ships Mozilla's (launcher/cacert.pem)
-+	curl_easy_setopt(curl, CURLOPT_CAINFO, "/app0/launcher/cacert.pem");
++	curl_easy_setopt(curl, CURLOPT_CAINFO, (std::string(ps4_app_dir()) + "/launcher/cacert.pem").c_str());
 +#endif
  
  	curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
@@ -1551,17 +1561,27 @@ index 614739abc..db7c04058 100644
 +}
 +#endif
 diff --git a/core/ui/gui_font.cpp b/core/ui/gui_font.cpp
-index 3e3f1b215..cfe55168a 100644
+index 3e3f1b215..bb9756419 100644
 --- a/core/ui/gui_font.cpp
 +++ b/core/ui/gui_font.cpp
-@@ -427,6 +427,16 @@ void gui_loadFonts()
+@@ -17,6 +17,9 @@
+  along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
+  */
+ #include "gui_font.h"
++#ifdef __ORBIS__
++const char *ps4_app_dir();	// shell/ps4/updater.cpp
++#endif
+ #include "gui.h"
+ #include "settings.h"
+ #include "oslib/resources.h"
+@@ -427,6 +430,16 @@ void gui_loadFonts()
  		"/system/fonts/NotoSansCJK-Regular.ttc"
  	}, .size=fontSize * 1.05f });
  	
 +#elif defined(__ORBIS__)
 +	// Resonance: Noto Sans cut to the characters the translations use (scripts/make-lang.py)
 +	{
-+		const std::string dir = "/app0/launcher/fonts/";
++		const std::string dir = std::string(ps4_app_dir()) + "/launcher/fonts/";
 +		registerFont({&fonts, &boldFonts}, { .lang="ja", .paths={ dir + "NotoSansJP-Medium.ttf" }, .size=fontSize * 1.05f });
 +		registerFont({&fonts, &boldFonts}, { .lang="ko", .paths={ dir + "NotoSansKR-Medium.ttf" }, .size=fontSize * 1.05f });
 +		registerFont({&fonts, &boldFonts}, { .lang="zh_CN", .paths={ dir + "NotoSansSC-Medium.ttf" }, .size=fontSize * 1.05f });
@@ -1637,10 +1657,10 @@ index 8f3b8733e..b98e14d43 100644
  	// Determine the preview text
 diff --git a/resources/i18n/ar.po b/resources/i18n/ar.po
 new file mode 100644
-index 000000000..01856b2a7
+index 000000000..6cc5bd1bd
 --- /dev/null
 +++ b/resources/i18n/ar.po
-@@ -0,0 +1,2328 @@
+@@ -0,0 +1,2403 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -3969,11 +3989,86 @@ index 000000000..01856b2a7
 +
 +msgid "Libraries"
 +msgstr "المكتبات"
++
++msgid "Check for Updates"
++msgstr "البحث عن تحديثات"
++
++msgid "Check at Startup"
++msgstr "البحث عند البدء"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "يبحث في GitHub عن إصدار أحدث من Resonance عند تشغيل التطبيق"
++
++msgid "Checking..."
++msgstr "جار البحث..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance محدث"
++
++msgid "No releases yet"
++msgstr "لا توجد إصدارات بعد"
++
++msgid "Update v%s available: press X to install it"
++msgstr "التحديث v%s متاح: اضغط X لتثبيته"
++
++msgid "Downloading %d%%"
++msgstr "جار التنزيل %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "التحديث جاهز: أعد تشغيل Resonance لاستخدامه"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "تم الحفظ في /data/pkg: ثبته باستخدام Package Installer"
++
++msgid "Update failed: %s"
++msgstr "فشل التحديث: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "تعذر البحث عن تحديثات: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "التحديث v%s متاح: الإعدادات > حول"
++
++msgid "Restart to finish"
++msgstr "أعد التشغيل للإنهاء"
++
++msgid "Cheat Source"
++msgstr "مصدر الغش"
++
++msgid "Download automatically"
++msgstr "تنزيل تلقائي"
++
++msgid "Cheats folder only"
++msgstr "مجلد الغش فقط"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "ضع ملفات .cht في /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "الحصول على الغش"
++
++msgid "Cheats loaded: %s"
++msgstr "تم تحميل الغش: %s"
++
++msgid "Searching for cheats..."
++msgstr "جار البحث عن الغش..."
++
++msgid "Downloading..."
++msgstr "جار التنزيل..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "تعذر تنزيل الغش: %s"
++
++msgid "No cheats found for this game"
++msgstr "لا يوجد غش لهذه اللعبة"
++
++msgid "No cheats yet"
++msgstr "لا يوجد غش بعد"
 diff --git a/resources/i18n/de.po b/resources/i18n/de.po
-index fb8203ba2..958141cde 100644
+index fb8203ba2..31154a9a8 100644
 --- a/resources/i18n/de.po
 +++ b/resources/i18n/de.po
-@@ -1,2963 +1,2324 @@
+@@ -1,2963 +1,2399 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -7841,14 +7936,89 @@ index fb8203ba2..958141cde 100644
 +
 +msgid "Made by"
 +msgstr "Erstellt von"
- 
++
 +msgid "Libraries"
 +msgstr "Bibliotheken"
++
++msgid "Check for Updates"
++msgstr "Nach Updates suchen"
++
++msgid "Check at Startup"
++msgstr "Beim Start suchen"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Sucht beim Start der App auf GitHub nach einem neueren Resonance"
++
++msgid "Checking..."
++msgstr "Suche..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance ist aktuell"
++
++msgid "No releases yet"
++msgstr "Noch keine Versionen"
++
++msgid "Update v%s available: press X to install it"
++msgstr "Update v%s verfügbar: X drücken zum Installieren"
++
++msgid "Downloading %d%%"
++msgstr "Lade herunter: %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Update bereit: Resonance neu starten, um es zu nutzen"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "In /data/pkg gespeichert: mit dem Package Installer installieren"
++
++msgid "Update failed: %s"
++msgstr "Update fehlgeschlagen: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "Suche nach Updates fehlgeschlagen: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "Update v%s verfügbar: Einstellungen > Info"
++
++msgid "Restart to finish"
++msgstr "Neustart zum Abschließen"
++
++msgid "Cheat Source"
++msgstr "Cheat-Quelle"
++
++msgid "Download automatically"
++msgstr "Automatisch herunterladen"
++
++msgid "Cheats folder only"
++msgstr "Nur Cheat-Ordner"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "Lege .cht-Dateien in /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "Cheats holen"
++
++msgid "Cheats loaded: %s"
++msgstr "Cheats geladen: %s"
++
++msgid "Searching for cheats..."
++msgstr "Suche nach Cheats..."
++
++msgid "Downloading..."
++msgstr "Lade herunter..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "Cheats konnten nicht geladen werden: %s"
++
++msgid "No cheats found for this game"
++msgstr "Keine Cheats für dieses Spiel gefunden"
+ 
++msgid "No cheats yet"
++msgstr "Noch keine Cheats"
 diff --git a/resources/i18n/es.po b/resources/i18n/es.po
-index 2735f014b..759ab983a 100644
+index 2735f014b..2e2d2b482 100644
 --- a/resources/i18n/es.po
 +++ b/resources/i18n/es.po
-@@ -1,2964 +1,2324 @@
+@@ -1,2964 +1,2399 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -11711,14 +11881,89 @@ index 2735f014b..759ab983a 100644
 +
 +msgid "Made by"
 +msgstr "Creado por"
- 
++
 +msgid "Libraries"
 +msgstr "Bibliotecas"
++
++msgid "Check for Updates"
++msgstr "Buscar actualizaciones"
++
++msgid "Check at Startup"
++msgstr "Buscar al iniciar"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Busca una versión más nueva de Resonance en GitHub al abrir la aplicación"
++
++msgid "Checking..."
++msgstr "Buscando..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance está actualizado"
++
++msgid "No releases yet"
++msgstr "Aún no hay versiones"
++
++msgid "Update v%s available: press X to install it"
++msgstr "Actualización v%s disponible: pulsa X para instalarla"
++
++msgid "Downloading %d%%"
++msgstr "Descargando %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Actualización lista: reinicia Resonance para usarla"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "Guardada en /data/pkg: instálala con el Package Installer"
++
++msgid "Update failed: %s"
++msgstr "Error al actualizar: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "No se pudo buscar actualizaciones: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "Actualización v%s disponible: Ajustes > Acerca de"
++
++msgid "Restart to finish"
++msgstr "Reinicia para terminar"
++
++msgid "Cheat Source"
++msgstr "Origen de los trucos"
++
++msgid "Download automatically"
++msgstr "Descargar automáticamente"
++
++msgid "Cheats folder only"
++msgstr "Solo la carpeta de trucos"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "Pon archivos .cht en /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "Obtener trucos"
++
++msgid "Cheats loaded: %s"
++msgstr "Trucos cargados: %s"
++
++msgid "Searching for cheats..."
++msgstr "Buscando trucos..."
++
++msgid "Downloading..."
++msgstr "Descargando..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "No se pudieron descargar los trucos: %s"
++
++msgid "No cheats found for this game"
++msgstr "No hay trucos para este juego"
+ 
++msgid "No cheats yet"
++msgstr "Aún no hay trucos"
 diff --git a/resources/i18n/fr.po b/resources/i18n/fr.po
-index f3754825e..12bf8a5b9 100644
+index f3754825e..627f2e446 100644
 --- a/resources/i18n/fr.po
 +++ b/resources/i18n/fr.po
-@@ -1,2967 +1,2324 @@
+@@ -1,2967 +1,2399 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -14891,11 +15136,86 @@ index f3754825e..12bf8a5b9 100644
 +
 +msgid "Libraries"
 +msgstr "Bibliothèques"
++
++msgid "Check for Updates"
++msgstr "Rechercher des mises à jour"
++
++msgid "Check at Startup"
++msgstr "Rechercher au démarrage"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Cherche une version plus récente de Resonance sur GitHub au lancement"
++
++msgid "Checking..."
++msgstr "Recherche..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance est à jour"
++
++msgid "No releases yet"
++msgstr "Pas encore de version publiée"
++
++msgid "Update v%s available: press X to install it"
++msgstr "Mise à jour v%s disponible : appuie sur X pour l'installer"
++
++msgid "Downloading %d%%"
++msgstr "Téléchargement %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Mise à jour prête : redémarre Resonance pour l'utiliser"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "Enregistrée dans /data/pkg : installe-la avec le Package Installer"
++
++msgid "Update failed: %s"
++msgstr "Échec de la mise à jour : %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "Impossible de rechercher les mises à jour : %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "Mise à jour v%s disponible : Paramètres > À propos"
++
++msgid "Restart to finish"
++msgstr "Redémarre pour terminer"
++
++msgid "Cheat Source"
++msgstr "Source des codes"
++
++msgid "Download automatically"
++msgstr "Télécharger automatiquement"
++
++msgid "Cheats folder only"
++msgstr "Dossier des codes seulement"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "Mets des fichiers .cht dans /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "Obtenir des codes"
++
++msgid "Cheats loaded: %s"
++msgstr "Codes chargés : %s"
++
++msgid "Searching for cheats..."
++msgstr "Recherche de codes..."
++
++msgid "Downloading..."
++msgstr "Téléchargement..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "Impossible de télécharger les codes : %s"
++
++msgid "No cheats found for this game"
++msgstr "Aucun code trouvé pour ce jeu"
++
++msgid "No cheats yet"
++msgstr "Pas encore de codes"
 diff --git a/resources/i18n/it.po b/resources/i18n/it.po
-index ee92eb28e..a359c3d2e 100644
+index ee92eb28e..7a8904bbb 100644
 --- a/resources/i18n/it.po
 +++ b/resources/i18n/it.po
-@@ -1,2963 +1,2324 @@
+@@ -1,2963 +1,2399 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -18763,14 +19083,89 @@ index ee92eb28e..a359c3d2e 100644
 +
 +msgid "Made by"
 +msgstr "Creato da"
- 
++
 +msgid "Libraries"
 +msgstr "Librerie"
++
++msgid "Check for Updates"
++msgstr "Cerca aggiornamenti"
++
++msgid "Check at Startup"
++msgstr "Cerca all'avvio"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Cerca su GitHub una versione più recente di Resonance all'avvio dell'app"
++
++msgid "Checking..."
++msgstr "Ricerca..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance è aggiornato"
++
++msgid "No releases yet"
++msgstr "Ancora nessuna versione"
++
++msgid "Update v%s available: press X to install it"
++msgstr "Aggiornamento v%s disponibile: premi X per installarlo"
++
++msgid "Downloading %d%%"
++msgstr "Download %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Aggiornamento pronto: riavvia Resonance per usarlo"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "Salvato in /data/pkg: installalo con il Package Installer"
++
++msgid "Update failed: %s"
++msgstr "Aggiornamento non riuscito: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "Impossibile cercare aggiornamenti: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "Aggiornamento v%s disponibile: Impostazioni > Informazioni"
++
++msgid "Restart to finish"
++msgstr "Riavvia per completare"
++
++msgid "Cheat Source"
++msgstr "Fonte dei trucchi"
++
++msgid "Download automatically"
++msgstr "Scarica automaticamente"
++
++msgid "Cheats folder only"
++msgstr "Solo la cartella dei trucchi"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "Metti i file .cht in /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "Ottieni trucchi"
++
++msgid "Cheats loaded: %s"
++msgstr "Trucchi caricati: %s"
++
++msgid "Searching for cheats..."
++msgstr "Ricerca trucchi..."
++
++msgid "Downloading..."
++msgstr "Download..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "Impossibile scaricare i trucchi: %s"
++
++msgid "No cheats found for this game"
++msgstr "Nessun trucco trovato per questo gioco"
+ 
++msgid "No cheats yet"
++msgstr "Ancora nessun trucco"
 diff --git a/resources/i18n/ja.po b/resources/i18n/ja.po
-index a79c6a14b..f464f804e 100644
+index a79c6a14b..86dd6e4c2 100644
 --- a/resources/i18n/ja.po
 +++ b/resources/i18n/ja.po
-@@ -1,2966 +1,2323 @@
+@@ -1,2966 +1,2398 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -21942,11 +22337,86 @@ index a79c6a14b..f464f804e 100644
 +
 +msgid "Libraries"
 +msgstr "ライブラリ"
++
++msgid "Check for Updates"
++msgstr "アップデートを確認"
++
++msgid "Check at Startup"
++msgstr "起動時に確認"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "アプリの起動時に GitHub で新しい Resonance を確認します"
++
++msgid "Checking..."
++msgstr "確認中..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance は最新です"
++
++msgid "No releases yet"
++msgstr "まだリリースがありません"
++
++msgid "Update v%s available: press X to install it"
++msgstr "アップデート v%s があります: X でインストール"
++
++msgid "Downloading %d%%"
++msgstr "ダウンロード中 %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "アップデートの準備完了: Resonance を再起動すると使えます"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "/data/pkg に保存しました: Package Installer でインストールしてください"
++
++msgid "Update failed: %s"
++msgstr "アップデートに失敗しました: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "アップデートを確認できません: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "アップデート v%s があります: 設定 > 情報"
++
++msgid "Restart to finish"
++msgstr "再起動で完了"
++
++msgid "Cheat Source"
++msgstr "チートの入手先"
++
++msgid "Download automatically"
++msgstr "自動でダウンロード"
++
++msgid "Cheats folder only"
++msgstr "チートフォルダーのみ"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr ".cht ファイルを /data/Resonance/cheats に置いてください"
++
++msgid "Get Cheats"
++msgstr "チートを入手"
++
++msgid "Cheats loaded: %s"
++msgstr "チートを読み込みました: %s"
++
++msgid "Searching for cheats..."
++msgstr "チートを検索中..."
++
++msgid "Downloading..."
++msgstr "ダウンロード中..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "チートをダウンロードできません: %s"
++
++msgid "No cheats found for this game"
++msgstr "このゲームのチートは見つかりません"
++
++msgid "No cheats yet"
++msgstr "まだチートがありません"
 diff --git a/resources/i18n/ko.po b/resources/i18n/ko.po
-index a5e70db54..405a81ce8 100644
+index a5e70db54..15e455f0e 100644
 --- a/resources/i18n/ko.po
 +++ b/resources/i18n/ko.po
-@@ -1,2962 +1,2323 @@
+@@ -1,2962 +1,2398 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -25812,15 +26282,90 @@ index a5e70db54..405a81ce8 100644
 +
 +msgid "Made by"
 +msgstr "제작"
- 
++
 +msgid "Libraries"
 +msgstr "라이브러리"
++
++msgid "Check for Updates"
++msgstr "업데이트 확인"
++
++msgid "Check at Startup"
++msgstr "시작할 때 확인"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "앱을 시작할 때 GitHub에서 새 Resonance를 확인합니다"
++
++msgid "Checking..."
++msgstr "확인 중..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance가 최신 버전입니다"
++
++msgid "No releases yet"
++msgstr "아직 릴리스가 없습니다"
++
++msgid "Update v%s available: press X to install it"
++msgstr "업데이트 v%s 사용 가능: X를 눌러 설치"
++
++msgid "Downloading %d%%"
++msgstr "다운로드 중 %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "업데이트 준비 완료: Resonance를 다시 시작하면 적용됩니다"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "/data/pkg에 저장됨: Package Installer로 설치하세요"
++
++msgid "Update failed: %s"
++msgstr "업데이트 실패: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "업데이트를 확인할 수 없음: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "업데이트 v%s 사용 가능: 설정 > 정보"
++
++msgid "Restart to finish"
++msgstr "다시 시작해서 완료"
++
++msgid "Cheat Source"
++msgstr "치트 출처"
++
++msgid "Download automatically"
++msgstr "자동으로 다운로드"
++
++msgid "Cheats folder only"
++msgstr "치트 폴더만"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr ".cht 파일을 /data/Resonance/cheats에 넣으세요"
++
++msgid "Get Cheats"
++msgstr "치트 가져오기"
++
++msgid "Cheats loaded: %s"
++msgstr "치트 불러옴: %s"
++
++msgid "Searching for cheats..."
++msgstr "치트 검색 중..."
++
++msgid "Downloading..."
++msgstr "다운로드 중..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "치트를 다운로드할 수 없음: %s"
++
++msgid "No cheats found for this game"
++msgstr "이 게임의 치트를 찾을 수 없습니다"
+ 
++msgid "No cheats yet"
++msgstr "아직 치트가 없습니다"
 diff --git a/resources/i18n/nl.po b/resources/i18n/nl.po
 new file mode 100644
-index 000000000..c85357f5e
+index 000000000..aa945f0c5
 --- /dev/null
 +++ b/resources/i18n/nl.po
-@@ -0,0 +1,2324 @@
+@@ -0,0 +1,2399 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -28145,11 +28690,86 @@ index 000000000..c85357f5e
 +
 +msgid "Libraries"
 +msgstr "Bibliotheken"
++
++msgid "Check for Updates"
++msgstr "Zoeken naar updates"
++
++msgid "Check at Startup"
++msgstr "Zoeken bij starten"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Zoekt bij het starten van de app op GitHub naar een nieuwere Resonance"
++
++msgid "Checking..."
++msgstr "Zoeken..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance is up-to-date"
++
++msgid "No releases yet"
++msgstr "Nog geen versies"
++
++msgid "Update v%s available: press X to install it"
++msgstr "Update v%s beschikbaar: druk op X om te installeren"
++
++msgid "Downloading %d%%"
++msgstr "Downloaden %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Update klaar: start Resonance opnieuw om hem te gebruiken"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "Opgeslagen in /data/pkg: installeer hem met de Package Installer"
++
++msgid "Update failed: %s"
++msgstr "Update mislukt: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "Kan niet zoeken naar updates: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "Update v%s beschikbaar: Instellingen > Over"
++
++msgid "Restart to finish"
++msgstr "Herstart om te voltooien"
++
++msgid "Cheat Source"
++msgstr "Bron van cheats"
++
++msgid "Download automatically"
++msgstr "Automatisch downloaden"
++
++msgid "Cheats folder only"
++msgstr "Alleen de cheatmap"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "Zet .cht-bestanden in /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "Cheats ophalen"
++
++msgid "Cheats loaded: %s"
++msgstr "Cheats geladen: %s"
++
++msgid "Searching for cheats..."
++msgstr "Cheats zoeken..."
++
++msgid "Downloading..."
++msgstr "Downloaden..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "Kan de cheats niet downloaden: %s"
++
++msgid "No cheats found for this game"
++msgstr "Geen cheats gevonden voor deze game"
++
++msgid "No cheats yet"
++msgstr "Nog geen cheats"
 diff --git a/resources/i18n/pl.po b/resources/i18n/pl.po
-index 548cbb44d..f002cbd42 100644
+index 548cbb44d..a9f1f56f9 100644
 --- a/resources/i18n/pl.po
 +++ b/resources/i18n/pl.po
-@@ -1,2965 +1,2325 @@
+@@ -1,2965 +1,2400 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -32021,14 +32641,89 @@ index 548cbb44d..f002cbd42 100644
 +
 +msgid "Made by"
 +msgstr "Autor"
- 
++
 +msgid "Libraries"
 +msgstr "Biblioteki"
++
++msgid "Check for Updates"
++msgstr "Sprawdź aktualizacje"
++
++msgid "Check at Startup"
++msgstr "Sprawdzaj przy starcie"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Sprawdza na GitHubie nowszą wersję Resonance przy uruchomieniu aplikacji"
++
++msgid "Checking..."
++msgstr "Sprawdzanie..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance jest aktualny"
++
++msgid "No releases yet"
++msgstr "Brak wydań"
++
++msgid "Update v%s available: press X to install it"
++msgstr "Dostępna aktualizacja v%s: naciśnij X, aby zainstalować"
++
++msgid "Downloading %d%%"
++msgstr "Pobieranie %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Aktualizacja gotowa: uruchom ponownie Resonance"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "Zapisano w /data/pkg: zainstaluj przez Package Installer"
++
++msgid "Update failed: %s"
++msgstr "Aktualizacja nieudana: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "Nie można sprawdzić aktualizacji: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "Dostępna aktualizacja v%s: Ustawienia > Informacje"
++
++msgid "Restart to finish"
++msgstr "Uruchom ponownie"
++
++msgid "Cheat Source"
++msgstr "Źródło kodów"
++
++msgid "Download automatically"
++msgstr "Pobieraj automatycznie"
++
++msgid "Cheats folder only"
++msgstr "Tylko folder kodów"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "Umieść pliki .cht w /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "Pobierz kody"
++
++msgid "Cheats loaded: %s"
++msgstr "Wczytano kody: %s"
++
++msgid "Searching for cheats..."
++msgstr "Szukanie kodów..."
++
++msgid "Downloading..."
++msgstr "Pobieranie..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "Nie można pobrać kodów: %s"
++
++msgid "No cheats found for this game"
++msgstr "Nie znaleziono kodów do tej gry"
+ 
++msgid "No cheats yet"
++msgstr "Brak kodów"
 diff --git a/resources/i18n/pt_BR.po b/resources/i18n/pt_BR.po
-index 6ec100a1e..ec4dd3fa6 100644
+index 6ec100a1e..8ed9936c9 100644
 --- a/resources/i18n/pt_BR.po
 +++ b/resources/i18n/pt_BR.po
-@@ -1,2966 +1,2324 @@
+@@ -1,2966 +1,2399 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -35215,12 +35910,87 @@ index 6ec100a1e..ec4dd3fa6 100644
 +
 +msgid "Libraries"
 +msgstr "Bibliotecas"
++
++msgid "Check for Updates"
++msgstr "Procurar atualizações"
++
++msgid "Check at Startup"
++msgstr "Procurar ao iniciar"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Procura uma versão mais nova do Resonance no GitHub ao abrir o app"
++
++msgid "Checking..."
++msgstr "Procurando..."
++
++msgid "Resonance is up to date"
++msgstr "O Resonance está atualizado"
++
++msgid "No releases yet"
++msgstr "Ainda não há versões"
++
++msgid "Update v%s available: press X to install it"
++msgstr "Atualização v%s disponível: pressione X para instalar"
++
++msgid "Downloading %d%%"
++msgstr "Baixando %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Atualização pronta: reinicie o Resonance para usá-la"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "Salva em /data/pkg: instale com o Package Installer"
++
++msgid "Update failed: %s"
++msgstr "Falha na atualização: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "Não foi possível procurar atualizações: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "Atualização v%s disponível: Configurações > Sobre"
++
++msgid "Restart to finish"
++msgstr "Reinicie para concluir"
++
++msgid "Cheat Source"
++msgstr "Origem das trapaças"
++
++msgid "Download automatically"
++msgstr "Baixar automaticamente"
++
++msgid "Cheats folder only"
++msgstr "Só a pasta de trapaças"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "Coloque arquivos .cht em /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "Obter trapaças"
++
++msgid "Cheats loaded: %s"
++msgstr "Trapaças carregadas: %s"
++
++msgid "Searching for cheats..."
++msgstr "Procurando trapaças..."
++
++msgid "Downloading..."
++msgstr "Baixando..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "Não foi possível baixar as trapaças: %s"
++
++msgid "No cheats found for this game"
++msgstr "Nenhuma trapaça encontrada para este jogo"
++
++msgid "No cheats yet"
++msgstr "Ainda não há trapaças"
 diff --git a/resources/i18n/ru.po b/resources/i18n/ru.po
 new file mode 100644
-index 000000000..bde870149
+index 000000000..6a93c4e6f
 --- /dev/null
 +++ b/resources/i18n/ru.po
-@@ -0,0 +1,2325 @@
+@@ -0,0 +1,2400 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -37546,11 +38316,86 @@ index 000000000..bde870149
 +
 +msgid "Libraries"
 +msgstr "Библиотеки"
++
++msgid "Check for Updates"
++msgstr "Проверить обновления"
++
++msgid "Check at Startup"
++msgstr "Проверять при запуске"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Ищет на GitHub новую версию Resonance при запуске приложения"
++
++msgid "Checking..."
++msgstr "Проверка..."
++
++msgid "Resonance is up to date"
++msgstr "Установлена последняя версия Resonance"
++
++msgid "No releases yet"
++msgstr "Выпусков пока нет"
++
++msgid "Update v%s available: press X to install it"
++msgstr "Доступно обновление v%s: нажмите X, чтобы установить"
++
++msgid "Downloading %d%%"
++msgstr "Загрузка %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Обновление готово: перезапустите Resonance"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "Сохранено в /data/pkg: установите через Package Installer"
++
++msgid "Update failed: %s"
++msgstr "Ошибка обновления: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "Не удалось проверить обновления: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "Доступно обновление v%s: Настройки > О программе"
++
++msgid "Restart to finish"
++msgstr "Перезапустите для завершения"
++
++msgid "Cheat Source"
++msgstr "Источник читов"
++
++msgid "Download automatically"
++msgstr "Скачивать автоматически"
++
++msgid "Cheats folder only"
++msgstr "Только папка читов"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "Положите файлы .cht в /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "Получить читы"
++
++msgid "Cheats loaded: %s"
++msgstr "Читы загружены: %s"
++
++msgid "Searching for cheats..."
++msgstr "Поиск читов..."
++
++msgid "Downloading..."
++msgstr "Загрузка..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "Не удалось скачать читы: %s"
++
++msgid "No cheats found for this game"
++msgstr "Для этой игры читы не найдены"
++
++msgid "No cheats yet"
++msgstr "Читов пока нет"
 diff --git a/resources/i18n/tr.po b/resources/i18n/tr.po
-index 8c8d8bc08..ecd4550a9 100644
+index 8c8d8bc08..214236176 100644
 --- a/resources/i18n/tr.po
 +++ b/resources/i18n/tr.po
-@@ -1,2965 +1,2324 @@
+@@ -1,2965 +1,2399 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -41123,14 +41968,89 @@ index 8c8d8bc08..ecd4550a9 100644
 +
 +msgid "Made by"
 +msgstr "Yapan"
- 
++
 +msgid "Libraries"
 +msgstr "Kitaplıklar"
++
++msgid "Check for Updates"
++msgstr "Güncellemeleri denetle"
++
++msgid "Check at Startup"
++msgstr "Açılışta denetle"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "Uygulama açılırken GitHub'da daha yeni bir Resonance arar"
++
++msgid "Checking..."
++msgstr "Denetleniyor..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance güncel"
++
++msgid "No releases yet"
++msgstr "Henüz sürüm yok"
++
++msgid "Update v%s available: press X to install it"
++msgstr "v%s güncellemesi var: kurmak için X'e bas"
++
++msgid "Downloading %d%%"
++msgstr "İndiriliyor %%%d"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "Güncelleme hazır: kullanmak için Resonance'ı yeniden başlat"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "/data/pkg içine kaydedildi: Package Installer ile kur"
++
++msgid "Update failed: %s"
++msgstr "Güncelleme başarısız: %s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "Güncellemeler denetlenemedi: %s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "v%s güncellemesi var: Ayarlar > Hakkında"
++
++msgid "Restart to finish"
++msgstr "Bitirmek için yeniden başlat"
++
++msgid "Cheat Source"
++msgstr "Hile kaynağı"
++
++msgid "Download automatically"
++msgstr "Otomatik indir"
++
++msgid "Cheats folder only"
++msgstr "Yalnızca hile klasörü"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr ".cht dosyalarını /data/Resonance/cheats içine koy"
++
++msgid "Get Cheats"
++msgstr "Hile al"
++
++msgid "Cheats loaded: %s"
++msgstr "Hileler yüklendi: %s"
++
++msgid "Searching for cheats..."
++msgstr "Hileler aranıyor..."
++
++msgid "Downloading..."
++msgstr "İndiriliyor..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "Hileler indirilemedi: %s"
++
++msgid "No cheats found for this game"
++msgstr "Bu oyun için hile bulunamadı"
+ 
++msgid "No cheats yet"
++msgstr "Henüz hile yok"
 diff --git a/resources/i18n/zh_CN.po b/resources/i18n/zh_CN.po
-index 3ecabd349..57044bc68 100644
+index 3ecabd349..c2f41bccf 100644
 --- a/resources/i18n/zh_CN.po
 +++ b/resources/i18n/zh_CN.po
-@@ -1,2962 +1,2323 @@
+@@ -1,2962 +1,2398 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -44996,9 +45916,84 @@ index 3ecabd349..57044bc68 100644
 +
 +msgid "Made by"
 +msgstr "制作者"
- 
++
 +msgid "Libraries"
 +msgstr "库"
++
++msgid "Check for Updates"
++msgstr "检查更新"
++
++msgid "Check at Startup"
++msgstr "启动时检查"
++
++msgid "Looks for a newer Resonance on GitHub when the app starts"
++msgstr "应用启动时在 GitHub 上检查新版 Resonance"
++
++msgid "Checking..."
++msgstr "正在检查..."
++
++msgid "Resonance is up to date"
++msgstr "Resonance 已是最新版本"
++
++msgid "No releases yet"
++msgstr "还没有发布版本"
++
++msgid "Update v%s available: press X to install it"
++msgstr "有更新 v%s：按 X 安装"
++
++msgid "Downloading %d%%"
++msgstr "正在下载 %d%%"
++
++msgid "Update ready: restart Resonance to use it"
++msgstr "更新已就绪：重启 Resonance 后生效"
++
++msgid "Saved in /data/pkg: install it with the Package Installer"
++msgstr "已保存到 /data/pkg：请用 Package Installer 安装"
++
++msgid "Update failed: %s"
++msgstr "更新失败：%s"
++
++msgid "Couldn't check for updates: %s"
++msgstr "无法检查更新：%s"
++
++msgid "Update v%s available: Settings > About"
++msgstr "有更新 v%s：设置 > 关于"
++
++msgid "Restart to finish"
++msgstr "重启以完成"
++
++msgid "Cheat Source"
++msgstr "金手指来源"
++
++msgid "Download automatically"
++msgstr "自动下载"
++
++msgid "Cheats folder only"
++msgstr "仅金手指文件夹"
++
++msgid "Put .cht files in /data/Resonance/cheats"
++msgstr "请把 .cht 文件放到 /data/Resonance/cheats"
++
++msgid "Get Cheats"
++msgstr "获取金手指"
++
++msgid "Cheats loaded: %s"
++msgstr "已加载金手指：%s"
++
++msgid "Searching for cheats..."
++msgstr "正在搜索金手指..."
++
++msgid "Downloading..."
++msgstr "正在下载..."
++
++msgid "Couldn't download the cheats: %s"
++msgstr "无法下载金手指：%s"
++
++msgid "No cheats found for this game"
++msgstr "没有找到此游戏的金手指"
+ 
++msgid "No cheats yet"
++msgstr "还没有金手指"
 diff --git a/resources/resources.cmake b/resources/resources.cmake
 index 9bf4830a7..1ed162421 100644
 --- a/resources/resources.cmake
@@ -45023,10 +46018,10 @@ index 9bf4830a7..1ed162421 100644
 +endif()
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
-index 000000000..c8d300285
+index 000000000..045d481fd
 --- /dev/null
 +++ b/shell/ps4/CMakeLists.txt
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,51 @@
 +# Resonance: Flycast on PS4 homebrew. Built with the Resonance toolchain (toolchain/ps4-decast.cmake,
 +# ps4-love-style.cmake: PS4_RUNTIME_SOURCES, ps4_link_mesa, ps4_add_eboot).
 +target_sources(${PROJECT_NAME} PRIVATE
@@ -45039,11 +46034,15 @@ index 000000000..c8d300285
 +	ps4_wsi.h
 +	audiobackend_ps4.cpp
 +	netfs.cpp
++	updater.cpp
++	updater.h
 +	netfs.h
 +	launcher/launcher.cpp
 +	launcher/launcher.h
 +	launcher/launcher_internal.h
 +	launcher/covers.cpp
++	launcher/cheats_db.cpp
++	launcher/cheats_menu.cpp
 +	launcher/intro.cpp
 +	launcher/keyboard.cpp
 +	launcher/quick_menu.cpp
@@ -45276,6 +46275,547 @@ index 000000000..c970bb9f7
 +	std::thread thread;
 +};
 +static PS4AudioBackend ps4AudioBackend;
+diff --git a/shell/ps4/launcher/cheats_db.cpp b/shell/ps4/launcher/cheats_db.cpp
+new file mode 100644
+index 000000000..3030fcb38
+--- /dev/null
++++ b/shell/ps4/launcher/cheats_db.cpp
+@@ -0,0 +1,246 @@
++/*
++	Resonance cheats: RetroArch .cht files, from libretro's cheat database (libretro-database,
++	cht/Sega - Dreamcast) or from /data/Resonance/cheats. The database's file names are loose titles
++	("Vigilante 8-2nd Offense.cht"), so a game's title is matched by its words; the list of names is
++	kept for a week (/data/Resonance/cheats/libretro-index.txt).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "updater.h"
++#include "cfg/cfg.h"
++#include "json.hpp"
++
++#include <algorithm>
++#include <cctype>
++#include <cstdio>
++#include <cstring>
++#include <ctime>
++#include <dirent.h>
++#include <set>
++#include <sys/stat.h>
++
++namespace launcher
++{
++namespace
++{
++const char *const kListUrl = "https://api.github.com/repos/libretro/libretro-database/contents/cht/Sega%20-%20Dreamcast";
++const char *const kRawUrl = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht/Sega%20-%20Dreamcast/";
++
++std::string cheatsDir() {
++	return "/data/Resonance/cheats";
++}
++
++std::vector<std::string> words(const std::string& s)
++{
++	// region and edition words don't tell games apart; "Version 1.0" is an edition, not a sequel
++	static const std::set<std::string> noise = { "the", "usa", "us", "europe", "european", "japan", "japanese", "version",
++		"en", "fr", "de", "es", "it", "ja", "rev", "disc", "cht", "included", "with" };
++	std::vector<std::string> out;
++	std::string w;
++	bool afterVersion = false;
++	auto flush = [&]() {
++		if (w.empty())
++			return;
++		const bool number = isdigit((unsigned char)w[0]);
++		if (w == "version")
++			afterVersion = true;
++		else if (afterVersion && number)
++			;
++		else
++		{
++			afterVersion = false;
++			if (noise.count(w) == 0 && std::find(out.begin(), out.end(), w) == out.end())
++				out.push_back(w);
++		}
++		w.clear();
++	};
++	for (char c : s)
++	{
++		if (isalnum((unsigned char)c))
++			w += (char)tolower((unsigned char)c);
++		else
++			flush();
++	}
++	flush();
++	return out;
++}
++
++std::string joined(const std::vector<std::string>& words)
++{
++	std::string s;
++	for (const std::string& w : words)
++		s += w;
++	return s;
++}
++
++std::string urlEncode(const std::string& s)
++{
++	static const char hex[] = "0123456789ABCDEF";
++	std::string out;
++	for (unsigned char c : s)
++	{
++		if (isalnum(c) || strchr("-_.~()!,'", c) != nullptr)
++			out += (char)c;
++		else
++		{
++			out += '%';
++			out += hex[c >> 4];
++			out += hex[c & 15];
++		}
++	}
++	return out;
++}
++
++// The database's file names, from the cache when it's less than a week old
++std::vector<std::string> index(std::string& error)
++{
++	const std::string path = cheatsDir() + "/libretro-index.txt";
++	std::vector<std::string> names;
++	struct stat st;
++	if (stat(path.c_str(), &st) == 0 && time(nullptr) - st.st_mtime < 7 * 24 * 3600)
++	{
++		if (FILE *f = fopen(path.c_str(), "r"))
++		{
++			char line[512];
++			while (fgets(line, sizeof(line), f) != nullptr)
++			{
++				std::string s = line;
++				while (!s.empty() && (s.back() == '\n' || s.back() == '\r'))
++					s.pop_back();
++				if (!s.empty())
++					names.push_back(s);
++			}
++			fclose(f);
++		}
++		if (!names.empty())
++			return names;
++	}
++	std::string body;
++	const long status = ps4_http_get(kListUrl, body, error);
++	if (status != 200)
++	{
++		if (error.empty())
++			error = "GitHub answered " + std::to_string(status);
++		return names;
++	}
++	try {
++		for (const auto& e : nlohmann::json::parse(body))
++		{
++			const std::string name = e.value("name", "");
++			if (name.size() > 4 && (name.compare(name.size() - 4, 4, ".cht") == 0))
++				names.push_back(name);
++		}
++	} catch (const std::exception&) {
++		error = "unexpected answer from GitHub";
++		return {};
++	}
++	mkdir(cheatsDir().c_str(), 0777);
++	if (FILE *f = fopen(path.c_str(), "w"))
++	{
++		for (const std::string& n : names)
++			fprintf(f, "%s\n", n.c_str());
++		fclose(f);
++	}
++	return names;
++}
++} // namespace
++
++std::vector<CheatCandidate> cheatCandidates(const std::string& title, std::string& error)
++{
++	std::vector<CheatCandidate> out;
++	const std::vector<std::string> want = words(title);
++	if (want.empty())
++		return out;
++	for (const std::string& name : index(error))
++	{
++		const std::vector<std::string> have = words(name.substr(0, name.size() - 4));
++		if (have.empty())
++			continue;
++		int common = 0;
++		for (const std::string& w : want)
++			common += std::count(have.begin(), have.end(), w) > 0;
++		// the same title written differently ("Soulcalibur", "Soul Calibur")
++		const bool same = joined(want) == joined(have);
++		if (common == 0 && !same)
++			continue;
++		// every word of the title found, few extra words: near 1
++		float score = same ? 1.f : (float)common / want.size() - .08f * std::max(0, (int)have.size() - common);
++		// numbers must agree ("Crazy Taxi" vs "Crazy Taxi 2")
++		if (!same)
++		{
++			for (const std::string& w : have)
++				if (isdigit((unsigned char)w[0]) && std::find(want.begin(), want.end(), w) == want.end())
++					score -= .5f;
++			for (const std::string& w : want)
++				if (isdigit((unsigned char)w[0]) && std::find(have.begin(), have.end(), w) == have.end())
++					score -= .5f;
++		}
++		// a file for another region's disc: its codes are for other addresses; offered, never picked alone
++		std::string lowerName;
++		for (char c : name)
++			lowerName += (char)tolower((unsigned char)c);
++		if (lowerName.find("japan") != std::string::npos || lowerName.find("europe") != std::string::npos)
++			score -= .3f;
++		if (score > .3f)
++			out.push_back({ name, score });
++	}
++	std::sort(out.begin(), out.end(), [](const CheatCandidate& a, const CheatCandidate& b) { return a.score > b.score; });
++	if (out.size() > 12)
++		out.resize(12);
++	return out;
++}
++
++std::string downloadCheat(const std::string& name, const std::string& dest)
++{
++	std::string body, error;
++	const long status = ps4_http_get(kRawUrl + urlEncode(name), body, error);
++	if (status != 200)
++		return error.empty() ? "GitHub answered " + std::to_string(status) : error;
++	mkdir(cheatsDir().c_str(), 0777);
++	FILE *f = fopen(dest.c_str(), "wb");
++	if (f == nullptr)
++		return "can't write " + dest;
++	fwrite(body.data(), 1, body.size(), f);
++	fclose(f);
++	return "";
++}
++
++std::vector<std::string> folderCheats()
++{
++	std::vector<std::string> out;
++	if (DIR *d = opendir(cheatsDir().c_str()))
++	{
++		while (dirent *e = readdir(d))
++		{
++			const std::string name = e->d_name;
++			if (name.size() < 5 || name == "libretro-index.txt")
++				continue;
++			const std::string ext = name.substr(name.size() - 4);
++			if (ext == ".cht" || ext == ".txt")
++				out.push_back(cheatsDir() + "/" + name);
++		}
++		closedir(d);
++	}
++	std::sort(out.begin(), out.end());
++	return out;
++}
++
++bool cheatsAutomatic() {
++	return config::loadInt("resonance", "CheatSource", 0) == 0;
++}
++
++} // namespace launcher
+diff --git a/shell/ps4/launcher/cheats_menu.cpp b/shell/ps4/launcher/cheats_menu.cpp
+new file mode 100644
+index 000000000..307456d43
+--- /dev/null
++++ b/shell/ps4/launcher/cheats_menu.cpp
+@@ -0,0 +1,283 @@
++/*
++	Resonance's cheats in the quick menu: the game's cheats, each On/Off, and "Get Cheats": a list of
++	matching files from libretro's cheat database (by the game's title) and the files in
++	/data/Resonance/cheats. With Cheat Source on Download automatically, a game without cheats gets
++	the best match when the list is opened. The file chosen is remembered for the game (Flycast's
++	[cheats] in emu.cfg).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "cheats.h"
++#include "emulator.h"
++#include "ui/IconsFontAwesome6.h"
++
++#include <future>
++
++using i18n::T;
++
++namespace launcher
++{
++namespace
++{
++enum class View { LIST, PICK };
++
++struct Source
++{
++	std::string label;		// shown
++	std::string name;		// database file name, or
++	std::string path;		// a file in the folder
++	bool online = false;
++};
++
++View gView;
++int gSel;
++float gPos, gVel;
++std::vector<Source> gSources;
++std::future<std::vector<CheatCandidate>> gSearch;
++std::string gSearchError;
++std::future<std::string> gDownload;
++std::string gDownloadPath, gDownloadLabel;
++bool gAutoPick;			// the search was started to take the best match by itself
++std::string gStatus;
++float gStatusAt = -10;
++bool gStatusBad;
++float gNow;
++
++void say(const std::string& text, bool bad)
++{
++	gStatus = text;
++	gStatusAt = gNow;
++	gStatusBad = bad;
++}
++
++std::string fileStem(const std::string& path)
++{
++	std::string s = path.substr(path.find_last_of('/') + 1);
++	const size_t dot = s.find_last_of('.');
++	return dot == std::string::npos ? s : s.substr(0, dot);
++}
++
++// where a downloaded file for this game goes
++std::string downloadPath()
++{
++	std::string id = settings.content.gameId;
++	for (char& c : id)
++		if (!isalnum((unsigned char)c) && c != '-')
++			c = '_';
++	if (id.empty())
++		id = "game";
++	return "/data/Resonance/cheats/" + id + ".cht";
++}
++
++void load(const std::string& path, const std::string& label)
++{
++	cheatManager.loadCheatFile(path);
++	char buf[256];
++	snprintf(buf, sizeof(buf), T("Cheats loaded: %s"), label.c_str());
++	say(buf, false);
++	playSound(Sound::Confirm);
++	gView = View::LIST;
++	gSel = 0;
++}
++
++void startSearch(bool autoPick)
++{
++	if (gSearch.valid())
++		return;
++	gAutoPick = autoPick;
++	gSources.clear();
++	gSearchError.clear();
++	say(T("Searching for cheats..."), false);
++	const std::string title = gui_ps4_game_title();
++	if (cheatsAutomatic())
++		gSearch = std::async(std::launch::async, [title] {
++			std::string error;
++			auto list = cheatCandidates(title, error);
++			gSearchError = error;
++			return list;
++		});
++	else
++		gSearch = std::async(std::launch::deferred, [] { return std::vector<CheatCandidate>(); });
++}
++
++void startDownload(const Source& s)
++{
++	if (gDownload.valid())
++		return;
++	gDownloadPath = downloadPath();
++	gDownloadLabel = s.label;
++	say(T("Downloading..."), false);
++	const std::string name = s.name, dest = gDownloadPath;
++	gDownload = std::async(std::launch::async, [name, dest] { return downloadCheat(name, dest); });
++}
++
++void poll()
++{
++	if (gSearch.valid() && gSearch.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
++	{
++		const std::vector<CheatCandidate> found = gSearch.get();
++		gSources.clear();
++		for (const CheatCandidate& c : found)
++			gSources.push_back({ c.name.substr(0, c.name.size() - 4), c.name, "", true });
++		for (const std::string& p : folderCheats())
++			gSources.push_back({ fileStem(p), "", p, false });
++		if (gAutoPick && !found.empty() && found[0].score >= .75f)
++		{
++			startDownload(gSources[0]);
++			return;
++		}
++		if (gSources.empty())
++		{
++			if (!gSearchError.empty())
++			{
++				char buf[256];
++				snprintf(buf, sizeof(buf), T("Couldn't download the cheats: %s"), gSearchError.c_str());
++				say(buf, true);
++			}
++			else
++				say(cheatsAutomatic() ? T("No cheats found for this game") : T("Put .cht files in /data/Resonance/cheats"), false);
++			return;
++		}
++		gStatus.clear();
++		gView = View::PICK;
++		gSel = 0;
++		gPos = 0;
++	}
++	if (gDownload.valid() && gDownload.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
++	{
++		const std::string error = gDownload.get();
++		if (error.empty())
++			load(gDownloadPath, gDownloadLabel);
++		else
++		{
++			char buf[256];
++			snprintf(buf, sizeof(buf), T("Couldn't download the cheats: %s"), error.c_str());
++			say(buf, true);
++			playSound(Sound::Error);
++		}
++	}
++}
++} // namespace
++
++void cheatsOpen(float t)
++{
++	gNow = t;
++	gView = View::LIST;
++	gSel = 0;
++	gPos = 0;
++	gStatus.clear();
++	if (cheatManager.cheatCount() == 0 && cheatsAutomatic())
++		startSearch(true);
++}
++
++bool cheatsInput(const MenuInput& in, float t)
++{
++	gNow = t;
++	poll();
++	const int n = gView == View::LIST ? (int)cheatManager.cheatCount() + 1 : (int)gSources.size();
++	if (in.dy != 0 && n > 0)
++	{
++		gSel = std::clamp(gSel + in.dy, 0, n - 1);
++		playSound(Sound::Move);
++	}
++	if (in.circle)
++	{
++		playSound(Sound::Back);
++		if (gView == View::PICK)
++		{
++			gView = View::LIST;
++			gSel = 0;
++			return true;
++		}
++		return false;
++	}
++	if (!in.cross || gSearch.valid() || gDownload.valid())
++		return true;
++	if (gView == View::LIST)
++	{
++		if (gSel == 0)
++		{
++			playSound(Sound::Confirm);
++			startSearch(false);
++		}
++		else
++		{
++			const size_t i = gSel - 1;
++			cheatManager.enableCheat(i, !cheatManager.cheatEnabled(i));
++			playSound(Sound::Move);
++		}
++	}
++	else if (gSel < (int)gSources.size())
++	{
++		const Source& s = gSources[gSel];
++		if (s.online)
++			startDownload(s);
++		else
++			load(s.path, s.label);
++	}
++	return true;
++}
++
++void cheatsDraw(Frame& f, float alpha, float x0, float x1)
++{
++	ImDrawList *dl = f.dl;
++	const float top = f.h * .2f, rowH = f.h * .058f, ts = f.h * .026f;
++	const Color tone = xmbTone();
++	dl->AddRectFilled(ImVec2(x0, top - f.h * .08f), ImVec2(x1, f.h * .9f), IM_COL32(6, 10, 20, (int)(200 * alpha)), 10.f);
++	xmbText(dl, bodyFont(), f.h * .032f, ImVec2(x0 + f.w * .015f, top - f.h * .065f), alpha,
++			std::string(ICON_FA_MASK "  ") + (gView == View::LIST ? T("Cheats") : T("Get Cheats")));
++
++	struct Line { std::string label, value; };
++	std::vector<Line> lines;
++	if (gView == View::LIST)
++	{
++		lines.push_back({ std::string(ICON_FA_DOWNLOAD "  ") + T("Get Cheats"), "" });
++		for (size_t i = 0; i < cheatManager.cheatCount(); i++)
++			lines.push_back({ cheatManager.cheatDescription(i), cheatManager.cheatEnabled(i) ? T("On") : T("Off") });
++	}
++	else
++		for (const Source& s : gSources)
++			lines.push_back({ s.label, s.online ? std::string(ICON_FA_GLOBE) : std::string(ICON_FA_FOLDER_OPEN) });
++
++	spring(gPos, gVel, (float)gSel, 170.f, 26.f, f.dt);
++	const int visible = (int)((f.h * .62f) / rowH);
++	const float scroll = std::clamp(gPos - visible * .4f, 0.f, std::max(0.f, (float)lines.size() - visible));
++	dl->PushClipRect(ImVec2(x0, top), ImVec2(x1, top + visible * rowH), true);
++	const float hy = top + (gPos - scroll) * rowH;
++	dl->AddRectFilledMultiColor(ImVec2(x0 + 6, hy), ImVec2(x1 - 6, hy + rowH), tone.u32(.5f * alpha), tone.u32(.12f * alpha),
++			tone.u32(.12f * alpha), tone.u32(.5f * alpha));
++	for (int i = 0; i < (int)lines.size(); i++)
++	{
++		const float y = top + (i - scroll) * rowH;
++		if (y < top - rowH || y > top + visible * rowH)
++			continue;
++		const float a = alpha * (i == gSel ? 1.f : .8f);
++		const float ty = y + (rowH - ts) * .5f;
++		xmbText(dl, bodyFont(), ts, ImVec2(x0 + f.w * .015f, ty), a, lines[i].label, 0, (x1 - x0) * .75f);
++		if (!lines[i].value.empty())
++			xmbText(dl, bodyFont(), ts * .92f, ImVec2(x1 - f.w * .015f, ty), a, lines[i].value, 1.f);
++	}
++	dl->PopClipRect();
++	if (gView == View::LIST && cheatManager.cheatCount() == 0 && gStatus.empty())
++		xmbText(dl, bodyFont(), ts * .9f, ImVec2(x0 + f.w * .015f, top + rowH * 1.6f), alpha * .8f, T("No cheats yet"));
++	const bool busy = gSearch.valid() || gDownload.valid();
++	if (!gStatus.empty() && (busy || gNow - gStatusAt < 8.f))
++		xmbText(dl, bodyFont(), f.h * .023f, ImVec2(x0 + f.w * .015f, f.h * .86f), alpha, gStatus, 0, x1 - x0 - f.w * .03f,
++				gStatusBad ? IM_COL32(255, 150, 140, 255) : IM_COL32(170, 240, 190, 255));
++}
++
++} // namespace launcher
 diff --git a/shell/ps4/launcher/covers.cpp b/shell/ps4/launcher/covers.cpp
 new file mode 100644
 index 000000000..968b94cdd
@@ -45663,10 +47203,10 @@ index 000000000..968b94cdd
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/intro.cpp b/shell/ps4/launcher/intro.cpp
 new file mode 100644
-index 000000000..e8eac7a60
+index 000000000..a54334880
 --- /dev/null
 +++ b/shell/ps4/launcher/intro.cpp
-@@ -0,0 +1,667 @@
+@@ -0,0 +1,671 @@
 +/*
 +	Resonance's opening, played once when the app starts: Sonic spin-dashes into the spotlight as a
 +	ball, skids to the middle of the stage and hops up as the Dreamcast drops out of the sky, uncurls
@@ -45695,6 +47235,7 @@ index 000000000..e8eac7a60
 + */
 +#include "launcher_internal.h"
 +#include "ps4_gamepad.h"
++#include "updater.h"
 +#include "ui/imgui_driver.h"
 +#include "cfg/cfg.h"
 +#include "emulator.h"
@@ -45711,7 +47252,10 @@ index 000000000..e8eac7a60
 +{
 +namespace
 +{
-+const char *const kDir = "/app0/launcher/intro/";
++// (a function: the running program's folder is known in main(), after static initialization)
++std::string introDir() {
++	return std::string(ps4_app_dir()) + "/launcher/intro/";
++}
 +
 +// Timeline (seconds)
 +constexpr float ROLL_START = .30f, ROLL_END = .95f;	// the ball rolls in and skids to the middle
@@ -45748,7 +47292,7 @@ index 000000000..e8eac7a60
 +		for (int i = 0; i < 3; i++)
 +			if (dest[i]->tex == ImTextureID())
 +			{
-+				dest[i]->tex = loadTexture(std::string(kDir) + names[i]);
++				dest[i]->tex = loadTexture(introDir() + names[i]);
 +				if (dest[i]->tex == ImTextureID())
 +					return false;
 +			}
@@ -45763,7 +47307,7 @@ index 000000000..e8eac7a60
 +	bool readLayout()
 +	{
 +		std::map<std::string, Layer> layout;
-+		FILE *f = fopen((std::string(kDir) + "layout.txt").c_str(), "r");
++		FILE *f = fopen((introDir() + "layout.txt").c_str(), "r");
 +		if (f == nullptr)
 +			return false;
 +		char line[256];
@@ -46507,10 +48051,10 @@ index 000000000..d8426aabd
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
 new file mode 100644
-index 000000000..f3fe55131
+index 000000000..f554bd739
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.cpp
-@@ -0,0 +1,820 @@
+@@ -0,0 +1,853 @@
 +/*
 +	Resonance launcher core: the library, covers and colours, DualShock 4 input, theme switching
 +	and starting games. The themes draw; this file decides what they draw.
@@ -46532,6 +48076,7 @@ index 000000000..f3fe55131
 + */
 +#include "launcher_internal.h"
 +#include "ps4_gamepad.h"
++#include "updater.h"
 +#include "cfg/cfg.h"
 +#include "cfg/option.h"
 +#include "emulator.h"
@@ -46558,7 +48103,9 @@ index 000000000..f3fe55131
 +
 +namespace
 +{
-+const char *const kFontPath = "/app0/launcher/Michroma-Regular.ttf";
++std::string fontPath() {
++	return std::string(ps4_app_dir()) + "/launcher/Michroma-Regular.ttf";
++}
 +
 +ImFont *gDisplayFont;
 +bool gFontFailed;
@@ -46579,6 +48126,11 @@ index 000000000..f3fe55131
 +// "Theme: Orbit" and the like
 +std::string gToast;
 +float gToastAt = -10.f;
++float gToastFor = 1.6f;
++// a newer release found at start (updater thread -> UI)
++std::mutex gUpdateMutex;
++std::string gUpdateVersion;
++bool gUpdateShown;
 +
 +// input: edges and key repeat
 +u32 gPrevButtons;
@@ -47222,13 +48774,13 @@ index 000000000..f3fe55131
 +		gDisplayFont = nullptr;
 +	if (gDisplayFont == nullptr && !gFontFailed)
 +	{
-+		FILE *f = fopen(kFontPath, "rb");
++		FILE *f = fopen(fontPath().c_str(), "rb");
 +		if (f != nullptr)
 +		{
 +			fclose(f);
 +			ImFontConfig cfg;
 +			cfg.MergeMode = false;
-+			gDisplayFont = io.Fonts->AddFontFromFileTTF(kFontPath, 32.f, &cfg);
++			gDisplayFont = io.Fonts->AddFontFromFileTTF(fontPath().c_str(), 32.f, &cfg);
 +		}
 +		if (gDisplayFont == nullptr)
 +		{
@@ -47249,6 +48801,16 @@ index 000000000..f3fe55131
 +		started = true;
 +		gLast = now;
 +		setTheme(config::loadInt("resonance", "LauncherTheme", 0));
++		if (config::loadBool("resonance", "CheckUpdates", true))
++			std::thread([] {
++				ThreadName _("UpdateCheck");
++				const updater::Release r = updater::checkLatest();
++				if (r.ok && updater::compareVersions(r.version, ps4_app_version()) > 0)
++				{
++					std::lock_guard<std::mutex> lock(gUpdateMutex);
++					gUpdateVersion = r.version;
++				}
++			}).detach();
 +		if (!gPaletteThread)
 +		{
 +			gPaletteThread = true;
@@ -47291,6 +48853,7 @@ index 000000000..f3fe55131
 +			gFadeAt = gTime;
 +			gToast = themeLabel(gThemeIndex);
 +			gToastAt = gTime;
++			gToastFor = 1.6f;
 +			f = makeFrame();
 +		}
 +		else
@@ -47303,10 +48866,24 @@ index 000000000..f3fe55131
 +
 +	if (fade > 0.f)
 +		f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * clamp01(fade))));
-+	const float toastAge = gTime - gToastAt;
-+	if (toastAge < 1.6f)
++	if (!gUpdateShown && gLaunchAt < 0)
 +	{
-+		const float a = clamp01(std::fmin(toastAge / .15f, (1.6f - toastAge) / .3f));
++		std::lock_guard<std::mutex> lock(gUpdateMutex);
++		if (!gUpdateVersion.empty())
++		{
++			gUpdateShown = true;
++			char text[160];
++			snprintf(text, sizeof(text), i18n::T("Update v%s available: Settings > About"), gUpdateVersion.c_str());
++			gToast = text;
++			gToastAt = gTime;
++			gToastFor = 6.f;
++			playSound(Sound::Category);
++		}
++	}
++	const float toastAge = gTime - gToastAt;
++	if (toastAge < gToastFor)
++	{
++		const float a = clamp01(std::fmin(toastAge / .15f, (gToastFor - toastAge) / .3f));
 +		const float fs = f.h * .03f, tw = textWidth(bodyFont(), fs, gToast);
 +		const ImVec2 c(f.w / 2, f.h * .06f);
 +		f.dl->AddRectFilled(ImVec2(c.x - tw / 2 - fs, c.y - fs * .2f), ImVec2(c.x + tw / 2 + fs, c.y + fs * 1.5f),
@@ -47408,10 +48985,10 @@ index 000000000..0e648b80a
 +void launcher_open_quick_menu();
 diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
 new file mode 100644
-index 000000000..6dfaaefff
+index 000000000..d300c749f
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher_internal.h
-@@ -0,0 +1,223 @@
+@@ -0,0 +1,235 @@
 +/*
 +	Resonance launcher internals: what the core (launcher.cpp) shares with the themes
 +	(theme_*.cpp), covers (covers.cpp) and sounds (sound.cpp).
@@ -47618,6 +49195,18 @@ index 000000000..6dfaaefff
 +		std::function<void(bool ok, const std::string& text)> done);
 +void keyboardUpdate();
 +
++// cheats_db.cpp: RetroArch .cht cheats from libretro's database or /data/Resonance/cheats
++struct CheatCandidate { std::string name; float score; };
++// database files whose names fit the title, best first (network: off the UI thread)
++std::vector<CheatCandidate> cheatCandidates(const std::string& title, std::string& error);
++std::string downloadCheat(const std::string& name, const std::string& dest);	// "" when done
++std::vector<std::string> folderCheats();	// paths of the files in the cheats folder
++bool cheatsAutomatic();						// Settings > System > Cheat Source
++// cheats_menu.cpp: the quick menu's cheats; cheatsInput false = back to the quick menu
++void cheatsOpen(float t);
++bool cheatsInput(const MenuInput& in, float t);
++void cheatsDraw(Frame& f, float alpha, float x0, float x1);
++
 +// The cover of the game being played, for the quick menu (the launcher sets it when starting one)
 +extern std::string currentGameCover;
 +
@@ -47694,10 +49283,10 @@ index 000000000..5605ef4cb
 +};
 diff --git a/shell/ps4/launcher/quick_menu.cpp b/shell/ps4/launcher/quick_menu.cpp
 new file mode 100644
-index 000000000..bc4c1d7ce
+index 000000000..edb1ccd3b
 --- /dev/null
 +++ b/shell/ps4/launcher/quick_menu.cpp
-@@ -0,0 +1,284 @@
+@@ -0,0 +1,299 @@
 +/*
 +	Resonance's quick menu during a game (L3+R3, or the touchpad), in place of Flycast's commands
 +	window: the game paused behind a side panel with its cover and name; Resume, Save State and Load
@@ -47737,7 +49326,8 @@ index 000000000..bc4c1d7ce
 +
 +namespace
 +{
-+enum Row { RESUME, SAVE, LOAD, VOLUME, FPS, DISC, SETTINGS, CLOSE, ROWS };
++enum Row { RESUME, SAVE, LOAD, VOLUME, FPS, CHEATS, DISC, SETTINGS, CLOSE, ROWS };
++bool gInCheats;
 +
 +MenuInput gIn;
 +int gSel;
@@ -47769,6 +49359,7 @@ index 000000000..bc4c1d7ce
 +		gChanged = false;
 +		gCover = Game();
 +		gCover.cover = currentGameCover;
++		gInCheats = false;
 +		soundStart();
 +		playSound(Sound::Category);
 +	}
@@ -47778,12 +49369,17 @@ index 000000000..bc4c1d7ce
 +	const float in = easeOut((f.t - gOpenedAt) / .25f);
 +
 +	// ---- input ----
-+	if (gIn.dy != 0)
++	if (gInCheats)
++	{
++		if (!cheatsInput(gIn, f.t))
++			gInCheats = false;
++	}
++	else if (gIn.dy != 0)
 +	{
 +		gSel = (gSel + gIn.dy + ROWS) % ROWS;
 +		playSound(Sound::Move);
 +	}
-+	if (gIn.dx != 0)
++	if (gIn.dx != 0 && !gInCheats)
 +	{
 +		switch (gSel)
 +		{
@@ -47806,7 +49402,7 @@ index 000000000..bc4c1d7ce
 +	}
 +	const long long date = gui_ps4_state_date(config::SavestateSlot);
 +	bool leaving = false;
-+	if (gIn.cross)
++	if (gIn.cross && !gInCheats)
 +	{
 +		switch (gSel)
 +		{
@@ -47838,6 +49434,11 @@ index 000000000..bc4c1d7ce
 +			gChanged = true;
 +			playSound(Sound::Move);
 +			break;
++		case CHEATS:
++			playSound(Sound::Confirm);
++			gInCheats = true;
++			cheatsOpen(f.t);
++			break;
 +		case DISC:
 +			playSound(Sound::Confirm);
 +			gui_ps4_swap_disc();
@@ -47857,7 +49458,7 @@ index 000000000..bc4c1d7ce
 +			return true;
 +		}
 +	}
-+	if (gIn.circle)
++	if (gIn.circle && !gInCheats)
 +		leaving = true;
 +	if (leaving)
 +	{
@@ -47911,6 +49512,7 @@ index 000000000..bc4c1d7ce
 +		{ ICON_FA_CLOCK_ROTATE_LEFT, T("Load State"), slot, true, date == 0 },
 +		{ ICON_FA_VOLUME_HIGH, T("Volume Level"), std::to_string(config::AudioVolume.get()) + "%", true, false },
 +		{ ICON_FA_GAUGE_HIGH, T("Show FPS Counter"), config::ShowFPS ? T("On") : T("Off"), true, false },
++		{ ICON_FA_MASK, T("Cheats"), "", false, false },
 +		{ ICON_FA_COMPACT_DISC, gui_ps4_disc_open() ? T("Insert Disk") : T("Eject Disk"), "", false, false },
 +		{ ICON_FA_GEAR, T("Settings"), "", false, false },
 +		{ ICON_FA_POWER_OFF, T("Close Game"), "", false, false },
@@ -47940,7 +49542,9 @@ index 000000000..bc4c1d7ce
 +	}
 +
 +	// the slot's card beside the panel while on Save/Load
-+	const float card = clamp01((gSel == SAVE || gSel == LOAD) ? 1.f : 0.f) * in;
++	if (gInCheats)
++		cheatsDraw(f, in, panelW + f.w * .04f, f.w * .95f);
++	const float card = clamp01((gSel == SAVE || gSel == LOAD) && !gInCheats ? 1.f : 0.f) * in;
 +	if (card > 0)
 +	{
 +		const ImTextureID pic = (ImTextureID)(uintptr_t)gui_ps4_state_picture(gReloadPicture);
@@ -47973,7 +49577,7 @@ index 000000000..bc4c1d7ce
 +	}
 +
 +	xmbClock(f, in);
-+	xmbHints(f, { { 'x', T("Select") }, { 'o', T("Resume") } }, in);
++	xmbHints(f, { { 'x', T("Select") }, { 'o', gInCheats ? T("Back") : T("Resume") } }, in);
 +	return true;
 +}
 +
@@ -47984,10 +49588,10 @@ index 000000000..bc4c1d7ce
 +}
 diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_menu.cpp
 new file mode 100644
-index 000000000..9082929ea
+index 000000000..92e3e1f74
 --- /dev/null
 +++ b/shell/ps4/launcher/settings_menu.cpp
-@@ -0,0 +1,760 @@
+@@ -0,0 +1,858 @@
 +/*
 +	Resonance's settings, PS3 style, in place of Flycast's settings window: five groups (Video,
 +	Audio, Controllers, System, Home Screen); a group lists its options with the current value on the
@@ -48018,7 +49622,9 @@ index 000000000..9082929ea
 +#include "stdclass.h"
 +#include "ui/IconsFontAwesome6.h"
 +#include "netfs.h"
++#include "updater.h"
 +
++#include <atomic>
 +#include <functional>
 +#include <future>
 +
@@ -48200,6 +49806,10 @@ index 000000000..9082929ea
 +		system.items.push_back(toggle(Tnop("Dreamcast 32MB RAM Mod"), Tnop("Enables 32MB RAM Mod for Dreamcast. May affect compatibility"), config::RamMod32MB, true));
 +		system.items.push_back(toggle(Tnop("Load State at Start"), Tnop("Load the last saved state of the game when starting"), config::AutoLoadState));
 +		system.items.push_back(toggle(Tnop("Save State on Exit"), Tnop("Save the state of the game when stopping"), config::AutoSaveState));
++		system.items.push_back(Setting { T("Cheat Source"), T("Put .cht files in /data/Resonance/cheats"),
++			{ { T("Download automatically"), 0 }, { T("Cheats folder only"), 1 } },
++			[] { return config::loadInt("resonance", "CheatSource", 0); },
++			[](int v) { config::saveInt("resonance", "CheatSource", v); } });
 +		groups.push_back(std::move(system));
 +
 +		Group home { ICON_FA_HOUSE, T("Home Screen Settings"), T("Theme, language, covers, opening"), {} };
@@ -48227,19 +49837,8 @@ index 000000000..9082929ea
 +	}
 +
 +	// ---- about ----
-+	static std::string appVersion()
-+	{
-+		std::string v;
-+		if (FILE *f = fopen("/app0/version.txt", "r"))
-+		{
-+			char buf[32] = {};
-+			if (fgets(buf, sizeof(buf), f) != nullptr)
-+				v = buf;
-+			fclose(f);
-+		}
-+		while (!v.empty() && (v.back() == '\n' || v.back() == '\r'))
-+			v.pop_back();
-+		return v.empty() ? "?" : v;
++	static std::string appVersion() {
++		return ps4_app_version();
 +	}
 +
 +	Group aboutGroup()
@@ -48256,7 +49855,109 @@ index 000000000..9082929ea
 +		line("GitHub", "github.com/iHaiDeeZ", "");
 +		line(T("Emulator"), "Flycast", "Flycast by flyinghead and contributors (GPL-2.0)");
 +		line(T("Libraries"), "Mesa RADV, Dear ImGui, libnfs, libsmb2", "PS4 graphics from DolphinPS4's RADV port; OpenOrbis toolchain");
++
++		Setting check { T("Check for Updates"), "github.com/iHaiDeeZ/Resonance", {}, [] { return 0; }, [](int) {} };
++		check.value = [this] { return updateState(); };
++		check.action = [this] { updateAction(); };
++		about.items.push_back(check);
++		about.items.push_back(Setting { T("Check at Startup"), T("Looks for a newer Resonance on GitHub when the app starts"), onOff(),
++			[] { return config::loadBool("resonance", "CheckUpdates", true) ? 1 : 0; },
++			[](int v) { config::saveBool("resonance", "CheckUpdates", v != 0); } });
 +		return about;
++	}
++
++	// ---- updates ----
++	std::future<updater::Release> checking;
++	updater::Release latest;
++	bool haveLatest = false;
++	std::future<std::string> installing;
++	std::atomic<int> percent { 0 };
++	bool viaInstaller = false, updateReady = false;
++
++	bool newer() const {
++		return haveLatest && latest.ok && updater::compareVersions(latest.version, ps4_app_version()) > 0;
++	}
++
++	std::string updateState() const
++	{
++		char buf[96];
++		if (installing.valid())
++		{
++			snprintf(buf, sizeof(buf), T("Downloading %d%%"), percent.load());
++			return buf;
++		}
++		if (updateReady)
++			return T("Restart to finish");
++		if (checking.valid())
++			return T("Checking...");
++		if (newer())
++			return "v" + latest.version;
++		return "";
++	}
++
++	void updateAction()
++	{
++		if (installing.valid() || checking.valid() || updateReady)
++			return;
++		if (newer())
++		{
++			percent = 0;
++			const updater::Release release = latest;
++			installing = std::async(std::launch::async, [this, release] {
++				bool installer = false;
++				const std::string error = updater::install(release, [this](uint64_t done, uint64_t total) {
++					percent = total ? (int)(done * 100 / total) : 0;
++					return true;
++				}, &installer);
++				viaInstaller = installer;
++				return error;
++			});
++			return;
++		}
++		checking = std::async(std::launch::async, [] { return updater::checkLatest(); });
++	}
++
++	void pollUpdate()
++	{
++		char buf[512];
++		if (checking.valid() && checking.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
++		{
++			latest = checking.get();
++			haveLatest = true;
++			if (!latest.ok)
++			{
++				if (latest.error == "no releases yet")
++					say(T("No releases yet"), false);
++				else
++				{
++					snprintf(buf, sizeof(buf), T("Couldn't check for updates: %s"), latest.error.c_str());
++					say(buf, true);
++				}
++			}
++			else if (newer())
++			{
++				snprintf(buf, sizeof(buf), T("Update v%s available: press X to install it"), latest.version.c_str());
++				say(buf, false);
++			}
++			else
++				say(T("Resonance is up to date"), false);
++		}
++		if (installing.valid() && installing.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
++		{
++			const std::string error = installing.get();
++			if (!error.empty())
++			{
++				snprintf(buf, sizeof(buf), T("Update failed: %s"), error.c_str());
++				say(buf, true);
++			}
++			else if (viaInstaller)
++				say(T("Saved in /data/pkg: install it with the Package Installer"), false);
++			else
++			{
++				updateReady = true;
++				say(T("Update ready: restart Resonance to use it"), false);
++			}
++		}
 +	}
 +	bool rebuildPending = false;
 +
@@ -48471,6 +50172,7 @@ index 000000000..9082929ea
 +	m.now = t;
 +	keyboardUpdate();
 +	m.pollTest();
++	m.pollUpdate();
 +	if (!m.open || keyboardOpen())
 +		return;
 +	std::vector<Setting>& items = m.groups[m.group].items;
@@ -48612,7 +50314,7 @@ index 000000000..9082929ea
 +	const size_t nl = help.find('\n');
 +	if (nl != std::string::npos)
 +		help = help.substr(0, nl);
-+	if (!m.status.empty() && (f.t - m.statusAt < 8.f || m.testing.valid()))
++	if (!m.status.empty() && (f.t - m.statusAt < 8.f || m.testing.valid() || m.installing.valid() || m.checking.valid()))
 +	{
 +		const ImU32 col = m.statusBad ? IM_COL32(255, 150, 140, 255) : IM_COL32(170, 240, 190, 255);
 +		xmbText(dl, bodyFont(), f.h * .024f, ImVec2(f.w * .07f, f.h * .875f), in, m.status, 0, f.w * .86f, col);
@@ -48750,10 +50452,10 @@ index 000000000..9082929ea
 +}
 diff --git a/shell/ps4/launcher/sound.cpp b/shell/ps4/launcher/sound.cpp
 new file mode 100644
-index 000000000..7a22276dc
+index 000000000..d08d62690
 --- /dev/null
 +++ b/shell/ps4/launcher/sound.cpp
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,194 @@
 +/*
 +	Resonance launcher sounds: short WAVs (48 kHz stereo 16-bit, /app0/launcher/sounds) mixed on
 +	an audio-out port of their own while the home screen is up. The port closes when a game starts,
@@ -48776,6 +50478,7 @@ index 000000000..7a22276dc
 + */
 +#include "launcher_internal.h"
 +#include "oslib/oslib.h"
++#include "updater.h"
 +
 +#include <orbis/AudioOut.h>
 +
@@ -48896,7 +50599,7 @@ index 000000000..7a22276dc
 +	{
 +		gLoaded = true;
 +		for (int i = 0; i < SOUND_COUNT; i++)
-+			loadWav(std::string("/app0/launcher/sounds/") + kNames[i] + ".wav", gClips[i]);
++			loadWav(std::string(ps4_app_dir()) + "/launcher/sounds/" + kNames[i] + ".wav", gClips[i]);
 +	}
 +	const int32_t init = sceAudioOutInit();
 +	if (init != 0 && init != (int32_t)0x8026000E)	// already initialized
@@ -51761,10 +53464,10 @@ index 000000000..8cf0835cc
 +bool ps4_pad_state(u32& buttons, float& lx, float& ly);
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..1c00f944a
+index 000000000..ac2f344f9
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
-@@ -0,0 +1,365 @@
+@@ -0,0 +1,368 @@
 +/*
 +	Resonance: Flycast's PS4 frontend.
 +
@@ -51803,6 +53506,7 @@ index 000000000..1c00f944a
 +#include "hw/sh4/sh4_if.h"
 +#include "ps4_wsi.h"
 +#include "ps4_stats.h"
++#include "updater.h"
 +
 +#include <orbis/Sysmodule.h>
 +#include <orbis/libkernel.h>
@@ -51863,7 +53567,7 @@ index 000000000..1c00f944a
 +
 +std::string appVersion()
 +{
-+	FILE *f = fopen("/app0/version.txt", "r");
++	FILE *f = fopen((std::string(ps4_app_dir()) + "/version.txt").c_str(), "r");
 +	if (f == nullptr)
 +		return "?";
 +	char buf[32] {};
@@ -52000,6 +53704,8 @@ index 000000000..1c00f944a
 +int main(int argc, char *argv[])
 +{
 +	loadSystemModules();
++	// a newer downloaded update runs instead of this program (doesn't come back then)
++	updater::startDownloadedUpdate(argc, argv);
 +	trace("Resonance " + appVersion() + " starting");
 +
 +	migrateFromDeCast();
@@ -52009,9 +53715,9 @@ index 000000000..1c00f944a
 +	set_user_config_dir(kDataRoot + "/");
 +	set_user_data_dir(kDataRoot + "/data/");
 +	add_system_config_dir(kDataRoot + "/");
-+	add_system_config_dir("/app0/");
++	add_system_config_dir(std::string(ps4_app_dir()) + "/");
 +	add_system_data_dir(kDataRoot + "/data/");
-+	add_system_data_dir("/app0/data/");
++	add_system_data_dir(std::string(ps4_app_dir()) + "/data/");
 +
 +	// full HD through VideoOut; the menus are sized for a TV across the room
 +	settings.display.width = ps4wsi::kWidth;
@@ -53154,3 +54860,612 @@ index 000000000..5bad18c77
 +// vkGetInstanceProcAddr of the statically linked RADV, with the PS4 surface and swapchain
 +// (VK_EXT_headless_surface + VK_KHR_swapchain on VideoOut) added.
 +PFN_vkGetInstanceProcAddr ps4_vk_get_instance_proc_addr();
+diff --git a/shell/ps4/updater.cpp b/shell/ps4/updater.cpp
+new file mode 100644
+index 000000000..4368468bf
+--- /dev/null
++++ b/shell/ps4/updater.cpp
+@@ -0,0 +1,528 @@
++/*
++	Resonance updates (see updater.h). From DolphinPS4's PS4Updater.cpp and
++	PlatformPS4.cpp (StartDownloadedUpdate), on libcurl, OpenSSL's SHA-256 and nlohmann::json.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "updater.h"
++#include "json.hpp"
++
++#include <curl/curl.h>
++#include <openssl/sha.h>
++#include <orbis/SystemService.h>
++
++#include <algorithm>
++#include <cctype>
++#include <cstdio>
++#include <cstring>
++#include <dirent.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include <vector>
++
++extern "C" void ps4_boot_trace(const char *line);
++
++namespace
++{
++const char *const kLatest = "https://api.github.com/repos/iHaiDeeZ/Resonance/releases/latest";
++const std::string kData = "/data/Resonance";
++const std::string kUpdateDir = kData + "/app";			// the unpacked update
++const std::string kPending = kData + "/app-pending.txt";	// written before starting it
++const std::string kFailed = kData + "/app-failed";		// an update that didn't start
++const char *const kRunningUpdate = "--resonance-update";	// argument to the update we start
++
++bool gRunningUpdate;
++
++void log(const std::string& text) {
++	ps4_boot_trace(("update: " + text).c_str());
++}
++
++std::string firstLine(const std::string& path)
++{
++	std::string line;
++	if (FILE *f = fopen(path.c_str(), "r"))
++	{
++		char buf[64] = {};
++		if (fgets(buf, sizeof(buf), f) != nullptr)
++			line = buf;
++		fclose(f);
++	}
++	while (!line.empty() && (line.back() == '\n' || line.back() == '\r' || line.back() == ' '))
++		line.pop_back();
++	return line;
++}
++
++void removeTree(const std::string& path)
++{
++	if (DIR *d = opendir(path.c_str()))
++	{
++		while (dirent *e = readdir(d))
++		{
++			if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
++				continue;
++			const std::string child = path + "/" + e->d_name;
++			struct stat st;
++			if (stat(child.c_str(), &st) == 0 && S_ISDIR(st.st_mode))
++				removeTree(child);
++			else
++				remove(child.c_str());
++		}
++		closedir(d);
++	}
++	rmdir(path.c_str());
++}
++
++void makeDirs(const std::string& path)
++{
++	for (size_t p = 1; p != std::string::npos; p = path.find('/', p + 1))
++		mkdir(path.substr(0, p).c_str(), 0777);
++	mkdir(path.c_str(), 0777);
++}
++
++std::string lower(std::string s)
++{
++	for (char& c : s)
++		c = (char)tolower((unsigned char)c);
++	return s;
++}
++
++bool endsWith(const std::string& s, const std::string& end) {
++	return s.size() >= end.size() && s.compare(s.size() - end.size(), end.size(), end) == 0;
++}
++
++std::string caFile() {
++	return std::string(ps4_app_dir()) + "/launcher/cacert.pem";
++}
++
++// A GET through libcurl: the body to sink (false stops it), progress(done, total). HTTP status, or 0
++long get(const std::string& url, const std::function<bool(const char *, size_t)>& sink,
++		const std::function<bool(uint64_t, uint64_t)>& progress, long timeout, std::string& error)
++{
++	struct Context {
++		const std::function<bool(const char *, size_t)> *sink;
++		const std::function<bool(uint64_t, uint64_t)> *progress;
++	} ctx { &sink, &progress };
++	CURL *curl = curl_easy_init();
++	if (curl == nullptr)
++	{
++		error = "curl failed to start";
++		return 0;
++	}
++	char curlError[CURL_ERROR_SIZE] = {};
++	curl_slist *headers = nullptr;
++	headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
++	headers = curl_slist_append(headers, "X-GitHub-Api-Version: 2022-11-28");
++	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
++	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
++	curl_easy_setopt(curl, CURLOPT_USERAGENT, ("Resonance/" + ps4_app_version()).c_str());
++	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
++	curl_easy_setopt(curl, CURLOPT_CAINFO, caFile().c_str());
++	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlError);
++	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 20L);
++	if (timeout > 0)
++		curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
++	else
++	{
++		// a large file on a slow line: a stalled one ends instead
++		curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1024L);
++		curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);
++	}
++	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
++	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char *data, size_t size, size_t n, void *user) -> size_t {
++		Context *c = (Context *)user;
++		return (*c->sink)(data, size * n) ? size * n : 0;
++	});
++	if (progress)
++	{
++		curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
++		curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &ctx);
++		curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, +[](void *user, curl_off_t total, curl_off_t done, curl_off_t, curl_off_t) -> int {
++			Context *c = (Context *)user;
++			return (*c->progress)((uint64_t)done, (uint64_t)total) ? 0 : 1;
++		});
++	}
++	const CURLcode r = curl_easy_perform(curl);
++	long status = 0;
++	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
++	if (r != CURLE_OK)
++	{
++		error = curlError[0] ? curlError : curl_easy_strerror(r);
++		status = 0;
++	}
++	curl_slist_free_all(headers);
++	curl_easy_cleanup(curl);
++	return status;
++}
++
++std::string hex(const unsigned char *data, size_t size)
++{
++	static const char digits[] = "0123456789abcdef";
++	std::string s;
++	for (size_t i = 0; i < size; i++)
++	{
++		s += digits[data[i] >> 4];
++		s += digits[data[i] & 15];
++	}
++	return s;
++}
++
++// Downloads url to path (through path.part), checking its size and SHA-256
++std::string download(const std::string& url, uint64_t size, const std::string& sha256, const std::string& path,
++		const std::function<bool(uint64_t, uint64_t)>& progress)
++{
++	const std::string part = path + ".part";
++	FILE *f = fopen(part.c_str(), "wb");
++	if (f == nullptr)
++		return "can't write " + part;
++	SHA256_CTX sha;
++	SHA256_Init(&sha);
++	uint64_t written = 0;
++	bool writeFailed = false;
++	std::string error;
++	const long status = get(url,
++		[&](const char *data, size_t n) {
++			if (fwrite(data, 1, n, f) != n) {
++				writeFailed = true;
++				return false;
++			}
++			SHA256_Update(&sha, data, n);
++			written += n;
++			return true;
++		},
++		[&](uint64_t done, uint64_t total) { return progress(done, total ? total : size); },
++		0, error);
++	fclose(f);
++	unsigned char digest[SHA256_DIGEST_LENGTH];
++	SHA256_Final(digest, &sha);
++	if (writeFailed)
++		error = "couldn't write the download (is the PS4's storage full?)";
++	else if (status != 200 && error.empty())
++		error = "GitHub answered " + std::to_string(status);
++	else if (status == 200 && written != size)
++		error = "the download is incomplete";
++	else if (status == 200 && hex(digest, sizeof(digest)) != sha256)
++		error = "the download doesn't match GitHub's checksum";
++	if (!error.empty())
++	{
++		remove(part.c_str());
++		log("download failed: " + error);
++		return error;
++	}
++	remove(path.c_str());
++	if (rename(part.c_str(), path.c_str()) != 0)
++	{
++		remove(part.c_str());
++		return "can't rename " + part;
++	}
++	log("downloaded " + path + " (" + std::to_string(written) + " bytes, checksum OK)");
++	return "";
++}
++
++// A ustar archive (plain files and folders) into dir
++std::string extractTar(const std::string& tar, const std::string& dir)
++{
++	FILE *in = fopen(tar.c_str(), "rb");
++	if (in == nullptr)
++		return "can't open " + tar;
++	std::vector<char> buffer(1 << 20);
++	std::string error;
++	int files = 0;
++	for (;;)
++	{
++		unsigned char header[512];
++		if (fread(header, 1, sizeof(header), in) != sizeof(header))
++		{
++			error = "the archive is cut short";
++			break;
++		}
++		if (std::all_of(header, header + sizeof(header), [](unsigned char c) { return c == 0; }))
++			break;
++		auto field = [&](size_t at, size_t length) {
++			const char *begin = (const char *)header + at;
++			return std::string(begin, strnlen(begin, length));
++		};
++		std::string name = field(0, 100);
++		const std::string prefix = field(345, 155);
++		if (!prefix.empty())
++			name = prefix + "/" + name;
++		const uint64_t size = strtoull(field(124, 12).c_str(), nullptr, 8);
++		const char type = (char)header[156];
++		while (name.rfind("./", 0) == 0)
++			name.erase(0, 2);
++		while (!name.empty() && name.back() == '/')
++			name.pop_back();
++		if (name.empty())
++			continue;
++		if (name[0] == '/' || name.find("..") != std::string::npos)
++		{
++			error = "the archive has an unsafe path: " + name;
++			break;
++		}
++		const std::string path = dir + "/" + name;
++		if (type == '5')
++		{
++			makeDirs(path);
++			continue;
++		}
++		if (type != '0' && type != '\0')
++		{
++			fseek(in, (long)((size + 511) / 512 * 512), SEEK_CUR);
++			continue;
++		}
++		makeDirs(path.substr(0, path.find_last_of('/')));
++		FILE *out = fopen(path.c_str(), "wb");
++		if (out == nullptr)
++		{
++			error = "can't write " + path;
++			break;
++		}
++		uint64_t left = size;
++		while (left > 0 && error.empty())
++		{
++			const size_t chunk = (size_t)std::min<uint64_t>(left, buffer.size());
++			if (fread(buffer.data(), 1, chunk, in) != chunk || fwrite(buffer.data(), 1, chunk, out) != chunk)
++				error = "can't unpack " + name;
++			left -= chunk;
++		}
++		fclose(out);
++		if (!error.empty())
++			break;
++		files++;
++		const uint64_t padding = (512 - size % 512) % 512;
++		if (padding)
++			fseek(in, (long)padding, SEEK_CUR);
++	}
++	fclose(in);
++	if (error.empty())
++		log("unpacked " + std::to_string(files) + " files into " + dir);
++	return error;
++}
++} // namespace
++
++const char *ps4_app_dir()
++{
++	return gRunningUpdate ? kUpdateDir.c_str() : "/app0";
++}
++
++std::string ps4_app_version()
++{
++	static std::string version;
++	if (version.empty())
++	{
++		version = firstLine(std::string(ps4_app_dir()) + "/version.txt");
++		if (version.empty())
++			version = "00.00";
++	}
++	return version;
++}
++
++long ps4_http_get(const std::string& url, std::string& body, std::string& error)
++{
++	body.clear();
++	return get(url, [&body](const char *data, size_t n) {
++		body.append(data, n);
++		return body.size() < 16 * 1024 * 1024;
++	}, {}, 60, error);
++}
++
++namespace updater
++{
++
++int compareVersions(const std::string& a, const std::string& b)
++{
++	auto parts = [](const std::string& text) {
++		std::vector<long> n;
++		for (size_t i = 0; i < text.size();)
++		{
++			if (isdigit((unsigned char)text[i]))
++			{
++				char *end = nullptr;
++				n.push_back(strtol(text.c_str() + i, &end, 10));
++				i = (size_t)(end - text.c_str());
++			}
++			else
++				i++;
++		}
++		return n;
++	};
++	const std::vector<long> x = parts(a), y = parts(b);
++	for (size_t i = 0; i < std::max(x.size(), y.size()); i++)
++	{
++		const long p = i < x.size() ? x[i] : 0, q = i < y.size() ? y[i] : 0;
++		if (p != q)
++			return p < q ? -1 : 1;
++	}
++	return 0;
++}
++
++Release checkLatest()
++{
++	Release release;
++	std::string body, error;
++	const long status = get(kLatest, [&body](const char *data, size_t n) {
++		body.append(data, n);
++		return body.size() < 4 * 1024 * 1024;
++	}, {}, 30, error);
++	if (status == 404)
++	{
++		release.error = "no releases yet";
++		log("check: no releases yet");
++		return release;
++	}
++	if (status != 200)
++	{
++		release.error = status == 0 ? error : "GitHub answered " + std::to_string(status);
++		log("check failed: " + release.error);
++		return release;
++	}
++	try {
++		const nlohmann::json root = nlohmann::json::parse(body);
++		std::string tag = root.value("tag_name", "");
++		if (!tag.empty() && (tag[0] == 'v' || tag[0] == 'V'))
++			tag.erase(0, 1);
++		release.version = tag;
++		release.title = root.value("name", "");
++		for (const auto& asset : root.value("assets", nlohmann::json::array()))
++		{
++			const std::string name = asset.value("name", "");
++			const uint64_t size = asset.value("size", (uint64_t)0);
++			const std::string digest = asset.value("digest", "");
++			const std::string sha = digest.rfind("sha256:", 0) == 0 ? lower(digest.substr(7)) : "";
++			const std::string url = asset.value("browser_download_url", "");
++			if (endsWith(lower(name), "-update.tar") && release.archiveUrl.empty())
++			{
++				release.archive = name;
++				release.archiveUrl = url;
++				release.archiveSize = size;
++				release.archiveSha256 = sha;
++			}
++			else if (endsWith(lower(name), ".pkg") && release.url.empty())
++			{
++				release.package = name;
++				release.url = url;
++				release.size = size;
++				release.sha256 = sha;
++			}
++		}
++	} catch (const std::exception& e) {
++		release.error = "unexpected answer from GitHub";
++		log("check failed: " + release.error + " (" + e.what() + ")");
++		return release;
++	}
++	if (release.archiveSha256.size() != 64)
++		release.archiveUrl.clear();	// unchecked: the package instead
++	if (release.version.empty() || (release.url.empty() && release.archiveUrl.empty()))
++		release.error = "the latest release has nothing to install";
++	else if (release.archiveUrl.empty() && release.sha256.size() != 64)
++		release.error = "the latest release has no checksum";
++	else
++		release.ok = true;
++	log("latest release " + release.version + (release.ok ? "" : ": " + release.error));
++	return release;
++}
++
++std::string install(const Release& release, const std::function<bool(uint64_t, uint64_t)>& progress, bool *needsInstaller)
++{
++	*needsInstaller = false;
++	if (!release.archiveUrl.empty())
++	{
++		const std::string tar = kData + "/" + release.archive;
++		std::string error = download(release.archiveUrl, release.archiveSize, release.archiveSha256, tar, progress);
++		if (!error.empty())
++			return error;
++		// unpacked next to the current one, then swapped in
++		const std::string fresh = kUpdateDir + ".new";
++		removeTree(fresh);
++		makeDirs(fresh);
++		error = extractTar(tar, fresh);
++		remove(tar.c_str());
++		if (error.empty() && firstLine(fresh + "/version.txt") != release.version)
++			error = "the update archive doesn't hold version " + release.version;
++		if (!error.empty())
++		{
++			removeTree(fresh);
++			return error;
++		}
++		if (!gRunningUpdate)
++			removeTree(kUpdateDir);
++		else
++			removeTree(kUpdateDir + ".old");	// still running from it: moved aside, gone next start
++		if (gRunningUpdate)
++			rename(kUpdateDir.c_str(), (kUpdateDir + ".old").c_str());
++		if (rename(fresh.c_str(), kUpdateDir.c_str()) != 0)
++			return "can't move the update into place";
++		remove(kPending.c_str());
++		removeTree(kFailed);
++		log("v" + release.version + " ready: it starts next time");
++		return "";
++	}
++	*needsInstaller = true;
++	mkdir("/data/pkg", 0777);
++	return download(release.url, release.size, release.sha256, "/data/pkg/" + release.package, progress);
++}
++
++void startDownloadedUpdate(int argc, char *argv[])
++{
++	for (int i = 1; i < argc; i++)
++		if (argv[i] != nullptr && !strcmp(argv[i], kRunningUpdate))
++		{
++			gRunningUpdate = true;
++			remove(kPending.c_str());	// it started
++			removeTree(kUpdateDir + ".old");
++			log("running the downloaded update v" + ps4_app_version() + " (installed: v" + firstLine("/app0/version.txt") + ")");
++			return;
++		}
++	removeTree(kUpdateDir + ".old");
++	const std::string update = firstLine(kUpdateDir + "/version.txt");
++	if (update.empty())
++		return;
++	const std::string installed = firstLine("/app0/version.txt");
++	if (compareVersions(update, installed) <= 0)
++	{
++		removeTree(kUpdateDir);
++		remove(kPending.c_str());
++		log("removed the downloaded v" + update + ": the installed v" + installed + " is as new");
++		return;
++	}
++	if (FILE *pending = fopen(kPending.c_str(), "r"))
++	{
++		// started last time and never said so: set aside, the installed one runs
++		fclose(pending);
++		remove(kPending.c_str());
++		removeTree(kFailed);
++		rename(kUpdateDir.c_str(), kFailed.c_str());
++		log("the downloaded v" + update + " didn't start last time: set aside in " + kFailed);
++		return;
++	}
++	if (FILE *pending = fopen(kPending.c_str(), "w"))
++	{
++		fprintf(pending, "%s\n", update.c_str());
++		fclose(pending);
++	}
++	log("starting the downloaded v" + update + " (installed: v" + installed + ")");
++	const std::string eboot = kUpdateDir + "/eboot.bin";
++	const char *args[] = { kRunningUpdate, nullptr };
++	const int r = sceSystemServiceLoadExec(eboot.c_str(), args);
++	// still here: it couldn't be started
++	remove(kPending.c_str());
++	removeTree(kFailed);
++	rename(kUpdateDir.c_str(), kFailed.c_str());
++	char line[200];
++	snprintf(line, sizeof(line), "sceSystemServiceLoadExec(%s) failed (%x): the installed version runs", eboot.c_str(), (unsigned)r);
++	log(line);
++}
++
++} // namespace updater
+diff --git a/shell/ps4/updater.h b/shell/ps4/updater.h
+new file mode 100644
+index 000000000..8fc472914
+--- /dev/null
++++ b/shell/ps4/updater.h
+@@ -0,0 +1,69 @@
++/*
++	Resonance updates from the project's GitHub releases, the way DolphinPS4 does it
++	(DolphinNoGUI/PS4Updater.cpp): the latest release is compared with the running version and its
++	files are downloaded, the connection's certificate checked and each file checked against the
++	SHA-256 GitHub publishes for it.
++
++	A release has the full package (Resonance-vXX.YY.pkg) and an update archive
++	(Resonance-vXX.YY-update.tar: eboot.bin, version.txt, launcher/). The archive is unpacked into
++	/data/Resonance/app, and from the next start the installed app starts the newer program from
++	there (startDownloadedUpdate); its pictures, fonts and sounds come from there too
++	(ps4_app_dir). The running app can't install a package over itself: a release without an
++	archive leaves its checked package in /data/pkg for the Package Installer.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#pragma once
++#include <cstdint>
++#include <functional>
++#include <string>
++
++// Where the running program's files are: "/app0", or the downloaded update's folder
++const char *ps4_app_dir();
++// The running version ("01.18")
++std::string ps4_app_version();
++// An HTTPS GET into body (GitHub-friendly headers, the bundled CA list). HTTP status, or 0 with error
++long ps4_http_get(const std::string& url, std::string& body, std::string& error);
++
++namespace updater
++{
++
++struct Release
++{
++	bool ok = false;
++	std::string error;
++	std::string version;		// "01.18" (the tag without its "v")
++	std::string title;
++	std::string package, url, sha256;
++	uint64_t size = 0;
++	std::string archive, archiveUrl, archiveSha256;
++	uint64_t archiveSize = 0;
++};
++
++// The latest release on GitHub (blocks: call off the UI thread)
++Release checkLatest();
++// <0 when a is older than b
++int compareVersions(const std::string& a, const std::string& b);
++// Downloads and installs the release: the archive into the update folder (the next start runs it),
++// or the package into /data/pkg. progress(done, total) may return false to cancel.
++// "" when done; else what went wrong. *needsInstaller: the package route was taken
++std::string install(const Release& release, const std::function<bool(uint64_t, uint64_t)>& progress, bool *needsInstaller);
++
++// At the very start of main(): run the downloaded update if it is newer than the installed app
++// (doesn't return then), or tidy it away
++void startDownloadedUpdate(int argc, char *argv[]);
++
++}

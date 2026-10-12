@@ -770,3 +770,28 @@
 2064	Gemaakt door
 370	Emulator
 2065	Bibliotheken
+2066	Zoeken naar updates
+2067	Zoeken bij starten
+2068	Zoekt bij het starten van de app op GitHub naar een nieuwere Resonance
+2069	Zoeken...
+2070	Resonance is up-to-date
+2071	Nog geen versies
+2072	Update v%s beschikbaar: druk op X om te installeren
+2073	Downloaden %d%%
+2074	Update klaar: start Resonance opnieuw om hem te gebruiken
+2075	Opgeslagen in /data/pkg: installeer hem met de Package Installer
+2076	Update mislukt: %s
+2077	Kan niet zoeken naar updates: %s
+2078	Update v%s beschikbaar: Instellingen > Over
+2079	Herstart om te voltooien
+2080	Bron van cheats
+2081	Automatisch downloaden
+2082	Alleen de cheatmap
+2083	Zet .cht-bestanden in /data/Resonance/cheats
+2084	Cheats ophalen
+2085	Cheats geladen: %s
+2086	Cheats zoeken...
+2087	Downloaden...
+2088	Kan de cheats niet downloaden: %s
+2089	Geen cheats gevonden voor deze game
+2090	Nog geen cheats

@@ -770,3 +770,28 @@
 2064	Autor
 370	Emulator
 2065	Biblioteki
+2066	Sprawdź aktualizacje
+2067	Sprawdzaj przy starcie
+2068	Sprawdza na GitHubie nowszą wersję Resonance przy uruchomieniu aplikacji
+2069	Sprawdzanie...
+2070	Resonance jest aktualny
+2071	Brak wydań
+2072	Dostępna aktualizacja v%s: naciśnij X, aby zainstalować
+2073	Pobieranie %d%%
+2074	Aktualizacja gotowa: uruchom ponownie Resonance
+2075	Zapisano w /data/pkg: zainstaluj przez Package Installer
+2076	Aktualizacja nieudana: %s
+2077	Nie można sprawdzić aktualizacji: %s
+2078	Dostępna aktualizacja v%s: Ustawienia > Informacje
+2079	Uruchom ponownie
+2080	Źródło kodów
+2081	Pobieraj automatycznie
+2082	Tylko folder kodów
+2083	Umieść pliki .cht w /data/Resonance/cheats
+2084	Pobierz kody
+2085	Wczytano kody: %s
+2086	Szukanie kodów...
+2087	Pobieranie...
+2088	Nie można pobrać kodów: %s
+2089	Nie znaleziono kodów do tej gry
+2090	Brak kodów
