@@ -1,3 +1,5 @@
 Upstream Flycast the PS4 patch applies to (cloned with submodules by scripts/clone-flycast.sh):
 url: https://github.com/flyinghead/flycast
 base: 0d9853df9
+libnfs: 7613236464317bee2d9636f087f995148de4db27 https://github.com/sahlberg/libnfs
+libsmb2: e94eee9465d55ed094ace2c038a8705b4822dada https://github.com/sahlberg/libsmb2

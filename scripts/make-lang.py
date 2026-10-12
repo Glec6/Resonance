@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""DeCast-S4 translations: Flycast's menus (resources/i18n/flycast.pot) plus the home screen's
-texts (lang/decast-keys.txt), in the 12 languages DolphinPS4 and Crema have, plus Arabic.
+"""Resonance translations: Flycast's menus (resources/i18n/flycast.pot) plus the home screen's
+texts (lang/resonance-keys.txt), in the 12 languages DolphinPS4 and Crema have, plus Arabic.
 
 lang/keys.txt numbers every English text (written by `make-lang.py keys`). lang/src/<code>.txt has
 "<number><TAB><translation>" lines; a plural is "<form 0> || <form 1> || ...". Texts keep the .po
@@ -23,7 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.join(HERE, "..")
 LANG = os.path.join(REPO, "lang")
 FONTS = os.path.join(REPO, "launcher-assets", "launcher", "fonts")
-FLYCAST = os.path.expanduser("~/decast-build/src/flycast")
+FLYCAST = os.path.expanduser("~/resonance-build/src/flycast")
 I18N = os.path.join(FLYCAST, "resources", "i18n")
 NOTO = os.path.expanduser("~/dolphinps4-build/tools/noto")
 
@@ -115,7 +115,7 @@ def read_keys():
 def write_keys():
     pot = parse_po(os.path.join(I18N, "flycast.pot"))
     seen = set()
-    lines = ["# English texts: Flycast's flycast.pot, then the home screen's (lang/decast-keys.txt).",
+    lines = ["# English texts: Flycast's flycast.pot, then the home screen's (lang/resonance-keys.txt).",
              "# <number><TAB>[context] text || plural. Written by scripts/make-lang.py keys."]
     n = 0
     for e in pot:
@@ -124,7 +124,7 @@ def write_keys():
         ctx = f"[{e['ctx']}] " if e["ctx"] else ""
         lines.append(f"{n}\t{ctx}{e['id']}" + (f" || {e['plural']}" if e["plural"] else ""))
     n = 2000
-    for line in open(os.path.join(LANG, "decast-keys.txt"), encoding="utf-8"):
+    for line in open(os.path.join(LANG, "resonance-keys.txt"), encoding="utf-8"):
         line = line.rstrip("\n")
         if not line or line.startswith("#"):
             continue
@@ -184,7 +184,7 @@ def build(code, keys):
            '"MIME-Version: 1.0\\n"', '"Content-Type: text/plain; charset=UTF-8\\n"',
            '"Content-Transfer-Encoding: 8bit\\n"', f'"Language: {language}\\n"',
            f'"Plural-Forms: {plural_forms}\\n"',
-           '"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/' + code + '.txt)\\n"', ""]
+           '"X-Generator: Resonance scripts/make-lang.py (lang/src/' + code + '.txt)\\n"', ""]
     used, missing, mine = set(), 0, 0
     for num, ctx, msgid, plural in keys:
         k = (ctx or "") + "\x04" + msgid

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fetch /data/DeCast-S4/{boot-trace,crash,hang}.log and Flycast's data/flycast.log from the console
+# Fetch /data/Resonance/{boot-trace,crash,hang}.log and Flycast's data/flycast.log from the console
 # and symbolize the crash and hang addresses against the ELF (default: the newest packaged
 # version's, from oelf/).
 #   crashlog.sh [elf]
@@ -11,11 +11,11 @@ HOST="ftp://${PS4_HOST:-192.168.0.90}:${PS4_FTP_PORT:-2121}"
 OUT="$PS4_BUILD_ROOT/logs"
 mkdir -p "$OUT"
 for f in boot-trace.log crash.log hang.log data/flycast.log; do
-    curl -s --max-time 30 -o "$OUT/$(basename "$f")" "$HOST/data/DeCast-S4/$f" || rm -f "$OUT/$(basename "$f")"
+    curl -s --max-time 30 -o "$OUT/$(basename "$f")" "$HOST/data/Resonance/$f" || rm -f "$OUT/$(basename "$f")"
 done
-# symbolize against the build that ran (boot-trace.log: "DeCast-S4 XX.YY starting")
+# symbolize against the build that ran (boot-trace.log: "Resonance XX.YY starting")
 if [ -z "${1:-}" ]; then
-    ran="$(grep -oE "DeCast-S4 [0-9]{2}\.[0-9]{2} starting" "$OUT/boot-trace.log" 2>/dev/null | head -1 | cut -d' ' -f2 || true)"
+    ran="$(grep -oE "Resonance [0-9]{2}\.[0-9]{2} starting" "$OUT/boot-trace.log" 2>/dev/null | head -1 | cut -d' ' -f2 || true)"
     [ -n "$ran" ] && [ -f "$PS4_BUILD_ROOT/oelf/v$ran.elf" ] && ELF="$PS4_BUILD_ROOT/oelf/v$ran.elf"
 fi
 echo "== symbols from $(basename "$ELF")"
@@ -41,7 +41,7 @@ print_thread_dump() {
     done
 }
 # screenshots taken from Flycast's menu
-echo "== screenshots: $(curl -s --max-time 30 --list-only "$HOST/data/DeCast-S4/screenshots/" | tr '
+echo "== screenshots: $(curl -s --max-time 30 --list-only "$HOST/data/Resonance/screenshots/" | tr '
 ' ' ')"
 echo "== boot-trace.log"; cat "$OUT/boot-trace.log" 2>/dev/null || echo "(none)"
 echo "== flycast.log (last 60 lines)"; tail -60 "$OUT/flycast.log" 2>/dev/null || echo "(none)"

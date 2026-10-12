@@ -713,9 +713,9 @@
 2007	Designs
 2008	Sprache
 2009	Deine Bibliothek ist leer
-2010	Kopiere GDI-, CHD- oder CDI-Spiele nach /data/DeCast-S4/games, dann erscheinen sie hier.
+2010	Kopiere GDI-, CHD- oder CDI-Spiele nach /data/Resonance/games, dann erscheinen sie hier.
 2011	Noch keine Spiele
-2012	Spiele nach /data/DeCast-S4/games kopieren
+2012	Spiele nach /data/Resonance/games kopieren
 2013	LIVE
 2014	Discs auf einem drehenden Ring
 2015	Jedes Spiel ist ein Fernsehkanal
@@ -724,5 +724,28 @@
 2018	Emulator-Einstellungen
 2019	Video, Audio, Steuerung, BIOS, Inhaltsordner
 2020	Cover
-2021	Eigene: /data/DeCast-S4/covers/<Spieldatei oder Seriennummer>.png
+2021	Eigene: /data/Resonance/covers/<Spieldatei oder Seriennummer>.png
 2022	Drücke X, um die Menüsprache zu ändern
+2023	Videoeinstellungen
+2024	Auflösung, Breitbild, Filterung, Bildrate
+2025	Audioeinstellungen
+2026	Lautstärke, Soundprozessor
+2027	Controller-Einstellungen
+2028	Geräte an den Ports der Dreamcast
+2029	Systemeinstellungen
+2030	Region, Sprache, BIOS, CPU
+2031	Startbildschirm-Einstellungen
+2032	Design, Sprache, Cover, Intro
+2033	An
+2034	Aus
+2035	Automatisches Frameskipping
+2036	Texturfilterung
+2037	Spielstand beim Start laden
+2038	Spielstand beim Beenden speichern
+2039	Design des Startbildschirms
+2040	Menüsprache
+2041	Coverbilder vom libretro-Thumbnail-Server, nach Disc-Seriennummer
+2042	Intro-Animation
+2043	Läuft beim Start der App
+2044	Ändern
+2045	PAUSIERT

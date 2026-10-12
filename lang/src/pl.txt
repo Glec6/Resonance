@@ -713,9 +713,9 @@
 2007	Motywy
 2008	Język
 2009	Twoja biblioteka jest pusta
-2010	Skopiuj gry GDI, CHD lub CDI do /data/DeCast-S4/games, a pojawią się tutaj.
+2010	Skopiuj gry GDI, CHD lub CDI do /data/Resonance/games, a pojawią się tutaj.
 2011	Nie ma jeszcze gier
-2012	Skopiuj gry do /data/DeCast-S4/games
+2012	Skopiuj gry do /data/Resonance/games
 2013	NA ŻYWO
 2014	Płyty na obracającym się pierścieniu
 2015	Każda gra to kanał TV
@@ -724,5 +724,28 @@
 2018	Ustawienia emulatora
 2019	Wideo, dźwięk, sterowanie, BIOS, foldery zawartości
 2020	Okładki
-2021	Własne: /data/DeCast-S4/covers/<plik gry lub numer seryjny>.png
+2021	Własne: /data/Resonance/covers/<plik gry lub numer seryjny>.png
 2022	Naciśnij X, aby zmienić język menu
+2023	Ustawienia obrazu
+2024	Rozdzielczość, panorama, filtrowanie, klatki
+2025	Ustawienia dźwięku
+2026	Głośność, procesor dźwięku
+2027	Ustawienia kontrolerów
+2028	Urządzenia w portach Dreamcasta
+2029	Ustawienia systemu
+2030	Region, język, BIOS, CPU
+2031	Ustawienia ekranu głównego
+2032	Motyw, język, okładki, intro
+2033	Wł.
+2034	Wył.
+2035	Automatyczne pomijanie klatek
+2036	Filtrowanie tekstur
+2037	Wczytaj stan przy starcie
+2038	Zapisz stan przy wyjściu
+2039	Motyw ekranu głównego
+2040	Język menu
+2041	Okładki z serwera miniatur libretro, według numeru seryjnego płyty
+2042	Animacja otwarcia
+2043	Odtwarzana przy starcie aplikacji
+2044	Zmień
+2045	WSTRZYMANO

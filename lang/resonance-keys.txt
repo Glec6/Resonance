@@ -1,0 +1,53 @@
+# Resonance home screen texts (shell/ps4/launcher), English. Texts Flycast's flycast.pot already
+# has (Settings, Japan, USA, Europe, System Default, ...) are left out of keys.txt automatically.
+Start
+Settings
+Theme: %s
+Orbit
+Channel
+Shelf
+Cross bar
+Games
+Themes
+Language
+Your library is empty
+Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here.
+No games yet
+Copy games to /data/Resonance/games
+Starting...
+LIVE
+Discs on a turning ring
+Every game is a TV channel
+Box art on a glossy shelf
+This menu
+Emulator settings
+Video, audio, controls, BIOS, content folders
+Covers
+Your own: /data/Resonance/covers/<game file or serial>.png
+Press X to change the menu language
+Japan
+USA
+Europe
+Video Settings
+Resolution, widescreen, filtering, frame rate
+Audio Settings
+Volume, sound processor
+Controller Settings
+Devices in the Dreamcast's ports
+System Settings
+Region, language, BIOS, CPU
+Home Screen Settings
+Theme, language, covers, opening
+On
+Off
+Automatic Frame Skipping
+Texture Filtering
+Load State at Start
+Save State on Exit
+Home Screen Theme
+Menu Language
+Cover pictures from the libretro thumbnail server, by disc serial
+Opening Animation
+Plays when the app starts
+Change
+PAUSED

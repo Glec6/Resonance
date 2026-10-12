@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Package the PS4 Flycast build (after configure-flycast.sh + build-flycast.sh) as Resonance (the
-# app's name on the PS4; the project is DeCast-S4), DCST00001 (IV0000-DCST00001_00-DECASTS400000000.pkg:
-# the IDs stay, so an update installs over the earlier builds and keeps /data/DeCast-S4).
-#   DECAST_VERSION=01.00 package-decast.sh [upload]
+# Package the PS4 Flycast build (after configure-flycast.sh + build-flycast.sh) as Resonance (formerly
+# DeCast-S4), DCST00001 (IV0000-DCST00001_00-DECASTS400000000.pkg:
+# the IDs stay, so an update installs over the earlier builds and keeps /data/Resonance).
+#   RESONANCE_VERSION=01.00 package-resonance.sh [upload]
 # upload: puts the pkg in the console's /data/pkg as Resonance-vXX.YY.pkg (install it with GoldHEN's
 # Package Installer). Older builds of this app are deleted, on the PC (out/) and on the console
-# (DeCast-S4-v*, Resonance-v*, IV0000-DCST00001*); other apps' packages are left alone.
+# (Resonance-v*, the old DeCast-S4-v*, IV0000-DCST00001*); other apps' packages are left alone.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/ps4-env.sh"
 BUILD="$PS4_BUILD_ROOT/build/flycast"
 EBOOT="$BUILD/shell/ps4/flycast_eboot/eboot.bin"
-VERSION="${DECAST_VERSION:-01.00}"
+VERSION="${RESONANCE_VERSION:-01.00}"
 HOST="ftp://${PS4_HOST:-192.168.0.90}:${PS4_FTP_PORT:-2121}"
 
 [ -f "$EBOOT" ] || { echo "missing $EBOOT: build first" >&2; exit 1; }
 [[ "$VERSION" =~ ^[0-9][0-9]\.[0-9][0-9]$ ]] || { echo "version must look like 01.00" >&2; exit 1; }
-STAGE="$PS4_BUILD_ROOT/build/decast-stage"
+STAGE="$PS4_BUILD_ROOT/build/resonance-stage"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/sce_sys"
 cp "$EBOOT" "$STAGE/eboot.bin"
@@ -29,7 +29,7 @@ find "$STAGE" -type d -empty -delete
 # Vulkan (RADV on GNM) runs under the plain homebrew identity (4.5 GiB of direct memory).
 PKG="$(SFO_STYLE=plain NO_RIGHT_SPRX=1 DOLPHIN_PS4_MODULES_DIR=/nonexistent "$HERE/make-pkg.sh" "$STAGE" DCST00001 "Resonance" "$VERSION" DECASTS4 "$PS4_BUILD_ROOT/out" | tail -1)"
 ls -la "$PKG"
-# a copy next to the repo (E:\PS4 Projects\DeCast-S4\out), easy to find from Windows; *.pkg is ignored by git
+# a copy next to the repo (E:\PS4 Projects\Resonance\out), easy to find from Windows; *.pkg is ignored by git
 mkdir -p "$HERE/../out"
 NAME="Resonance-v$VERSION.pkg"
 cp "$PKG" "$HERE/../out/$NAME"
@@ -40,8 +40,8 @@ mkdir -p "$PS4_BUILD_ROOT/oelf"
 cp "$BUILD/shell/ps4/flycast_eboot/flycast.oelf" "$PS4_BUILD_ROOT/oelf/v$VERSION.oelf"
 cp "$BUILD/flycast" "$PS4_BUILD_ROOT/oelf/v$VERSION.elf"
 if [ "${1:-}" = upload ]; then
-    for old in $(curl -sS --list-only "$HOST/data/pkg/" | tr -d '\r' | grep -E '^(DeCast-S4-v[0-9.]+|Resonance-v[0-9.]+|IV0000-DCST00001_00-[A-Z0-9]+)[.]pkg$' | grep -vx "$NAME"); do
-        curl -sS "$HOST/" -Q "DELE /data/pkg/$old" > /dev/null && echo "console: removed old $old"
+    for old in $(curl -sS --list-only "$HOST/data/pkg/" | tr -d '\r' | grep -E '^(Resonance-v[0-9.]+|DeCast-S4-v[0-9.]+|IV0000-DCST00001_00-[A-Z0-9]+)[.]pkg$' | grep -vx "$NAME"); do
+        if curl -sS "$HOST/" -Q "DELE /data/pkg/$old" > /dev/null; then echo "console: removed old $old"; else echo "console: could not remove $old"; fi
     done
     curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
     echo "uploaded $NAME"

@@ -1,4 +1,4 @@
-# Toolchain for Flycast on PS4 (DeCast-S4): DolphinPS4/Crema's love-ps4-style modern toolchain
+# Toolchain for Flycast on PS4 (Resonance): DolphinPS4/Crema's love-ps4-style modern toolchain
 # (clang 21 + libc++ 21, ld.lld called directly, OpenOrbis CRT/libc), plus this port's sysroot
 # (seeded from Crema's: zlib, zstd, libzip, glslang, ...) on the find path ahead of PacBrew's.
 include(${CMAKE_CURRENT_LIST_DIR}/ps4-love-modern.cmake)

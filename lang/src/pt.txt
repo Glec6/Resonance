@@ -23,9 +23,9 @@
 2007	Temas
 2008	Idioma
 2009	Sua biblioteca está vazia
-2010	Copie jogos GDI, CHD ou CDI para /data/DeCast-S4/games e eles aparecerão aqui.
+2010	Copie jogos GDI, CHD ou CDI para /data/Resonance/games e eles aparecerão aqui.
 2011	Ainda não há jogos
-2012	Copie jogos para /data/DeCast-S4/games
+2012	Copie jogos para /data/Resonance/games
 2013	AO VIVO
 2014	Discos em um anel que gira
 2015	Cada jogo é um canal de TV
@@ -34,5 +34,28 @@
 2018	Configurações do emulador
 2019	Vídeo, áudio, controles, BIOS, pastas de conteúdo
 2020	Capas
-2021	As suas: /data/DeCast-S4/covers/<arquivo do jogo ou número de série>.png
+2021	As suas: /data/Resonance/covers/<arquivo do jogo ou número de série>.png
 2022	Pressione X para mudar o idioma do menu
+2023	Configurações de vídeo
+2024	Resolução, widescreen, filtragem, quadros
+2025	Configurações de áudio
+2026	Volume, processador de som
+2027	Configurações de controles
+2028	Dispositivos nas portas do Dreamcast
+2029	Configurações do sistema
+2030	Região, idioma, BIOS, CPU
+2031	Configurações da tela inicial
+2032	Tema, idioma, capas, abertura
+2033	Ligado
+2034	Desligado
+2035	Pulo automático de quadros
+2036	Filtragem de texturas
+2037	Carregar estado ao iniciar
+2038	Salvar estado ao sair
+2039	Tema da tela inicial
+2040	Idioma do menu
+2041	Capas do servidor de miniaturas da libretro, pelo número de série do disco
+2042	Animação de abertura
+2043	Toca ao abrir o app
+2044	Alterar
+2045	PAUSADO

@@ -713,9 +713,9 @@
 2007	Thema's
 2008	Taal
 2009	Je bibliotheek is leeg
-2010	Kopieer GDI-, CHD- of CDI-games naar /data/DeCast-S4/games, dan verschijnen ze hier.
+2010	Kopieer GDI-, CHD- of CDI-games naar /data/Resonance/games, dan verschijnen ze hier.
 2011	Nog geen games
-2012	Kopieer games naar /data/DeCast-S4/games
+2012	Kopieer games naar /data/Resonance/games
 2013	LIVE
 2014	Schijven op een draaiende ring
 2015	Elke game is een tv-zender
@@ -724,5 +724,28 @@
 2018	Emulatorinstellingen
 2019	Video, audio, besturing, BIOS, inhoudsmappen
 2020	Hoesjes
-2021	Je eigen: /data/DeCast-S4/covers/<gamebestand of serienummer>.png
+2021	Je eigen: /data/Resonance/covers/<gamebestand of serienummer>.png
 2022	Druk op X om de menutaal te wijzigen
+2023	Video-instellingen
+2024	Resolutie, breedbeeld, filtering, framerate
+2025	Audio-instellingen
+2026	Volume, geluidsprocessor
+2027	Controller-instellingen
+2028	Apparaten in de poorten van de Dreamcast
+2029	Systeeminstellingen
+2030	Regio, taal, BIOS, CPU
+2031	Instellingen startscherm
+2032	Thema, taal, hoesjes, intro
+2033	Aan
+2034	Uit
+2035	Automatisch frames overslaan
+2036	Texturefiltering
+2037	State laden bij starten
+2038	State opslaan bij afsluiten
+2039	Thema van het startscherm
+2040	Menutaal
+2041	Hoesjes van de libretro-thumbnailserver, op serienummer van de schijf
+2042	Openingsanimatie
+2043	Speelt bij het starten van de app
+2044	Wijzigen
+2045	GEPAUZEERD

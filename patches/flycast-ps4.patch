@@ -1,12 +1,12 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index c5ac6f6e8..488f1c238 100644
+index c5ac6f6e8..257ab0937 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -66,6 +66,18 @@ if(NOT DEFINED ARCHITECTURE)
  endif()
  message(STATUS "Target architecture: ${ARCHITECTURE}")
  
-+# PS4 homebrew (DeCast-S4): Vulkan on RADV/GNM, native ScePad/AudioOut frontend in shell/ps4,
++# PS4 homebrew (Resonance): Vulkan on RADV/GNM, native ScePad/AudioOut frontend in shell/ps4,
 +# no desktop libraries (SDL, X11, ALSA, ...).
 +if(PS4)
 +	set(USE_VULKAN ON CACHE BOOL "" FORCE)
@@ -140,7 +140,7 @@ index f2f0cca50..2cac65b91 100755
  			u64 now = getTimeMs();
  			cpu_time_idx = (cpu_time_idx + 1) % cpu_cycles.size();
 diff --git a/core/linux/common.cpp b/core/linux/common.cpp
-index 9e2078486..2aab50571 100644
+index 9e2078486..b16a44706 100644
 --- a/core/linux/common.cpp
 +++ b/core/linux/common.cpp
 @@ -30,31 +30,50 @@ extern "C" char __start__;
@@ -215,7 +215,7 @@ index 9e2078486..2aab50571 100644
  	sigemptyset(&act.sa_mask);
  	act.sa_flags = SA_SIGINFO;
 +#ifdef __ORBIS__
-+	// every PS4 thread has a signal stack (DeCast-S4 port/ps4_runtime.cpp): a thread out of stack still reports
++	// every PS4 thread has a signal stack (Resonance port/ps4_runtime.cpp): a thread out of stack still reports
 +	act.sa_flags |= SA_ONSTACK;
 +#endif
  	sigaction(SIGSEGV, &act, &next_segv_handler);
@@ -241,7 +241,7 @@ index 9e2078486..2aab50571 100644
  	}
  	pthread_setname_np(pthread_self(), name);
 +#elif defined(__ORBIS__)
-+	// named threads appear in DeCast-S4's crash and hang reports and its profiler
++	// named threads appear in Resonance's crash and hang reports and its profiler
 +	ps4_name_thread(name);
  #endif
  }
@@ -291,7 +291,7 @@ index 2d4241090..0abe87530 100644
  namespace virtmem
  {
 diff --git a/core/log/LogManager.cpp b/core/log/LogManager.cpp
-index 0d5086b0d..f16043804 100644
+index 0d5086b0d..731d2ac46 100644
 --- a/core/log/LogManager.cpp
 +++ b/core/log/LogManager.cpp
 @@ -145,14 +145,19 @@ LogManager::LogManager()
@@ -299,7 +299,7 @@ index 0d5086b0d..f16043804 100644
  void LogManager::UpdateConfig()
  {
 +#ifdef __ORBIS__
-+	// PS4 test builds: there is no console to read (/data/DeCast-S4/data/flycast.log)
++	// PS4 test builds: there is no console to read (/data/Resonance/data/flycast.log)
 +	bool logToFile = config::loadBool("log", "LogToFile", true);
 +#else
  	bool logToFile = config::loadBool("log", "LogToFile", false);
@@ -328,7 +328,7 @@ index 03a31db18..84893986b 100644
          oslib.h
          resources.cpp
 diff --git a/core/oslib/http_client.cpp b/core/oslib/http_client.cpp
-index 6a250597e..90b58ce25 100644
+index 6a250597e..64cd3bb95 100644
 --- a/core/oslib/http_client.cpp
 +++ b/core/oslib/http_client.cpp
 @@ -362,6 +362,10 @@ static CURL *makeCurlEasy(const std::string& url)
@@ -336,14 +336,14 @@ index 6a250597e..90b58ce25 100644
  	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
  	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30);	// default is 300 s so 5 min
 +#ifdef __ORBIS__
-+	// the PS4 has no system certificate store: DeCast-S4 ships Mozilla's (launcher/cacert.pem)
++	// the PS4 has no system certificate store: Resonance ships Mozilla's (launcher/cacert.pem)
 +	curl_easy_setopt(curl, CURLOPT_CAINFO, "/app0/launcher/cacert.pem");
 +#endif
  
  	curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
  
 diff --git a/core/oslib/i18n.cpp b/core/oslib/i18n.cpp
-index 4cfa487c8..601daee0b 100644
+index 4cfa487c8..ed9b4457c 100644
 --- a/core/oslib/i18n.cpp
 +++ b/core/oslib/i18n.cpp
 @@ -24,6 +24,9 @@
@@ -426,7 +426,7 @@ index 4cfa487c8..601daee0b 100644
  
 -#if !defined(__ANDROID__) && !defined(__SWITCH__) && !defined(LIBRETRO) && !defined(TARGET_MAC)
 +#if defined(__ORBIS__) && !defined(LIBRETRO)
-+// DeCast-S4: the PS4's system language, as the locale of a translation we ship
++// Resonance: the PS4's system language, as the locale of a translation we ship
 +std::string getSystemLocale()
 +{
 +	static const char *const locales[] = {
@@ -859,7 +859,7 @@ index 2a02ab625..a1d091484 100644
  #elif defined(__ANDROID__)
  #define DECLARE_CODE_CACHE(Name, Size) alignas(4096) static u8 Name[Size];
 diff --git a/core/rec-x64/rec_x64.cpp b/core/rec-x64/rec_x64.cpp
-index b78ffc9e4..84c86f267 100644
+index b78ffc9e4..8b7cb8be2 100644
 --- a/core/rec-x64/rec_x64.cpp
 +++ b/core/rec-x64/rec_x64.cpp
 @@ -536,6 +536,30 @@ public:
@@ -901,7 +901,7 @@ index b78ffc9e4..84c86f267 100644
 +		// The next block's code from the FPCB table, inline: without the MMU that is all
 +		// bm_GetCodeByVAddr does, but as a call it saved and restored six registers around one
 +		// load, and on the PS4's Jaguar cores the lookup cost ~30% of the emulation thread
-+		// (DeCast-S4 profile). With the MMU on, the C++ lookup as before.
++		// (Resonance profile). With the MMU on, the C++ lookup as before.
 +		{
 +			Xbyak::Label slowLookup, haveCode;
 +			mov(rax, (size_t)&mmuOn);
@@ -1213,20 +1213,20 @@ index 2cb703a9c..1321ed802 100644
  	ShaderCompiler::Term();
  	swapChain.reset();
 diff --git a/core/rend/vulkan/vulkan_context.h b/core/rend/vulkan/vulkan_context.h
-index f2d8293e4..c99bb8329 100644
+index f2d8293e4..b0e00ff9b 100644
 --- a/core/rend/vulkan/vulkan_context.h
 +++ b/core/rend/vulkan/vulkan_context.h
 @@ -152,6 +152,8 @@ public:
  	void setSwapInterval(int interval) override;
  	vk::Format GetDepthFormat() const { return depthFormat; }
  	static VulkanContext *Instance() { return static_cast<VulkanContext *>(GraphicsContext::Instance()); }
-+	// writes the Vulkan pipeline cache to disk (DeCast-S4 calls it while running)
++	// writes the Vulkan pipeline cache to disk (Resonance calls it while running)
 +	void SavePipelineCache();
  	bool SupportsSamplerAnisotropy() const { return samplerAnisotropy; }
  	float GetMaxSamplerAnisotropy() const { return samplerAnisotropy ? maxSamplerAnisotropy : 1.f; }
  	bool SupportsDedicatedAllocation() const { return dedicatedAllocationSupported; }
 diff --git a/core/ui/boxart/boxart.cpp b/core/ui/boxart/boxart.cpp
-index 36be5f1ef..81572f6b4 100644
+index 36be5f1ef..7347b815c 100644
 --- a/core/ui/boxart/boxart.cpp
 +++ b/core/ui/boxart/boxart.cpp
 @@ -22,6 +22,9 @@
@@ -1244,7 +1244,7 @@ index 36be5f1ef..81572f6b4 100644
  			if (scraper == nullptr)
  			{
 +#ifdef __ORBIS__
-+				// DeCast-S4: libretro thumbnails by disc serial
++				// Resonance: libretro thumbnails by disc serial
 +				scraper = std::unique_ptr<Scraper>(new LibretroScraper());
 +#else
  				scraper = std::unique_ptr<Scraper>(new TheGamesDb());
@@ -1253,7 +1253,7 @@ index 36be5f1ef..81572f6b4 100644
  				{
  					ERROR_LOG(COMMON, "thegamesdb scraper initialization failed");
 diff --git a/core/ui/boxart/boxart.h b/core/ui/boxart/boxart.h
-index d2096c491..1666411f0 100644
+index d2096c491..87f7b411b 100644
 --- a/core/ui/boxart/boxart.h
 +++ b/core/ui/boxart/boxart.h
 @@ -64,5 +64,10 @@ private:
@@ -1261,14 +1261,14 @@ index d2096c491..1666411f0 100644
  	std::future<void> fetching;
  
 +#ifdef __ORBIS__
-+	// DeCast-S4: its own file, so games TheGamesDB already marked as scraped get libretro covers
-+	static constexpr char const *DB_NAME = "decast-gamedb.json";
++	// Resonance: its own file, so games TheGamesDB already marked as scraped get libretro covers
++	static constexpr char const *DB_NAME = "resonance-gamedb.json";
 +#else
  	static constexpr char const *DB_NAME = "flycast-gamedb.json";
 +#endif
  };
 diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
-index 614739abc..1ff446d12 100644
+index 614739abc..73a14152d 100644
 --- a/core/ui/gui.cpp
 +++ b/core/ui/gui.cpp
 @@ -17,6 +17,7 @@
@@ -1294,7 +1294,7 @@ index 614739abc..1ff446d12 100644
  }
  
 +#ifdef __ORBIS__
-+// DeCast-S4 launcher (shell/ps4/launcher): the library as the scanner and box-art database see it
++// Resonance launcher (shell/ps4/launcher): the library as the scanner and box-art database see it
 +void gui_ps4_list_games(std::vector<LauncherEntry>& out)
 +{
 +	out.clear();
@@ -1341,19 +1341,39 @@ index 614739abc..1ff446d12 100644
  	gui_newFrame();
  	ImGui::NewFrame();
  	error_msg_shown = false;
-@@ -1364,6 +1406,11 @@ void gui_display_ui()
+@@ -1353,9 +1395,19 @@ void gui_display_ui()
+ 	switch (gui_state)
+ 	{
+ 	case GuiState::Settings:
++#ifdef __ORBIS__
++		// Resonance's settings (shell/ps4/launcher/settings_menu.cpp)
++		if (launcher_settings_draw())
++			break;
++#endif
+ 		gui_display_settings();
+ 		break;
+ 	case GuiState::Commands:
++#ifdef __ORBIS__
++		// Resonance's quick menu (shell/ps4/launcher/quick_menu.cpp)
++		if (launcher_quick_menu_draw())
++			break;
++#endif
+ 		gui_display_commands();
+ 		break;
+ 	case GuiState::Pause:
+@@ -1364,6 +1416,11 @@ void gui_display_ui()
  		break;
  	case GuiState::Main:
  		//gui_display_demo();
 +#ifdef __ORBIS__
-+		// DeCast-S4's home screen (shell/ps4/launcher)
++		// Resonance's home screen (shell/ps4/launcher)
 +		if (launcher_draw())
 +			break;
 +#endif
  		gui_display_content();
  		break;
  	case GuiState::Closed:
-@@ -1408,6 +1455,10 @@ void gui_display_ui()
+@@ -1408,6 +1465,10 @@ void gui_display_ui()
  		emu.start();
  }
  
@@ -1364,12 +1384,12 @@ index 614739abc..1ff446d12 100644
  static u64 LastFPSTime;
  static int lastFrameCount = 0;
  static float fps = -1;
-@@ -1422,6 +1473,25 @@ static std::string getFPSNotification()
+@@ -1422,6 +1483,25 @@ static std::string getFPSNotification()
  			LastFPSTime = now;
  			lastFrameCount = MainFrameCount;
  		}
 +#ifdef __ORBIS__
-+		// DeCast-S4: the emulation speed next to the frame rate (100% = the console's own speed)
++		// Resonance: the emulation speed next to the frame rate (100% = the console's own speed)
 +		static u64 lastVblanks;
 +		static float speed = -1;
 +		static u64 lastSpeedTime;
@@ -1390,12 +1410,12 @@ index 614739abc..1ff446d12 100644
  		if (fps >= 0.f && fps < 9999.f) {
  			char text[32];
  			snprintf(text, sizeof(text), "F:%4.1f%s", fps, settings.input.fastForwardMode ? " >>" : "");
-@@ -1669,6 +1739,25 @@ void gui_runOnUiThread(std::function<void()> function) {
+@@ -1669,6 +1749,25 @@ void gui_runOnUiThread(std::function<void()> function) {
  	uiThreadRunner.runOnThread(function);
  }
  
 +#ifdef __ORBIS__
-+// DeCast-S4 diagnostics (shell/ps4/ps4_main.cpp, screens.txt): the emulated picture as a PNG,
++// Resonance diagnostics (shell/ps4/ps4_main.cpp, screens.txt): the emulated picture as a PNG,
 +// without the "Screenshot saved" notification
 +void gui_saveFrameQuiet(const std::string& name)
 +{
@@ -1416,8 +1436,102 @@ index 614739abc..1ff446d12 100644
  void gui_takeScreenshot()
  {
  	if (!game_started)
+@@ -1705,3 +1804,93 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
+ 	return false;
+ }
+ #endif
++
++#ifdef __ORBIS__
++// Resonance's settings screen and quick menu (shell/ps4/launcher)
++bool gui_ps4_game_running() {
++	return game_started;
++}
++
++std::string gui_ps4_game_title() {
++	return settings.content.title;
++}
++
++void gui_ps4_resume()
++{
++	GamepadDevice::load_system_mappings();
++	gui_setState(GuiState::Closed);
++}
++
++void gui_ps4_save_state()
++{
++	if (!dc_savestateAllowed())
++		return;
++	gui_setState(GuiState::Closed);
++	savestate();
++}
++
++void gui_ps4_load_state()
++{
++	if (!dc_savestateAllowed() || settings.raHardcoreMode)
++		return;
++	gui_setState(GuiState::Closed);
++	dc_loadstate(config::SavestateSlot);
++}
++
++long long gui_ps4_state_date(int slot) {
++	return dc_savestateAllowed() ? (long long)dc_getStateCreationDate(slot) : 0;
++}
++
++void *gui_ps4_state_picture(bool reload)
++{
++	static ImguiStateTexture picture;
++	if (reload)
++		picture.invalidate();
++	return (void *)(uintptr_t)picture.getId();
++}
++
++bool gui_ps4_disc_open() {
++	return gdr::isOpen();
++}
++
++void gui_ps4_swap_disc()
++{
++	if (gdr::isOpen())
++		gui_setState(GuiState::SelectDisk);
++	else
++	{
++		emu.openGdrom();
++		gui_setState(GuiState::Closed);
++	}
++}
++
++void gui_ps4_quit_game() {
++	gui_stop_game();
++}
++
++void gui_ps4_open_quick_menu() {
++	gui_open_settings();
++}
++
++void gui_ps4_apply_settings(const bool mapleChanged[4], const bool expansionChanged[4][2])
++{
++	if (game_started && settings.platform.isConsole())
++		for (int bus = 0; bus < 4; bus++)
++		{
++			if (mapleChanged[bus])
++				maple_ReconnectDevice(bus, 5);
++			else
++				for (int slot = 0; slot < 2; slot++)
++					if (expansionChanged[bus][slot])
++					{
++						maple_ReconnectDevice(bus, slot);
++						reset_vmus();
++					}
++		}
++	SaveSettings();
++}
++
++void gui_ps4_settings_done() {
++	gui_setState(game_started ? GuiState::Commands : GuiState::Main);
++}
++#endif
 diff --git a/core/ui/gui_font.cpp b/core/ui/gui_font.cpp
-index 3e3f1b215..37a4f8cac 100644
+index 3e3f1b215..cfe55168a 100644
 --- a/core/ui/gui_font.cpp
 +++ b/core/ui/gui_font.cpp
 @@ -427,6 +427,16 @@ void gui_loadFonts()
@@ -1425,7 +1539,7 @@ index 3e3f1b215..37a4f8cac 100644
  	}, .size=fontSize * 1.05f });
  	
 +#elif defined(__ORBIS__)
-+	// DeCast-S4: Noto Sans cut to the characters the translations use (scripts/make-lang.py)
++	// Resonance: Noto Sans cut to the characters the translations use (scripts/make-lang.py)
 +	{
 +		const std::string dir = "/app0/launcher/fonts/";
 +		registerFont({&fonts, &boldFonts}, { .lang="ja", .paths={ dir + "NotoSansJP-Medium.ttf" }, .size=fontSize * 1.05f });
@@ -1452,7 +1566,7 @@ index b79559cb1..d9bc9a46d 100644
  #endif
  	}
 diff --git a/core/ui/settings_general.cpp b/core/ui/settings_general.cpp
-index 8f3b8733e..8cbe851c0 100644
+index 8f3b8733e..b98e14d43 100644
 --- a/core/ui/settings_general.cpp
 +++ b/core/ui/settings_general.cpp
 @@ -180,6 +180,14 @@ void addContentPath(bool start)
@@ -1475,7 +1589,7 @@ index 8f3b8733e..8cbe851c0 100644
  	UILanguages[] = {
  		{ T("System Default"), "" },
 +#ifdef __ORBIS__
-+		// DeCast-S4: the languages the PS4 menus have (shell/ps4/launcher), each in its own script
++		// Resonance: the languages the PS4 menus have (shell/ps4/launcher), each in its own script
 +		{ "English", "en" },
 +		{ "Español", "es" },
 +		{ "Français", "fr" },
@@ -1503,10 +1617,10 @@ index 8f3b8733e..8cbe851c0 100644
  	// Determine the preview text
 diff --git a/resources/i18n/ar.po b/resources/i18n/ar.po
 new file mode 100644
-index 000000000..327520300
+index 000000000..f63070053
 --- /dev/null
 +++ b/resources/i18n/ar.po
-@@ -0,0 +1,2199 @@
+@@ -0,0 +1,2268 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -1515,7 +1629,7 @@ index 000000000..327520300
 +"Content-Transfer-Encoding: 8bit\n"
 +"Language: ar\n"
 +"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5\n"
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/ar.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/ar.txt)\n"
 +
 +msgid "User %s authenticated"
 +msgstr "تم التحقق من المستخدم %s"
@@ -3668,14 +3782,14 @@ index 000000000..327520300
 +msgid "Your library is empty"
 +msgstr "مكتبتك فارغة"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "انسخ ألعاب GDI أو CHD أو CDI إلى /data/DeCast-S4/games لتظهر هنا."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "انسخ ألعاب GDI أو CHD أو CDI إلى /data/Resonance/games لتظهر هنا."
 +
 +msgid "No games yet"
 +msgstr "لا توجد ألعاب بعد"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "انسخ الألعاب إلى /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "انسخ الألعاب إلى /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "مباشر"
@@ -3701,16 +3815,85 @@ index 000000000..327520300
 +msgid "Covers"
 +msgstr "الأغلفة"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "أغلفتك: ضعها في /data/DeCast-S4/covers باسم ملف اللعبة أو رقمها التسلسلي بصيغة png"
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "أغلفتك: ضعها في /data/Resonance/covers باسم ملف اللعبة أو رقمها التسلسلي بصيغة png"
 +
 +msgid "Press X to change the menu language"
 +msgstr "اضغط X لتغيير لغة القائمة"
++
++msgid "Video Settings"
++msgstr "إعدادات الفيديو"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "الدقة والشاشة العريضة والترشيح ومعدل الإطارات"
++
++msgid "Audio Settings"
++msgstr "إعدادات الصوت"
++
++msgid "Volume, sound processor"
++msgstr "مستوى الصوت ومعالج الصوت"
++
++msgid "Controller Settings"
++msgstr "إعدادات أذرع التحكم"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "الأجهزة في منافذ Dreamcast"
++
++msgid "System Settings"
++msgstr "إعدادات النظام"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "المنطقة واللغة و BIOS والمعالج"
++
++msgid "Home Screen Settings"
++msgstr "إعدادات الشاشة الرئيسية"
++
++msgid "Theme, language, covers, opening"
++msgstr "السمة واللغة والأغلفة والافتتاحية"
++
++msgid "On"
++msgstr "تشغيل"
++
++msgid "Off"
++msgstr "إيقاف"
++
++msgid "Automatic Frame Skipping"
++msgstr "تخطي الإطارات تلقائيا"
++
++msgid "Texture Filtering"
++msgstr "ترشيح الخامات"
++
++msgid "Load State at Start"
++msgstr "تحميل الحالة عند البدء"
++
++msgid "Save State on Exit"
++msgstr "حفظ الحالة عند الخروج"
++
++msgid "Home Screen Theme"
++msgstr "سمة الشاشة الرئيسية"
++
++msgid "Menu Language"
++msgstr "لغة القائمة"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "أغلفة من خادم الصور المصغرة libretro حسب الرقم التسلسلي للقرص"
++
++msgid "Opening Animation"
++msgstr "الرسوم الافتتاحية"
++
++msgid "Plays when the app starts"
++msgstr "تعمل عند تشغيل التطبيق"
++
++msgid "Change"
++msgstr "تغيير"
++
++msgid "PAUSED"
++msgstr "متوقف مؤقتا"
 diff --git a/resources/i18n/de.po b/resources/i18n/de.po
-index fb8203ba2..c03851aed 100644
+index fb8203ba2..d9343727d 100644
 --- a/resources/i18n/de.po
 +++ b/resources/i18n/de.po
-@@ -1,2963 +1,2195 @@
+@@ -1,2963 +1,2264 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -3733,7 +3916,7 @@ index fb8203ba2..c03851aed 100644
 -
 -#: core/achievements/achievements.cpp:379
 -#, c-format
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/de.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/de.txt)\n"
 +
  msgid "User %s authenticated"
 -msgstr ""
@@ -7414,14 +7597,14 @@ index fb8203ba2..c03851aed 100644
 +msgid "Your library is empty"
 +msgstr "Deine Bibliothek ist leer"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "Kopiere GDI-, CHD- oder CDI-Spiele nach /data/DeCast-S4/games, dann erscheinen sie hier."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "Kopiere GDI-, CHD- oder CDI-Spiele nach /data/Resonance/games, dann erscheinen sie hier."
 +
 +msgid "No games yet"
 +msgstr "Noch keine Spiele"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Spiele nach /data/DeCast-S4/games kopieren"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Spiele nach /data/Resonance/games kopieren"
 +
 +msgid "LIVE"
 +msgstr "LIVE"
@@ -7447,16 +7630,85 @@ index fb8203ba2..c03851aed 100644
 +msgid "Covers"
 +msgstr "Cover"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "Eigene: /data/DeCast-S4/covers/<Spieldatei oder Seriennummer>.png"
- 
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "Eigene: /data/Resonance/covers/<Spieldatei oder Seriennummer>.png"
++
 +msgid "Press X to change the menu language"
 +msgstr "Drücke X, um die Menüsprache zu ändern"
++
++msgid "Video Settings"
++msgstr "Videoeinstellungen"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Auflösung, Breitbild, Filterung, Bildrate"
++
++msgid "Audio Settings"
++msgstr "Audioeinstellungen"
++
++msgid "Volume, sound processor"
++msgstr "Lautstärke, Soundprozessor"
++
++msgid "Controller Settings"
++msgstr "Controller-Einstellungen"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Geräte an den Ports der Dreamcast"
++
++msgid "System Settings"
++msgstr "Systemeinstellungen"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Region, Sprache, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Startbildschirm-Einstellungen"
++
++msgid "Theme, language, covers, opening"
++msgstr "Design, Sprache, Cover, Intro"
++
++msgid "On"
++msgstr "An"
++
++msgid "Off"
++msgstr "Aus"
++
++msgid "Automatic Frame Skipping"
++msgstr "Automatisches Frameskipping"
++
++msgid "Texture Filtering"
++msgstr "Texturfilterung"
++
++msgid "Load State at Start"
++msgstr "Spielstand beim Start laden"
++
++msgid "Save State on Exit"
++msgstr "Spielstand beim Beenden speichern"
++
++msgid "Home Screen Theme"
++msgstr "Design des Startbildschirms"
++
++msgid "Menu Language"
++msgstr "Menüsprache"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Coverbilder vom libretro-Thumbnail-Server, nach Disc-Seriennummer"
++
++msgid "Opening Animation"
++msgstr "Intro-Animation"
++
++msgid "Plays when the app starts"
++msgstr "Läuft beim Start der App"
++
++msgid "Change"
++msgstr "Ändern"
+ 
++msgid "PAUSED"
++msgstr "PAUSIERT"
 diff --git a/resources/i18n/es.po b/resources/i18n/es.po
-index 2735f014b..183ed9ef6 100644
+index 2735f014b..adf730d89 100644
 --- a/resources/i18n/es.po
 +++ b/resources/i18n/es.po
-@@ -1,2964 +1,2195 @@
+@@ -1,2964 +1,2264 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -7479,7 +7731,7 @@ index 2735f014b..183ed9ef6 100644
 -
 -#: core/achievements/achievements.cpp:379
 -#, c-format
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/es.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/es.txt)\n"
 +
  msgid "User %s authenticated"
  msgstr "Usuario %s autenticado"
@@ -11155,14 +11407,14 @@ index 2735f014b..183ed9ef6 100644
 +msgid "Your library is empty"
 +msgstr "Tu biblioteca está vacía"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "Copia juegos GDI, CHD o CDI en /data/DeCast-S4/games y aparecerán aquí."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "Copia juegos GDI, CHD o CDI en /data/Resonance/games y aparecerán aquí."
 +
 +msgid "No games yet"
 +msgstr "Aún no hay juegos"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Copia juegos en /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Copia juegos en /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "EN DIRECTO"
@@ -11188,16 +11440,85 @@ index 2735f014b..183ed9ef6 100644
 +msgid "Covers"
 +msgstr "Carátulas"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "Las tuyas: /data/DeCast-S4/covers/<archivo del juego o número de serie>.png"
- 
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "Las tuyas: /data/Resonance/covers/<archivo del juego o número de serie>.png"
++
 +msgid "Press X to change the menu language"
 +msgstr "Pulsa X para cambiar el idioma del menú"
++
++msgid "Video Settings"
++msgstr "Ajustes de vídeo"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Resolución, panorámica, filtrado, fotogramas"
++
++msgid "Audio Settings"
++msgstr "Ajustes de audio"
++
++msgid "Volume, sound processor"
++msgstr "Volumen, procesador de sonido"
++
++msgid "Controller Settings"
++msgstr "Ajustes de mandos"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Dispositivos en los puertos de Dreamcast"
++
++msgid "System Settings"
++msgstr "Ajustes del sistema"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Región, idioma, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Ajustes de la pantalla de inicio"
++
++msgid "Theme, language, covers, opening"
++msgstr "Tema, idioma, carátulas, introducción"
++
++msgid "On"
++msgstr "Sí"
++
++msgid "Off"
++msgstr "No"
++
++msgid "Automatic Frame Skipping"
++msgstr "Salto automático de fotogramas"
++
++msgid "Texture Filtering"
++msgstr "Filtrado de texturas"
++
++msgid "Load State at Start"
++msgstr "Cargar estado al iniciar"
++
++msgid "Save State on Exit"
++msgstr "Guardar estado al salir"
++
++msgid "Home Screen Theme"
++msgstr "Tema de la pantalla de inicio"
++
++msgid "Menu Language"
++msgstr "Idioma del menú"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Carátulas del servidor de miniaturas de libretro, por número de serie del disco"
++
++msgid "Opening Animation"
++msgstr "Animación de inicio"
++
++msgid "Plays when the app starts"
++msgstr "Se reproduce al abrir la aplicación"
++
++msgid "Change"
++msgstr "Cambiar"
+ 
++msgid "PAUSED"
++msgstr "EN PAUSA"
 diff --git a/resources/i18n/fr.po b/resources/i18n/fr.po
-index f3754825e..da20aa853 100644
+index f3754825e..49088c813 100644
 --- a/resources/i18n/fr.po
 +++ b/resources/i18n/fr.po
-@@ -1,2967 +1,2195 @@
+@@ -1,2967 +1,2264 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -11220,7 +11541,7 @@ index f3754825e..da20aa853 100644
 -
 -#: core/achievements/achievements.cpp:379
 -#, c-format
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/fr.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/fr.txt)\n"
 +
  msgid "User %s authenticated"
  msgstr "Utilisateur %s authentifié"
@@ -14203,14 +14524,14 @@ index f3754825e..da20aa853 100644
 +msgid "Your library is empty"
 +msgstr "Ta bibliothèque est vide"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "Copie des jeux GDI, CHD ou CDI dans /data/DeCast-S4/games et ils apparaîtront ici."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "Copie des jeux GDI, CHD ou CDI dans /data/Resonance/games et ils apparaîtront ici."
 +
 +msgid "No games yet"
 +msgstr "Pas encore de jeux"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Copie des jeux dans /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Copie des jeux dans /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "EN DIRECT"
@@ -14236,16 +14557,85 @@ index f3754825e..da20aa853 100644
 +msgid "Covers"
 +msgstr "Jaquettes"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "Les tiennes : /data/DeCast-S4/covers/<fichier du jeu ou numéro de série>.png"
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "Les tiennes : /data/Resonance/covers/<fichier du jeu ou numéro de série>.png"
 +
 +msgid "Press X to change the menu language"
 +msgstr "Appuie sur X pour changer la langue du menu"
++
++msgid "Video Settings"
++msgstr "Paramètres vidéo"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Résolution, écran large, filtrage, fréquence"
++
++msgid "Audio Settings"
++msgstr "Paramètres audio"
++
++msgid "Volume, sound processor"
++msgstr "Volume, processeur sonore"
++
++msgid "Controller Settings"
++msgstr "Paramètres des manettes"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Périphériques dans les ports de la Dreamcast"
++
++msgid "System Settings"
++msgstr "Paramètres système"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Région, langue, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Paramètres de l'écran d'accueil"
++
++msgid "Theme, language, covers, opening"
++msgstr "Thème, langue, jaquettes, introduction"
++
++msgid "On"
++msgstr "Activé"
++
++msgid "Off"
++msgstr "Désactivé"
++
++msgid "Automatic Frame Skipping"
++msgstr "Saut d'images automatique"
++
++msgid "Texture Filtering"
++msgstr "Filtrage des textures"
++
++msgid "Load State at Start"
++msgstr "Charger l'état au démarrage"
++
++msgid "Save State on Exit"
++msgstr "Sauvegarder l'état en quittant"
++
++msgid "Home Screen Theme"
++msgstr "Thème de l'écran d'accueil"
++
++msgid "Menu Language"
++msgstr "Langue du menu"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Jaquettes du serveur de miniatures libretro, selon le numéro de série du disque"
++
++msgid "Opening Animation"
++msgstr "Animation d'ouverture"
++
++msgid "Plays when the app starts"
++msgstr "Joue au lancement de l'application"
++
++msgid "Change"
++msgstr "Changer"
++
++msgid "PAUSED"
++msgstr "EN PAUSE"
 diff --git a/resources/i18n/it.po b/resources/i18n/it.po
-index ee92eb28e..88b01cf77 100644
+index ee92eb28e..876746983 100644
 --- a/resources/i18n/it.po
 +++ b/resources/i18n/it.po
-@@ -1,2963 +1,2195 @@
+@@ -1,2963 +1,2264 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -14268,7 +14658,7 @@ index ee92eb28e..88b01cf77 100644
 -
 -#: core/achievements/achievements.cpp:379
 -#, c-format
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/it.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/it.txt)\n"
 +
  msgid "User %s authenticated"
 -msgstr ""
@@ -17949,14 +18339,14 @@ index ee92eb28e..88b01cf77 100644
 +msgid "Your library is empty"
 +msgstr "La tua libreria è vuota"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "Copia i giochi GDI, CHD o CDI in /data/DeCast-S4/games e appariranno qui."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "Copia i giochi GDI, CHD o CDI in /data/Resonance/games e appariranno qui."
 +
 +msgid "No games yet"
 +msgstr "Ancora nessun gioco"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Copia i giochi in /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Copia i giochi in /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "IN DIRETTA"
@@ -17982,16 +18372,85 @@ index ee92eb28e..88b01cf77 100644
 +msgid "Covers"
 +msgstr "Copertine"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "Le tue: /data/DeCast-S4/covers/<file del gioco o seriale>.png"
- 
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "Le tue: /data/Resonance/covers/<file del gioco o seriale>.png"
++
 +msgid "Press X to change the menu language"
 +msgstr "Premi X per cambiare la lingua del menu"
++
++msgid "Video Settings"
++msgstr "Impostazioni video"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Risoluzione, panoramico, filtri, fotogrammi"
++
++msgid "Audio Settings"
++msgstr "Impostazioni audio"
++
++msgid "Volume, sound processor"
++msgstr "Volume, processore audio"
++
++msgid "Controller Settings"
++msgstr "Impostazioni controller"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Dispositivi nelle porte del Dreamcast"
++
++msgid "System Settings"
++msgstr "Impostazioni di sistema"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Regione, lingua, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Impostazioni della schermata iniziale"
++
++msgid "Theme, language, covers, opening"
++msgstr "Tema, lingua, copertine, introduzione"
++
++msgid "On"
++msgstr "Sì"
++
++msgid "Off"
++msgstr "No"
++
++msgid "Automatic Frame Skipping"
++msgstr "Salto fotogrammi automatico"
++
++msgid "Texture Filtering"
++msgstr "Filtro delle texture"
++
++msgid "Load State at Start"
++msgstr "Carica stato all'avvio"
++
++msgid "Save State on Exit"
++msgstr "Salva stato all'uscita"
++
++msgid "Home Screen Theme"
++msgstr "Tema della schermata iniziale"
++
++msgid "Menu Language"
++msgstr "Lingua del menu"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Copertine dal server di miniature libretro, in base al seriale del disco"
++
++msgid "Opening Animation"
++msgstr "Animazione iniziale"
++
++msgid "Plays when the app starts"
++msgstr "Parte all'avvio dell'app"
++
++msgid "Change"
++msgstr "Cambia"
+ 
++msgid "PAUSED"
++msgstr "IN PAUSA"
 diff --git a/resources/i18n/ja.po b/resources/i18n/ja.po
-index a79c6a14b..a3bafc1ea 100644
+index a79c6a14b..0d25f1615 100644
 --- a/resources/i18n/ja.po
 +++ b/resources/i18n/ja.po
-@@ -1,2966 +1,2194 @@
+@@ -1,2966 +1,2263 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -18014,7 +18473,7 @@ index a79c6a14b..a3bafc1ea 100644
 -
 -#: core/achievements/achievements.cpp:379
 -#, c-format
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/ja.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/ja.txt)\n"
 +
  msgid "User %s authenticated"
  msgstr "ユーザー %s が認証されました"
@@ -20996,14 +21455,14 @@ index a79c6a14b..a3bafc1ea 100644
 +msgid "Your library is empty"
 +msgstr "ライブラリは空です"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "GDI、CHD、CDI のゲームを /data/DeCast-S4/games にコピーすると、ここに表示されます。"
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "GDI、CHD、CDI のゲームを /data/Resonance/games にコピーすると、ここに表示されます。"
 +
 +msgid "No games yet"
 +msgstr "まだゲームがありません"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "ゲームを /data/DeCast-S4/games にコピーしてください"
++msgid "Copy games to /data/Resonance/games"
++msgstr "ゲームを /data/Resonance/games にコピーしてください"
 +
 +msgid "LIVE"
 +msgstr "LIVE"
@@ -21029,16 +21488,85 @@ index a79c6a14b..a3bafc1ea 100644
 +msgid "Covers"
 +msgstr "カバー"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "自分のカバー：/data/DeCast-S4/covers/<ゲームのファイル名またはシリアル>.png"
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "自分のカバー：/data/Resonance/covers/<ゲームのファイル名またはシリアル>.png"
 +
 +msgid "Press X to change the menu language"
 +msgstr "X でメニューの言語を切り替えます"
++
++msgid "Video Settings"
++msgstr "ビデオ設定"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "解像度、ワイド画面、フィルター、フレームレート"
++
++msgid "Audio Settings"
++msgstr "オーディオ設定"
++
++msgid "Volume, sound processor"
++msgstr "音量、サウンドプロセッサー"
++
++msgid "Controller Settings"
++msgstr "コントローラー設定"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "ドリームキャストのポートの機器"
++
++msgid "System Settings"
++msgstr "システム設定"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "地域、言語、BIOS、CPU"
++
++msgid "Home Screen Settings"
++msgstr "ホーム画面の設定"
++
++msgid "Theme, language, covers, opening"
++msgstr "テーマ、言語、カバー、オープニング"
++
++msgid "On"
++msgstr "オン"
++
++msgid "Off"
++msgstr "オフ"
++
++msgid "Automatic Frame Skipping"
++msgstr "自動フレームスキップ"
++
++msgid "Texture Filtering"
++msgstr "テクスチャフィルター"
++
++msgid "Load State at Start"
++msgstr "起動時にステートをロード"
++
++msgid "Save State on Exit"
++msgstr "終了時にステートをセーブ"
++
++msgid "Home Screen Theme"
++msgstr "ホーム画面のテーマ"
++
++msgid "Menu Language"
++msgstr "メニューの言語"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "libretro のサムネイルサーバーからディスクのシリアルでカバーを取得"
++
++msgid "Opening Animation"
++msgstr "オープニングアニメーション"
++
++msgid "Plays when the app starts"
++msgstr "アプリの起動時に再生"
++
++msgid "Change"
++msgstr "変更"
++
++msgid "PAUSED"
++msgstr "一時停止中"
 diff --git a/resources/i18n/ko.po b/resources/i18n/ko.po
-index a5e70db54..690a24479 100644
+index a5e70db54..713dcad6d 100644
 --- a/resources/i18n/ko.po
 +++ b/resources/i18n/ko.po
-@@ -1,2962 +1,2194 @@
+@@ -1,2962 +1,2263 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -21061,7 +21589,7 @@ index a5e70db54..690a24479 100644
 -
 -#: core/achievements/achievements.cpp:379
 -#, c-format
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/ko.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/ko.txt)\n"
 +
  msgid "User %s authenticated"
 -msgstr ""
@@ -24740,14 +25268,14 @@ index a5e70db54..690a24479 100644
 +msgid "Your library is empty"
 +msgstr "라이브러리가 비어 있습니다"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "GDI, CHD, CDI 게임을 /data/DeCast-S4/games에 복사하면 여기에 나타납니다."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "GDI, CHD, CDI 게임을 /data/Resonance/games에 복사하면 여기에 나타납니다."
 +
 +msgid "No games yet"
 +msgstr "아직 게임이 없습니다"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "게임을 /data/DeCast-S4/games에 복사하세요"
++msgid "Copy games to /data/Resonance/games"
++msgstr "게임을 /data/Resonance/games에 복사하세요"
 +
 +msgid "LIVE"
 +msgstr "생방송"
@@ -24773,17 +25301,86 @@ index a5e70db54..690a24479 100644
 +msgid "Covers"
 +msgstr "커버"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "직접 넣기: /data/DeCast-S4/covers/<게임 파일 또는 시리얼>.png"
- 
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "직접 넣기: /data/Resonance/covers/<게임 파일 또는 시리얼>.png"
++
 +msgid "Press X to change the menu language"
 +msgstr "X를 눌러 메뉴 언어를 바꿉니다"
++
++msgid "Video Settings"
++msgstr "비디오 설정"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "해상도, 와이드스크린, 필터링, 프레임 속도"
++
++msgid "Audio Settings"
++msgstr "오디오 설정"
++
++msgid "Volume, sound processor"
++msgstr "음량, 사운드 프로세서"
++
++msgid "Controller Settings"
++msgstr "컨트롤러 설정"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "드림캐스트 포트의 장치"
++
++msgid "System Settings"
++msgstr "시스템 설정"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "지역, 언어, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "홈 화면 설정"
++
++msgid "Theme, language, covers, opening"
++msgstr "테마, 언어, 커버, 오프닝"
++
++msgid "On"
++msgstr "켬"
++
++msgid "Off"
++msgstr "끔"
++
++msgid "Automatic Frame Skipping"
++msgstr "자동 프레임 건너뛰기"
++
++msgid "Texture Filtering"
++msgstr "텍스처 필터링"
++
++msgid "Load State at Start"
++msgstr "시작할 때 상태 불러오기"
++
++msgid "Save State on Exit"
++msgstr "끝낼 때 상태 저장"
++
++msgid "Home Screen Theme"
++msgstr "홈 화면 테마"
++
++msgid "Menu Language"
++msgstr "메뉴 언어"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "디스크 시리얼로 libretro 썸네일 서버에서 커버 가져오기"
++
++msgid "Opening Animation"
++msgstr "오프닝 애니메이션"
++
++msgid "Plays when the app starts"
++msgstr "앱을 시작할 때 재생"
++
++msgid "Change"
++msgstr "변경"
+ 
++msgid "PAUSED"
++msgstr "일시 정지"
 diff --git a/resources/i18n/nl.po b/resources/i18n/nl.po
 new file mode 100644
-index 000000000..dd6f43101
+index 000000000..e03ae2dd3
 --- /dev/null
 +++ b/resources/i18n/nl.po
-@@ -0,0 +1,2195 @@
+@@ -0,0 +1,2264 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -24792,7 +25389,7 @@ index 000000000..dd6f43101
 +"Content-Transfer-Encoding: 8bit\n"
 +"Language: nl_NL\n"
 +"Plural-Forms: nplurals=2; plural=(n != 1);\n"
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/nl.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/nl.txt)\n"
 +
 +msgid "User %s authenticated"
 +msgstr "Gebruiker %s aangemeld"
@@ -26941,14 +27538,14 @@ index 000000000..dd6f43101
 +msgid "Your library is empty"
 +msgstr "Je bibliotheek is leeg"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "Kopieer GDI-, CHD- of CDI-games naar /data/DeCast-S4/games, dan verschijnen ze hier."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "Kopieer GDI-, CHD- of CDI-games naar /data/Resonance/games, dan verschijnen ze hier."
 +
 +msgid "No games yet"
 +msgstr "Nog geen games"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Kopieer games naar /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Kopieer games naar /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "LIVE"
@@ -26974,16 +27571,85 @@ index 000000000..dd6f43101
 +msgid "Covers"
 +msgstr "Hoesjes"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "Je eigen: /data/DeCast-S4/covers/<gamebestand of serienummer>.png"
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "Je eigen: /data/Resonance/covers/<gamebestand of serienummer>.png"
 +
 +msgid "Press X to change the menu language"
 +msgstr "Druk op X om de menutaal te wijzigen"
++
++msgid "Video Settings"
++msgstr "Video-instellingen"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Resolutie, breedbeeld, filtering, framerate"
++
++msgid "Audio Settings"
++msgstr "Audio-instellingen"
++
++msgid "Volume, sound processor"
++msgstr "Volume, geluidsprocessor"
++
++msgid "Controller Settings"
++msgstr "Controller-instellingen"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Apparaten in de poorten van de Dreamcast"
++
++msgid "System Settings"
++msgstr "Systeeminstellingen"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Regio, taal, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Instellingen startscherm"
++
++msgid "Theme, language, covers, opening"
++msgstr "Thema, taal, hoesjes, intro"
++
++msgid "On"
++msgstr "Aan"
++
++msgid "Off"
++msgstr "Uit"
++
++msgid "Automatic Frame Skipping"
++msgstr "Automatisch frames overslaan"
++
++msgid "Texture Filtering"
++msgstr "Texturefiltering"
++
++msgid "Load State at Start"
++msgstr "State laden bij starten"
++
++msgid "Save State on Exit"
++msgstr "State opslaan bij afsluiten"
++
++msgid "Home Screen Theme"
++msgstr "Thema van het startscherm"
++
++msgid "Menu Language"
++msgstr "Menutaal"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Hoesjes van de libretro-thumbnailserver, op serienummer van de schijf"
++
++msgid "Opening Animation"
++msgstr "Openingsanimatie"
++
++msgid "Plays when the app starts"
++msgstr "Speelt bij het starten van de app"
++
++msgid "Change"
++msgstr "Wijzigen"
++
++msgid "PAUSED"
++msgstr "GEPAUZEERD"
 diff --git a/resources/i18n/pl.po b/resources/i18n/pl.po
-index 548cbb44d..d4bd4b138 100644
+index 548cbb44d..16465370c 100644
 --- a/resources/i18n/pl.po
 +++ b/resources/i18n/pl.po
-@@ -1,2965 +1,2196 @@
+@@ -1,2965 +1,2265 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -27007,7 +27673,7 @@ index 548cbb44d..d4bd4b138 100644
 -#, c-format
 +"Language: pl_PL\n"
 +"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/pl.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/pl.txt)\n"
 +
  msgid "User %s authenticated"
 -msgstr ""
@@ -30691,14 +31357,14 @@ index 548cbb44d..d4bd4b138 100644
 +msgid "Your library is empty"
 +msgstr "Twoja biblioteka jest pusta"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "Skopiuj gry GDI, CHD lub CDI do /data/DeCast-S4/games, a pojawią się tutaj."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "Skopiuj gry GDI, CHD lub CDI do /data/Resonance/games, a pojawią się tutaj."
 +
 +msgid "No games yet"
 +msgstr "Nie ma jeszcze gier"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Skopiuj gry do /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Skopiuj gry do /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "NA ŻYWO"
@@ -30724,16 +31390,85 @@ index 548cbb44d..d4bd4b138 100644
 +msgid "Covers"
 +msgstr "Okładki"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "Własne: /data/DeCast-S4/covers/<plik gry lub numer seryjny>.png"
- 
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "Własne: /data/Resonance/covers/<plik gry lub numer seryjny>.png"
++
 +msgid "Press X to change the menu language"
 +msgstr "Naciśnij X, aby zmienić język menu"
++
++msgid "Video Settings"
++msgstr "Ustawienia obrazu"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Rozdzielczość, panorama, filtrowanie, klatki"
++
++msgid "Audio Settings"
++msgstr "Ustawienia dźwięku"
++
++msgid "Volume, sound processor"
++msgstr "Głośność, procesor dźwięku"
++
++msgid "Controller Settings"
++msgstr "Ustawienia kontrolerów"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Urządzenia w portach Dreamcasta"
++
++msgid "System Settings"
++msgstr "Ustawienia systemu"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Region, język, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Ustawienia ekranu głównego"
++
++msgid "Theme, language, covers, opening"
++msgstr "Motyw, język, okładki, intro"
++
++msgid "On"
++msgstr "Wł."
++
++msgid "Off"
++msgstr "Wył."
++
++msgid "Automatic Frame Skipping"
++msgstr "Automatyczne pomijanie klatek"
++
++msgid "Texture Filtering"
++msgstr "Filtrowanie tekstur"
++
++msgid "Load State at Start"
++msgstr "Wczytaj stan przy starcie"
++
++msgid "Save State on Exit"
++msgstr "Zapisz stan przy wyjściu"
++
++msgid "Home Screen Theme"
++msgstr "Motyw ekranu głównego"
++
++msgid "Menu Language"
++msgstr "Język menu"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Okładki z serwera miniatur libretro, według numeru seryjnego płyty"
++
++msgid "Opening Animation"
++msgstr "Animacja otwarcia"
++
++msgid "Plays when the app starts"
++msgstr "Odtwarzana przy starcie aplikacji"
++
++msgid "Change"
++msgstr "Zmień"
+ 
++msgid "PAUSED"
++msgstr "WSTRZYMANO"
 diff --git a/resources/i18n/pt_BR.po b/resources/i18n/pt_BR.po
-index 6ec100a1e..f9b34d510 100644
+index 6ec100a1e..3b1544937 100644
 --- a/resources/i18n/pt_BR.po
 +++ b/resources/i18n/pt_BR.po
-@@ -1,2966 +1,2195 @@
+@@ -1,2966 +1,2264 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -30757,7 +31492,7 @@ index 6ec100a1e..f9b34d510 100644
 -#, c-format
 +"Language: pt_BR\n"
 +"Plural-Forms: nplurals=2; plural=(n > 1);\n"
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/pt.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/pt.txt)\n"
 +
  msgid "User %s authenticated"
  msgstr "Usuário %s autenticado"
@@ -33753,14 +34488,14 @@ index 6ec100a1e..f9b34d510 100644
 +msgid "Your library is empty"
 +msgstr "Sua biblioteca está vazia"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "Copie jogos GDI, CHD ou CDI para /data/DeCast-S4/games e eles aparecerão aqui."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "Copie jogos GDI, CHD ou CDI para /data/Resonance/games e eles aparecerão aqui."
 +
 +msgid "No games yet"
 +msgstr "Ainda não há jogos"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Copie jogos para /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Copie jogos para /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "AO VIVO"
@@ -33786,17 +34521,86 @@ index 6ec100a1e..f9b34d510 100644
 +msgid "Covers"
 +msgstr "Capas"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "As suas: /data/DeCast-S4/covers/<arquivo do jogo ou número de série>.png"
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "As suas: /data/Resonance/covers/<arquivo do jogo ou número de série>.png"
 +
 +msgid "Press X to change the menu language"
 +msgstr "Pressione X para mudar o idioma do menu"
++
++msgid "Video Settings"
++msgstr "Configurações de vídeo"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Resolução, widescreen, filtragem, quadros"
++
++msgid "Audio Settings"
++msgstr "Configurações de áudio"
++
++msgid "Volume, sound processor"
++msgstr "Volume, processador de som"
++
++msgid "Controller Settings"
++msgstr "Configurações de controles"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Dispositivos nas portas do Dreamcast"
++
++msgid "System Settings"
++msgstr "Configurações do sistema"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Região, idioma, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Configurações da tela inicial"
++
++msgid "Theme, language, covers, opening"
++msgstr "Tema, idioma, capas, abertura"
++
++msgid "On"
++msgstr "Ligado"
++
++msgid "Off"
++msgstr "Desligado"
++
++msgid "Automatic Frame Skipping"
++msgstr "Pulo automático de quadros"
++
++msgid "Texture Filtering"
++msgstr "Filtragem de texturas"
++
++msgid "Load State at Start"
++msgstr "Carregar estado ao iniciar"
++
++msgid "Save State on Exit"
++msgstr "Salvar estado ao sair"
++
++msgid "Home Screen Theme"
++msgstr "Tema da tela inicial"
++
++msgid "Menu Language"
++msgstr "Idioma do menu"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Capas do servidor de miniaturas da libretro, pelo número de série do disco"
++
++msgid "Opening Animation"
++msgstr "Animação de abertura"
++
++msgid "Plays when the app starts"
++msgstr "Toca ao abrir o app"
++
++msgid "Change"
++msgstr "Alterar"
++
++msgid "PAUSED"
++msgstr "PAUSADO"
 diff --git a/resources/i18n/ru.po b/resources/i18n/ru.po
 new file mode 100644
-index 000000000..13627cfc9
+index 000000000..5df28d878
 --- /dev/null
 +++ b/resources/i18n/ru.po
-@@ -0,0 +1,2196 @@
+@@ -0,0 +1,2265 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -33805,7 +34609,7 @@ index 000000000..13627cfc9
 +"Content-Transfer-Encoding: 8bit\n"
 +"Language: ru_RU\n"
 +"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/ru.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/ru.txt)\n"
 +
 +msgid "User %s authenticated"
 +msgstr "Пользователь %s вошёл в систему"
@@ -35955,14 +36759,14 @@ index 000000000..13627cfc9
 +msgid "Your library is empty"
 +msgstr "Ваша библиотека пуста"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "Скопируйте игры GDI, CHD или CDI в /data/DeCast-S4/games, и они появятся здесь."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "Скопируйте игры GDI, CHD или CDI в /data/Resonance/games, и они появятся здесь."
 +
 +msgid "No games yet"
 +msgstr "Игр пока нет"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Скопируйте игры в /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Скопируйте игры в /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "В ЭФИРЕ"
@@ -35988,16 +36792,85 @@ index 000000000..13627cfc9
 +msgid "Covers"
 +msgstr "Обложки"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "Свои: /data/DeCast-S4/covers/<файл игры или серийный номер>.png"
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "Свои: /data/Resonance/covers/<файл игры или серийный номер>.png"
 +
 +msgid "Press X to change the menu language"
 +msgstr "Нажмите X, чтобы сменить язык меню"
++
++msgid "Video Settings"
++msgstr "Настройки видео"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Разрешение, широкий экран, фильтрация, частота кадров"
++
++msgid "Audio Settings"
++msgstr "Настройки звука"
++
++msgid "Volume, sound processor"
++msgstr "Громкость, звуковой процессор"
++
++msgid "Controller Settings"
++msgstr "Настройки контроллеров"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Устройства в портах Dreamcast"
++
++msgid "System Settings"
++msgstr "Настройки системы"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Регион, язык, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Настройки главного экрана"
++
++msgid "Theme, language, covers, opening"
++msgstr "Тема, язык, обложки, заставка"
++
++msgid "On"
++msgstr "Вкл."
++
++msgid "Off"
++msgstr "Выкл."
++
++msgid "Automatic Frame Skipping"
++msgstr "Автоматический пропуск кадров"
++
++msgid "Texture Filtering"
++msgstr "Фильтрация текстур"
++
++msgid "Load State at Start"
++msgstr "Загружать состояние при запуске"
++
++msgid "Save State on Exit"
++msgstr "Сохранять состояние при выходе"
++
++msgid "Home Screen Theme"
++msgstr "Тема главного экрана"
++
++msgid "Menu Language"
++msgstr "Язык меню"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Обложки с сервера миниатюр libretro по серийному номеру диска"
++
++msgid "Opening Animation"
++msgstr "Заставка"
++
++msgid "Plays when the app starts"
++msgstr "Играет при запуске приложения"
++
++msgid "Change"
++msgstr "Изменить"
++
++msgid "PAUSED"
++msgstr "ПАУЗА"
 diff --git a/resources/i18n/tr.po b/resources/i18n/tr.po
-index 8c8d8bc08..77e7cab44 100644
+index 8c8d8bc08..af92cf7f1 100644
 --- a/resources/i18n/tr.po
 +++ b/resources/i18n/tr.po
-@@ -1,2965 +1,2195 @@
+@@ -1,2965 +1,2264 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -36020,7 +36893,7 @@ index 8c8d8bc08..77e7cab44 100644
 -
 -#: core/achievements/achievements.cpp:379
 -#, c-format
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/tr.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/tr.txt)\n"
 +
  msgid "User %s authenticated"
  msgstr "Kullanıcı %s kimliği doğrulandı"
@@ -39406,14 +40279,14 @@ index 8c8d8bc08..77e7cab44 100644
 +msgid "Your library is empty"
 +msgstr "Kitaplığın boş"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "GDI, CHD veya CDI oyunlarını /data/DeCast-S4/games klasörüne kopyala, burada görünürler."
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "GDI, CHD veya CDI oyunlarını /data/Resonance/games klasörüne kopyala, burada görünürler."
 +
 +msgid "No games yet"
 +msgstr "Henüz oyun yok"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "Oyunları /data/DeCast-S4/games klasörüne kopyala"
++msgid "Copy games to /data/Resonance/games"
++msgstr "Oyunları /data/Resonance/games klasörüne kopyala"
 +
 +msgid "LIVE"
 +msgstr "CANLI"
@@ -39439,16 +40312,85 @@ index 8c8d8bc08..77e7cab44 100644
 +msgid "Covers"
 +msgstr "Kapaklar"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "Kendi kapakların: /data/DeCast-S4/covers/<oyun dosyası veya seri no>.png"
- 
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "Kendi kapakların: /data/Resonance/covers/<oyun dosyası veya seri no>.png"
++
 +msgid "Press X to change the menu language"
 +msgstr "Menü dilini değiştirmek için X'e bas"
++
++msgid "Video Settings"
++msgstr "Video ayarları"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "Çözünürlük, geniş ekran, filtreleme, kare hızı"
++
++msgid "Audio Settings"
++msgstr "Ses ayarları"
++
++msgid "Volume, sound processor"
++msgstr "Ses düzeyi, ses işlemcisi"
++
++msgid "Controller Settings"
++msgstr "Kontrolcü ayarları"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Dreamcast bağlantı noktalarındaki aygıtlar"
++
++msgid "System Settings"
++msgstr "Sistem ayarları"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "Bölge, dil, BIOS, CPU"
++
++msgid "Home Screen Settings"
++msgstr "Ana ekran ayarları"
++
++msgid "Theme, language, covers, opening"
++msgstr "Tema, dil, kapaklar, açılış"
++
++msgid "On"
++msgstr "Açık"
++
++msgid "Off"
++msgstr "Kapalı"
++
++msgid "Automatic Frame Skipping"
++msgstr "Otomatik kare atlama"
++
++msgid "Texture Filtering"
++msgstr "Doku filtreleme"
++
++msgid "Load State at Start"
++msgstr "Başlarken durumu yükle"
++
++msgid "Save State on Exit"
++msgstr "Çıkarken durumu kaydet"
++
++msgid "Home Screen Theme"
++msgstr "Ana ekran teması"
++
++msgid "Menu Language"
++msgstr "Menü dili"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "Disk seri numarasına göre libretro küçük resim sunucusundan kapaklar"
++
++msgid "Opening Animation"
++msgstr "Açılış animasyonu"
++
++msgid "Plays when the app starts"
++msgstr "Uygulama açılırken oynar"
++
++msgid "Change"
++msgstr "Değiştir"
+ 
++msgid "PAUSED"
++msgstr "DURAKLATILDI"
 diff --git a/resources/i18n/zh_CN.po b/resources/i18n/zh_CN.po
-index 3ecabd349..a5d1cea3d 100644
+index 3ecabd349..9b2be5c1f 100644
 --- a/resources/i18n/zh_CN.po
 +++ b/resources/i18n/zh_CN.po
-@@ -1,2962 +1,2194 @@
+@@ -1,2962 +1,2263 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -39471,7 +40413,7 @@ index 3ecabd349..a5d1cea3d 100644
 -
 -#: core/achievements/achievements.cpp:379
 -#, c-format
-+"X-Generator: DeCast-S4 scripts/make-lang.py (lang/src/zh.txt)\n"
++"X-Generator: Resonance scripts/make-lang.py (lang/src/zh.txt)\n"
 +
  msgid "User %s authenticated"
 -msgstr ""
@@ -43150,14 +44092,14 @@ index 3ecabd349..a5d1cea3d 100644
 +msgid "Your library is empty"
 +msgstr "你的游戏库是空的"
 +
-+msgid "Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."
-+msgstr "将 GDI、CHD 或 CDI 游戏复制到 /data/DeCast-S4/games，它们就会出现在这里。"
++msgid "Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."
++msgstr "将 GDI、CHD 或 CDI 游戏复制到 /data/Resonance/games，它们就会出现在这里。"
 +
 +msgid "No games yet"
 +msgstr "还没有游戏"
 +
-+msgid "Copy games to /data/DeCast-S4/games"
-+msgstr "将游戏复制到 /data/DeCast-S4/games"
++msgid "Copy games to /data/Resonance/games"
++msgstr "将游戏复制到 /data/Resonance/games"
 +
 +msgid "LIVE"
 +msgstr "直播"
@@ -43183,11 +44125,80 @@ index 3ecabd349..a5d1cea3d 100644
 +msgid "Covers"
 +msgstr "封面"
 +
-+msgid "Your own: /data/DeCast-S4/covers/<game file or serial>.png"
-+msgstr "自定义封面：/data/DeCast-S4/covers/<游戏文件名或序列号>.png"
- 
++msgid "Your own: /data/Resonance/covers/<game file or serial>.png"
++msgstr "自定义封面：/data/Resonance/covers/<游戏文件名或序列号>.png"
++
 +msgid "Press X to change the menu language"
 +msgstr "按 X 更改菜单语言"
++
++msgid "Video Settings"
++msgstr "视频设置"
++
++msgid "Resolution, widescreen, filtering, frame rate"
++msgstr "分辨率、宽屏、过滤、帧率"
++
++msgid "Audio Settings"
++msgstr "音频设置"
++
++msgid "Volume, sound processor"
++msgstr "音量、声音处理器"
++
++msgid "Controller Settings"
++msgstr "手柄设置"
++
++msgid "Devices in the Dreamcast's ports"
++msgstr "Dreamcast 端口上的设备"
++
++msgid "System Settings"
++msgstr "系统设置"
++
++msgid "Region, language, BIOS, CPU"
++msgstr "地区、语言、BIOS、CPU"
++
++msgid "Home Screen Settings"
++msgstr "主屏幕设置"
++
++msgid "Theme, language, covers, opening"
++msgstr "主题、语言、封面、开场动画"
++
++msgid "On"
++msgstr "开"
++
++msgid "Off"
++msgstr "关"
++
++msgid "Automatic Frame Skipping"
++msgstr "自动跳帧"
++
++msgid "Texture Filtering"
++msgstr "纹理过滤"
++
++msgid "Load State at Start"
++msgstr "启动时读取即时存档"
++
++msgid "Save State on Exit"
++msgstr "退出时保存即时存档"
++
++msgid "Home Screen Theme"
++msgstr "主屏幕主题"
++
++msgid "Menu Language"
++msgstr "菜单语言"
++
++msgid "Cover pictures from the libretro thumbnail server, by disc serial"
++msgstr "按光盘序列号从 libretro 缩略图服务器获取封面"
++
++msgid "Opening Animation"
++msgstr "开场动画"
++
++msgid "Plays when the app starts"
++msgstr "应用启动时播放"
++
++msgid "Change"
++msgstr "更改"
+ 
++msgid "PAUSED"
++msgstr "已暂停"
 diff --git a/resources/resources.cmake b/resources/resources.cmake
 index 9bf4830a7..1ed162421 100644
 --- a/resources/resources.cmake
@@ -43212,11 +44223,11 @@ index 9bf4830a7..1ed162421 100644
 +endif()
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
-index 000000000..1d38cd0f0
+index 000000000..b615840d5
 --- /dev/null
 +++ b/shell/ps4/CMakeLists.txt
-@@ -0,0 +1,40 @@
-+# DeCast-S4: Flycast on PS4 homebrew. Built with the DeCast-S4 toolchain (toolchain/ps4-decast.cmake,
+@@ -0,0 +1,43 @@
++# Resonance: Flycast on PS4 homebrew. Built with the Resonance toolchain (toolchain/ps4-decast.cmake,
 +# ps4-love-style.cmake: PS4_RUNTIME_SOURCES, ps4_link_mesa, ps4_add_eboot).
 +target_sources(${PROJECT_NAME} PRIVATE
 +	ps4_main.cpp
@@ -43232,6 +44243,9 @@ index 000000000..1d38cd0f0
 +	launcher/launcher_internal.h
 +	launcher/covers.cpp
 +	launcher/intro.cpp
++	launcher/quick_menu.cpp
++	launcher/settings_menu.cpp
++	launcher/xmb_style.cpp
 +	launcher/libretro_scraper.h
 +	launcher/sound.cpp
 +	launcher/theme_orbit.cpp
@@ -43258,12 +44272,12 @@ index 000000000..1d38cd0f0
 +ps4_add_eboot(${PROJECT_NAME})
 diff --git a/shell/ps4/audiobackend_ps4.cpp b/shell/ps4/audiobackend_ps4.cpp
 new file mode 100644
-index 000000000..8e3fc1978
+index 000000000..c970bb9f7
 --- /dev/null
 +++ b/shell/ps4/audiobackend_ps4.cpp
 @@ -0,0 +1,196 @@
 +/*
-+	DeCast-S4: audio through sceAudioOut.
++	Resonance: audio through sceAudioOut.
 +
 +	The AICA's 44.1 kHz stereo goes into a ring buffer; an output thread resamples it to the
 +	48 kHz the PS4's audio out plays and hands it over one 256-frame grain at a time
@@ -43460,12 +44474,12 @@ index 000000000..8e3fc1978
 +static PS4AudioBackend ps4AudioBackend;
 diff --git a/shell/ps4/launcher/covers.cpp b/shell/ps4/launcher/covers.cpp
 new file mode 100644
-index 000000000..26f3b7021
+index 000000000..968b94cdd
 --- /dev/null
 +++ b/shell/ps4/launcher/covers.cpp
 @@ -0,0 +1,379 @@
 +/*
-+	DeCast-S4 launcher covers: the user's own covers, box art from libretro's thumbnail server
++	Resonance launcher covers: the user's own covers, box art from libretro's thumbnail server
 +	(LibretroScraper, used by the box-art database) and colours read from a cover.
 +
 +	This file is part of Flycast.
@@ -43502,7 +44516,7 @@ index 000000000..26f3b7021
 +
 +namespace
 +{
-+const char *const kUserCovers = "/data/DeCast-S4/covers/";
++const char *const kUserCovers = "/data/Resonance/covers/";
 +const char *const kDatUrl = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/redump/Sega%20-%20Dreamcast.dat";
 +const char *const kThumbUrl = "https://thumbnails.libretro.com/Sega%20-%20Dreamcast/Named_Boxarts/";
 +const char *const kDatFile = "libretro-dreamcast.dat";
@@ -43749,7 +44763,7 @@ index 000000000..26f3b7021
 +namespace launcher
 +{
 +
-+// /data/DeCast-S4/covers/<file name>.png (or .jpg), <serial>.png or <title>.png
++// /data/Resonance/covers/<file name>.png (or .jpg), <serial>.png or <title>.png
 +std::string userCover(const LauncherEntry& e)
 +{
 +	struct Cached { std::string path; u64 at; };
@@ -43845,10 +44859,10 @@ index 000000000..26f3b7021
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/intro.cpp b/shell/ps4/launcher/intro.cpp
 new file mode 100644
-index 000000000..bc5eaffc5
+index 000000000..e8eac7a60
 --- /dev/null
 +++ b/shell/ps4/launcher/intro.cpp
-@@ -0,0 +1,653 @@
+@@ -0,0 +1,667 @@
 +/*
 +	Resonance's opening, played once when the app starts: Sonic spin-dashes into the spotlight as a
 +	ball, skids to the middle of the stage and hops up as the Dreamcast drops out of the sky, uncurls
@@ -43878,6 +44892,8 @@ index 000000000..bc5eaffc5
 +#include "launcher_internal.h"
 +#include "ps4_gamepad.h"
 +#include "ui/imgui_driver.h"
++#include "cfg/cfg.h"
++#include "emulator.h"
 +
 +#include <stb_image.h>
 +
@@ -44465,8 +45481,20 @@ index 000000000..bc5eaffc5
 +
 +} // namespace
 +
++bool introEnabled() {
++	return config::loadBool("resonance", "Intro", true);
++}
++
++void setIntroEnabled(bool on)
++{
++	config::saveBool("resonance", "Intro", on);
++	SaveSettings();
++}
++
 +bool introDraw(Frame& f)
 +{
++	if (!gIntroDone && !introEnabled())
++		gIntroDone = true;
 +	if (gIntroDone)
 +		return false;
 +	static float firstTry = -1;
@@ -44504,12 +45532,12 @@ index 000000000..bc5eaffc5
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
 new file mode 100644
-index 000000000..01f33e7dd
+index 000000000..f3fe55131
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.cpp
-@@ -0,0 +1,809 @@
+@@ -0,0 +1,820 @@
 +/*
-+	DeCast-S4 launcher core: the library, covers and colours, DualShock 4 input, theme switching
++	Resonance launcher core: the library, covers and colours, DualShock 4 input, theme switching
 +	and starting games. The themes draw; this file decides what they draw.
 +
 +	This file is part of Flycast.
@@ -44707,7 +45735,7 @@ index 000000000..01f33e7dd
 +	index = ((index % THEME_COUNT) + THEME_COUNT) % THEME_COUNT;
 +	gTheme.reset(makeTheme(index));
 +	gThemeIndex = index;
-+	config::saveInt("decast", "LauncherTheme", index);
++	config::saveInt("resonance", "LauncherTheme", index);
 +}
 +
 +Frame makeFrame()
@@ -44744,6 +45772,16 @@ index 000000000..01f33e7dd
 +	const u32 pressed = buttons & ~gPrevButtons;
 +	gPrevButtons = buttons;
 +	if (gLaunchAt >= 0 || gPendingTheme >= 0)
++		return;
++	// a menu of the theme's own (the Cross bar's settings): it reads the pad itself
++	if (gTheme->busy())
++	{
++		static MenuInput menuIn;
++		menuIn.read(gTime);
++		gTheme->menuInput(f, menuIn);
++		return;
++	}
++	if ((pressed & ORBIS_PAD_BUTTON_CIRCLE) && gTheme->back(f))
 +		return;
 +
 +	// direction: d-pad or the left stick, with key repeat
@@ -45017,7 +46055,7 @@ index 000000000..01f33e7dd
 +				p[3] = (u8)std::lround(d * d * (3 - 2 * d) * 255);
 +			}
 +	}
-+	return makeTexture("decast.blob", S, S, pixels);
++	return makeTexture("resonance.blob", S, S, pixels);
 +}
 +
 +ImTextureID discTexture()
@@ -45045,7 +46083,7 @@ index 000000000..01f33e7dd
 +				p[3] = 255;
 +			}
 +	}
-+	return makeTexture("decast.disc", S, S, pixels);
++	return makeTexture("resonance.disc", S, S, pixels);
 +}
 +
 +ImTextureID noiseTexture()
@@ -45064,7 +46102,7 @@ index 000000000..01f33e7dd
 +			pixels[i * 4 + 3] = 255;
 +		}
 +	}
-+	return makeTexture("decast.noise", W, H, pixels);
++	return makeTexture("resonance.noise", W, H, pixels);
 +}
 +
 +ImVec2 whiteUV(ImDrawList *dl) {
@@ -45194,7 +46232,7 @@ index 000000000..01f33e7dd
 +	drawText(f.dl, displayFont(), f.h * .045f, ImVec2(f.w / 2, f.h * .42f), IM_COL32(240, 242, 248, 255),
 +			i18n::T("Your library is empty"), .5f);
 +	drawText(f.dl, bodyFont(), f.h * .026f, ImVec2(f.w / 2, f.h * .51f), IM_COL32(170, 178, 196, 255),
-+			i18n::T("Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here."), .5f);
++			i18n::T("Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here."), .5f);
 +}
 +
 +} // namespace launcher
@@ -45235,7 +46273,7 @@ index 000000000..01f33e7dd
 +	{
 +		started = true;
 +		gLast = now;
-+		setTheme(config::loadInt("decast", "LauncherTheme", 0));
++		setTheme(config::loadInt("resonance", "LauncherTheme", 0));
 +		if (!gPaletteThread)
 +		{
 +			gPaletteThread = true;
@@ -45312,6 +46350,7 @@ index 000000000..01f33e7dd
 +			snprintf(line, sizeof(line), "launcher: starting %s", g.e.path.c_str());
 +			ps4_boot_trace(line);
 +			soundStop();
++			currentGameCover = g.cover;
 +			gui_ps4_start_game(g.e.path, g.e.title);
 +		}
 +	}
@@ -45319,12 +46358,12 @@ index 000000000..01f33e7dd
 +}
 diff --git a/shell/ps4/launcher/launcher.h b/shell/ps4/launcher/launcher.h
 new file mode 100644
-index 000000000..82268f8f0
+index 000000000..24b465595
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.h
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,68 @@
 +/*
-+	DeCast-S4: the PS4 home screen (launcher) that replaces Flycast's game list.
++	Resonance: the PS4 home screen (launcher) that replaces Flycast's game list.
 +
 +	Four themes share one library, cover and input layer: Orbit (discs on a ring), Channel (a TV
 +	set), Shelf (box art in 3D) and Cross bar. Square cycles them; the choice is saved.
@@ -45365,18 +46404,40 @@ index 000000000..82268f8f0
 +void gui_ps4_start_game(const std::string& path, const std::string& title);
 +void gui_ps4_open_settings();
 +
++// ui/gui.cpp, PS4 only: what the settings screen and the quick menu need from Flycast's GUI
++bool gui_ps4_game_running();
++std::string gui_ps4_game_title();
++void gui_ps4_resume();
++void gui_ps4_save_state();
++void gui_ps4_load_state();
++long long gui_ps4_state_date(int slot);		// 0: empty
++void *gui_ps4_state_picture(bool reload);	// ImTextureID of the current slot's picture, or 0
++bool gui_ps4_disc_open();
++void gui_ps4_swap_disc();
++void gui_ps4_quit_game();
++void gui_ps4_open_quick_menu();
++// Settings changed: saved; devices changed while a game runs are plugged in again
++void gui_ps4_apply_settings(const bool mapleChanged[4], const bool expansionChanged[4][2]);
++// The settings screen is done: back to the quick menu (in a game) or the home screen
++void gui_ps4_settings_done();
++
 +// Called before ImGui::NewFrame (fonts can only be added between frames).
 +void launcher_pre_frame();
 +// Draws the home screen for this frame; false when it can't (then Flycast's list is shown).
 +bool launcher_draw();
++// The settings screen (GuiState::Settings) and the in-game quick menu (GuiState::Commands)
++bool launcher_settings_draw();
++bool launcher_quick_menu_draw();
++// L3+R3 or the touchpad during a game: the quick menu
++void launcher_open_quick_menu();
 diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
 new file mode 100644
-index 000000000..53a66c851
+index 000000000..217ffc754
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher_internal.h
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,215 @@
 +/*
-+	DeCast-S4 launcher internals: what the core (launcher.cpp) shares with the themes
++	Resonance launcher internals: what the core (launcher.cpp) shares with the themes
 +	(theme_*.cpp), covers (covers.cpp) and sounds (sound.cpp).
 +
 +	This file is part of Flycast.
@@ -45445,6 +46506,8 @@ index 000000000..53a66c851
 +	float launchAt;			// when Start was pressed, or < 0
 +};
 +
++struct MenuInput;
++
 +class Theme
 +{
 +public:
@@ -45457,6 +46520,12 @@ index 000000000..53a66c851
 +	virtual bool navigate(Frame& f, int dx, int dy) { return false; }
 +	// Cross: true when the theme handled it itself (Cross bar menus other than Games).
 +	virtual bool activate(Frame& f) { return false; }
++	// Circle: true when the theme used it (leaving a Cross bar settings list).
++	virtual bool back(Frame& f) { return false; }
++	// While true the theme has a menu of its own open: it gets the pad as MenuInput (drawn in
++	// draw()), the core's own buttons (Square, Triangle, L1/R1, Cross to start) stay quiet.
++	virtual bool busy() const { return false; }
++	virtual void menuInput(Frame& f, const MenuInput& in) {}
 +};
 +std::unique_ptr<Theme> makeOrbit();
 +std::unique_ptr<Theme> makeChannel();
@@ -45509,9 +46578,67 @@ index 000000000..53a66c851
 +
 +// intro.cpp: the opening; false once it is over (or the pictures are missing)
 +bool introDraw(Frame& f);
++bool introEnabled();
++void setIntroEnabled(bool on);
++
++// xmb_style.cpp: the PS3 look shared by the Cross bar, the settings and the quick menu
++Color xmbTone();							// this month's colour, as on the PS3
++// Gradient and the slow wave; overGame: translucent, the paused game shows through
++void xmbBackground(Frame& f, bool overGame = false);
++// White text with a soft shadow
++float xmbText(ImDrawList *dl, ImFont *font, float size, ImVec2 pos, float alpha, const std::string& text,
++		float align = 0.f, float maxWidth = 0.f, ImU32 color = IM_COL32(255, 255, 255, 255));
++void xmbClock(Frame& f, float alpha);
++// Button hints at the bottom right: {'x', "Select"}, {'o', "Back"}
++struct Hint { char button; std::string label; };
++void xmbHints(Frame& f, const std::vector<Hint>& hints, float alpha = 1.f);
++// A Cross bar item at c: a Font Awesome glyph, or a game's cover; its title (and, focused, a
++// second line); focus 0..1
++void xmbItem(Frame& f, ImVec2 c, const char *glyph, const Game *game, const std::string& title,
++		const std::string& subtitle, float focus, float alpha);
++// A frame for the menus outside the home screen (settings, quick menu)
++Frame menuFrame();
++
++// The pad for menus: new presses, held directions with repeat. Buttons already down when a menu
++// (re)appears aren't new presses in it.
++struct MenuInput
++{
++	int dx = 0, dy = 0;
++	bool cross = false, circle = false, triangle = false, square = false, l1 = false, r1 = false;
++	void read(float t);
++private:
++	u32 prev = 0;
++	int held = -1;
++	float repeatAt = 0;
++	int lastFrame = -10;
++};
++
++// settings_menu.cpp: the emulator's settings, PS3 style: groups, their options with the current
++// value on the right, a drop-down list to change one
++class SettingsPanel
++{
++public:
++	SettingsPanel();
++	~SettingsPanel();
++	int groupCount() const;
++	const char *groupIcon(int g) const;
++	std::string groupName(int g) const;
++	std::string groupSummary(int g) const;
++	// show a group's options; Circle there closes the panel (changes applied and saved)
++	void openGroup(int g, float t);
++	bool isOpen() const;
++	void input(const MenuInput& in, float t);
++	void draw(Frame& f, float alpha);
++private:
++	void close();
++	struct Impl;
++	std::unique_ptr<Impl> impl;
++};
++// The cover of the game being played, for the quick menu (the launcher sets it when starting one)
++extern std::string currentGameCover;
 +
 +// covers.cpp
-+// The cover to show for a game: the user's own file in /data/DeCast-S4/covers wins, else the
++// The cover to show for a game: the user's own file in /data/Resonance/covers wins, else the
 +// box-art database's (downloaded from libretro, or the disc's own 0GDTEX image).
 +std::string userCover(const LauncherEntry& e);
 +// Bright/dark colours from a cover image (false when it can't be read)
@@ -45526,12 +46653,12 @@ index 000000000..53a66c851
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/libretro_scraper.h b/shell/ps4/launcher/libretro_scraper.h
 new file mode 100644
-index 000000000..e1c273f8e
+index 000000000..5605ef4cb
 --- /dev/null
 +++ b/shell/ps4/launcher/libretro_scraper.h
 @@ -0,0 +1,51 @@
 +/*
-+	DeCast-S4: box art from the libretro thumbnail server, matched by the disc's serial.
++	Resonance: box art from the libretro thumbnail server, matched by the disc's serial.
 +
 +	The serial (the IP.BIN product number Flycast's offline scraper reads, e.g. T13002N, MK-51117)
 +	is looked up in libretro-database's Redump DAT for the Dreamcast, which gives the Redump name;
@@ -45581,14 +46708,876 @@ index 000000000..e1c273f8e
 +	std::unordered_map<std::string, std::vector<DatGame>> bySerial;	// normalized serial
 +	u64 nextDatAttempt = 0;
 +};
+diff --git a/shell/ps4/launcher/quick_menu.cpp b/shell/ps4/launcher/quick_menu.cpp
+new file mode 100644
+index 000000000..bc4c1d7ce
+--- /dev/null
++++ b/shell/ps4/launcher/quick_menu.cpp
+@@ -0,0 +1,284 @@
++/*
++	Resonance's quick menu during a game (L3+R3, or the touchpad), in place of Flycast's commands
++	window: the game paused behind a side panel with its cover and name; Resume, Save State and Load
++	State each with their slot (Left/Right) and a picture of what the slot holds, the volume and the
++	FPS counter changed on the spot, the disc, Settings, Close Game.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "cfg/option.h"
++#include "emulator.h"
++#include "ui/IconsFontAwesome6.h"
++
++#include <ctime>
++
++using i18n::T;
++
++namespace launcher
++{
++std::string currentGameCover;
++}
++
++using namespace launcher;
++
++namespace
++{
++enum Row { RESUME, SAVE, LOAD, VOLUME, FPS, DISC, SETTINGS, CLOSE, ROWS };
++
++MenuInput gIn;
++int gSel;
++float gPos, gVel;
++int gLastFrame = -10;
++float gOpenedAt;
++bool gChanged;
++bool gReloadPicture = true;
++Game gCover;
++
++void changeSlot(int step)
++{
++	config::SavestateSlot = (config::SavestateSlot + step + 10) % 10;
++	gReloadPicture = true;
++	playSound(Sound::Move);
++}
++}
++
++bool launcher_quick_menu_draw()
++{
++	Frame f = menuFrame();
++	const int frame = ImGui::GetFrameCount();
++	if (frame != gLastFrame + 1)
++	{
++		gSel = RESUME;
++		gPos = 0;
++		gOpenedAt = f.t;
++		gReloadPicture = true;
++		gChanged = false;
++		gCover = Game();
++		gCover.cover = currentGameCover;
++		soundStart();
++		playSound(Sound::Category);
++	}
++	gLastFrame = frame;
++	gIn.read(f.t);
++	ImDrawList *dl = f.dl;
++	const float in = easeOut((f.t - gOpenedAt) / .25f);
++
++	// ---- input ----
++	if (gIn.dy != 0)
++	{
++		gSel = (gSel + gIn.dy + ROWS) % ROWS;
++		playSound(Sound::Move);
++	}
++	if (gIn.dx != 0)
++	{
++		switch (gSel)
++		{
++		case SAVE:
++		case LOAD:
++			changeSlot(gIn.dx);
++			break;
++		case VOLUME:
++			config::AudioVolume.set(std::clamp(config::AudioVolume.get() + gIn.dx * 10, 0, 100));
++			config::AudioVolume.calcDbPower();
++			gChanged = true;
++			playSound(Sound::Move);
++			break;
++		case FPS:
++			config::ShowFPS.set(!config::ShowFPS);
++			gChanged = true;
++			playSound(Sound::Move);
++			break;
++		}
++	}
++	const long long date = gui_ps4_state_date(config::SavestateSlot);
++	bool leaving = false;
++	if (gIn.cross)
++	{
++		switch (gSel)
++		{
++		case RESUME:
++			leaving = true;
++			break;
++		case SAVE:
++			playSound(Sound::Confirm);
++			if (gChanged)
++				SaveSettings();
++			gui_ps4_save_state();
++			return true;
++		case LOAD:
++			if (date == 0)
++				playSound(Sound::Error);
++			else
++			{
++				playSound(Sound::Confirm);
++				if (gChanged)
++					SaveSettings();
++				gui_ps4_load_state();
++				return true;
++			}
++			break;
++		case VOLUME:
++			break;
++		case FPS:
++			config::ShowFPS.set(!config::ShowFPS);
++			gChanged = true;
++			playSound(Sound::Move);
++			break;
++		case DISC:
++			playSound(Sound::Confirm);
++			gui_ps4_swap_disc();
++			return true;
++		case SETTINGS:
++			playSound(Sound::Confirm);
++			if (gChanged)
++				SaveSettings();
++			gui_ps4_open_settings();
++			return true;
++		case CLOSE:
++			playSound(Sound::Back);
++			if (gChanged)
++				SaveSettings();
++			soundStop();
++			gui_ps4_quit_game();
++			return true;
++		}
++	}
++	if (gIn.circle)
++		leaving = true;
++	if (leaving)
++	{
++		playSound(Sound::Back);
++		if (gChanged)
++			SaveSettings();
++		gui_ps4_resume();
++		return true;
++	}
++
++	// ---- the paused game behind a side panel ----
++	const float panelW = f.w * .4f;
++	const float slide = (1 - in) * -panelW * .3f;
++	const ImU32 dark = IM_COL32(4, 8, 18, (int)(235 * in)), mid = IM_COL32(4, 8, 18, (int)(150 * in)), clear = IM_COL32(4, 8, 18, 0);
++	dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(70 * in)));
++	dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(panelW, f.h), dark, mid, mid, dark);
++	dl->AddRectFilledMultiColor(ImVec2(panelW, 0), ImVec2(panelW + f.w * .15f, f.h), mid, clear, clear, mid);
++	const Color tone = xmbTone();
++	dl->AddRectFilled(ImVec2(panelW - 2 + slide, 0), ImVec2(panelW + slide, f.h), tone.u32(.6f * in));
++
++	// cover, name, PAUSED
++	const float x = f.w * .05f + slide;
++	const float coverH = f.h * .13f;
++	const ImTextureID cover = coverTexture(gCover);
++	if (cover != ImTextureID())
++	{
++		dl->AddRectFilled(ImVec2(x + 4, f.h * .07f + 5), ImVec2(x + coverH + 4, f.h * .07f + coverH + 5), IM_COL32(0, 0, 0, (int)(110 * in)), 6.f);
++		dl->AddImageRounded(cover, ImVec2(x, f.h * .07f), ImVec2(x + coverH, f.h * .07f + coverH), ImVec2(0, 0), ImVec2(1, 1),
++				IM_COL32(255, 255, 255, (int)(255 * in)), 6.f);
++	}
++	else
++		xmbText(dl, bodyFont(), coverH * .6f, ImVec2(x + coverH * .5f, f.h * .07f + coverH * .15f), in, ICON_FA_COMPACT_DISC, .5f);
++	const float tx = x + coverH + f.w * .015f;
++	const float pill = f.h * .02f;
++	const std::string paused = T("PAUSED");
++	const float pw = textWidth(bodyFont(), pill, paused) + pill * 1.4f;
++	const float pulse = .75f + .25f * std::sin(f.t * 3.f);
++	dl->AddRectFilled(ImVec2(tx, f.h * .075f), ImVec2(tx + pw, f.h * .075f + pill * 1.6f), tone.u32(.9f * in * pulse), pill * .8f);
++	xmbText(dl, bodyFont(), pill, ImVec2(tx + pill * .7f, f.h * .075f + pill * .28f), in, paused);
++	xmbText(dl, bodyFont(), f.h * .032f, ImVec2(tx, f.h * .075f + pill * 2.3f), in, gui_ps4_game_title(), 0, panelW - (tx - slide) - f.w * .02f);
++
++	// the rows
++	spring(gPos, gVel, (float)gSel, 170.f, 26.f, f.dt);
++	char buf[96];
++	struct RowView { const char *icon; std::string label, value; bool arrows; bool dim; };
++	snprintf(buf, sizeof(buf), T("Slot %d"), (int)config::SavestateSlot + 1);
++	const std::string slot = buf;
++	const RowView rows[ROWS] = {
++		{ ICON_FA_PLAY, T("Resume"), "", false, false },
++		{ ICON_FA_DOWNLOAD, T("Save State"), slot, true, false },
++		{ ICON_FA_CLOCK_ROTATE_LEFT, T("Load State"), slot, true, date == 0 },
++		{ ICON_FA_VOLUME_HIGH, T("Volume Level"), std::to_string(config::AudioVolume.get()) + "%", true, false },
++		{ ICON_FA_GAUGE_HIGH, T("Show FPS Counter"), config::ShowFPS ? T("On") : T("Off"), true, false },
++		{ ICON_FA_COMPACT_DISC, gui_ps4_disc_open() ? T("Insert Disk") : T("Eject Disk"), "", false, false },
++		{ ICON_FA_GEAR, T("Settings"), "", false, false },
++		{ ICON_FA_POWER_OFF, T("Close Game"), "", false, false },
++	};
++	const float rowH = f.h * .068f, top = f.h * .27f;
++	const float rx0 = x - f.w * .01f, rx1 = panelW - f.w * .025f + slide;
++	// the highlight glides between rows
++	const float hy = top + gPos * rowH;
++	dl->AddRectFilledMultiColor(ImVec2(rx0, hy), ImVec2(rx1, hy + rowH), tone.u32(.55f * in), tone.u32(.12f * in), tone.u32(.12f * in), tone.u32(.55f * in));
++	dl->AddRectFilled(ImVec2(rx0, hy), ImVec2(rx0 + 4, hy + rowH), IM_COL32(255, 255, 255, (int)(230 * in)));
++	const float ts = f.h * .029f;
++	for (int i = 0; i < ROWS; i++)
++	{
++		const RowView& r = rows[i];
++		const float y = top + i * rowH;
++		const float a = in * (r.dim ? .45f : 1.f) * (i == gSel ? 1.f : .82f);
++		const float ty = y + (rowH - ts) * .5f;
++		xmbText(dl, bodyFont(), ts * .95f, ImVec2(x + ts * .7f, ty), a, r.icon, .5f);
++		xmbText(dl, bodyFont(), ts, ImVec2(x + ts * 2.f, ty), a, r.label);
++		if (!r.value.empty())
++		{
++			std::string v = r.value;
++			if (r.arrows && i == gSel)
++				v = std::string(ICON_FA_CARET_LEFT "  ") + v + "  " ICON_FA_CARET_RIGHT;
++			xmbText(dl, bodyFont(), ts * .9f, ImVec2(rx1 - f.w * .01f, ty), a, v, 1.f);
++		}
++	}
++
++	// the slot's card beside the panel while on Save/Load
++	const float card = clamp01((gSel == SAVE || gSel == LOAD) ? 1.f : 0.f) * in;
++	if (card > 0)
++	{
++		const ImTextureID pic = (ImTextureID)(uintptr_t)gui_ps4_state_picture(gReloadPicture);
++		gReloadPicture = false;
++		const float cw = f.w * .32f, chh = cw * 3 / 4;
++		const ImVec2 a(panelW + f.w * .08f, f.h * .27f), b(a.x + cw, a.y + chh);
++		dl->AddRectFilled(ImVec2(a.x + 6, a.y + 8), ImVec2(b.x + 6, b.y + 8), IM_COL32(0, 0, 0, (int)(110 * card)), 8.f);
++		dl->AddRectFilled(a, b, IM_COL32(10, 14, 24, (int)(220 * card)), 8.f);
++		if (date != 0 && pic != ImTextureID())
++			dl->AddImageRounded(pic, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, (int)(255 * card)), 8.f);
++		else
++			xmbText(dl, bodyFont(), f.h * .03f, ImVec2((a.x + b.x) / 2, (a.y + b.y) / 2 - f.h * .015f), card * .8f, T("Empty"), .5f);
++		dl->AddRect(a, b, IM_COL32(255, 255, 255, (int)(80 * card)), 8.f, 0, 1.5f);
++		// ten dots: which slot
++		for (int i = 0; i < 10; i++)
++		{
++			const ImVec2 c(a.x + cw * .5f + (i - 4.5f) * f.h * .022f, b.y + f.h * .03f);
++			dl->AddCircleFilled(c, i == config::SavestateSlot ? f.h * .006f : f.h * .0035f,
++					IM_COL32(255, 255, 255, (int)((i == config::SavestateSlot ? 255 : 110) * card)), 12);
++		}
++		std::string when = T("Empty");
++		if (date != 0)
++		{
++			const time_t t = (time_t)date;
++			char tb[64];
++			strftime(tb, sizeof(tb), "%d/%m/%Y  %H:%M", localtime(&t));
++			when = tb;
++		}
++		xmbText(dl, bodyFont(), f.h * .026f, ImVec2(a.x, b.y + f.h * .055f), card, slot + "   " + when);
++	}
++
++	xmbClock(f, in);
++	xmbHints(f, { { 'x', T("Select") }, { 'o', T("Resume") } }, in);
++	return true;
++}
++
++void launcher_open_quick_menu()
++{
++	if (gui_ps4_game_running())
++		gui_ps4_open_quick_menu();
++}
+diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_menu.cpp
+new file mode 100644
+index 000000000..233587a4b
+--- /dev/null
++++ b/shell/ps4/launcher/settings_menu.cpp
+@@ -0,0 +1,566 @@
++/*
++	Resonance's settings, PS3 style, in place of Flycast's settings window: five groups (Video,
++	Audio, Controllers, System, Home Screen); a group lists its options with the current value on the
++	right; Cross on one opens a drop-down list of its values. The same panel runs inside the Cross
++	bar (Settings column) and as the settings screen (Triangle on the home screen, Settings in the
++	quick menu during a game).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "cfg/cfg.h"
++#include "cfg/option.h"
++#include "emulator.h"
++#include "hw/maple/maple_cfg.h"
++#include "stdclass.h"
++#include "ui/IconsFontAwesome6.h"
++
++#include <functional>
++
++using i18n::T;
++
++namespace launcher
++{
++namespace
++{
++
++struct Choice
++{
++	std::string label;
++	int value;
++};
++
++struct Setting
++{
++	std::string name, help;
++	std::vector<Choice> choices;
++	std::function<int()> get;
++	std::function<void(int)> set;
++	bool lockedInGame = false;		// needs the game restarted: not while one runs
++};
++
++struct Group
++{
++	const char *icon;
++	std::string name, summary;
++	std::vector<Setting> items;
++};
++
++std::vector<Choice> onOff() {
++	return { { T("Off"), 0 }, { T("On"), 1 } };
++}
++
++template<typename O>
++Setting toggle(const char *name, const char *help, O& opt, bool locked = false)
++{
++	Setting s { T(name), help ? T(help) : "", onOff(),
++		[&opt] { return opt.get() ? 1 : 0; },
++		[&opt](int v) { opt.set(v != 0); }, locked };
++	return s;
++}
++
++template<typename O>
++Setting pick(const char *name, const char *help, O& opt, std::vector<Choice> choices, bool locked = false)
++{
++	using V = std::remove_reference_t<decltype(opt.get())>;
++	Setting s { T(name), help ? T(help) : "", std::move(choices),
++		[&opt] { return (int)opt.get(); },
++		[&opt](int v) { opt.set((V)v); }, locked };
++	return s;
++}
++
++} // namespace
++
++struct SettingsPanel::Impl
++{
++	std::vector<Group> groups;
++	bool open = false;
++	int group = 0, sel = 0;
++	float selPos = 0, selVel = 0, openedAt = -10;
++	bool dropOpen = false;
++	int dropSel = 0;
++	float dropPos = 0, dropVel = 0, dropAt = -10;
++	bool mapleChanged[4] {};
++	bool expansionChanged[4][2] {};
++	bool changed = false;
++
++	void build()
++	{
++		groups.clear();
++		char buf[128];
++
++		Group video { ICON_FA_DISPLAY, T("Video Settings"), T("Resolution, widescreen, filtering, frame rate"), {} };
++		{
++			std::vector<Choice> res;
++			const float scales[] = { 1.f, 1.5f, 2.f, 3.f, 4.f };
++			for (float s : scales)
++			{
++				if (s == 1.f)
++					snprintf(buf, sizeof(buf), "%s (640x480)", T("Native"));
++				else
++					snprintf(buf, sizeof(buf), "x%g (%dx%d)", s, (int)(640 * s), (int)(480 * s));
++				res.push_back({ buf, (int)(480 * s) });
++			}
++			video.items.push_back(pick(Tnop("Internal Resolution"), Tnop("Internal render resolution. Higher is better, but more demanding on the GPU. Values higher than your display resolution (but no more than double your display resolution) can be used for supersampling, which provides high-quality antialiasing without reducing sharpness."),
++					config::RenderResolution, res));
++		}
++		video.items.push_back(toggle(Tnop("Widescreen"), Tnop("Draw geometry outside of the normal 4:3 aspect ratio. May produce graphical glitches in the revealed areas.\nAspect Fit and shows the full 16:9 content."), config::Widescreen));
++		video.items.push_back(toggle(Tnop("Super Widescreen"), Tnop("Use the full width of the screen or window when its aspect ratio is greater than 16:9.\nAspect Fill and remove black bars. Not compatible with integer scaling."), config::SuperWidescreen));
++		video.items.push_back(toggle(Tnop("Widescreen Game Cheats"), Tnop("Modify the game so that it displays in 16:9 anamorphic format and use horizontal screen stretching. Only some games are supported."), config::WidescreenGameHacks));
++		video.items.push_back(toggle(Tnop("Integer Scaling"), Tnop("Scales the output by the maximum integer multiple allowed by the display resolution."), config::IntegerScale));
++		video.items.push_back(toggle(Tnop("Linear Interpolation"), Tnop("Scales the output with linear interpolation. Will use nearest neighbor interpolation otherwise. Disable with integer scaling."), config::LinearInterpolation));
++		video.items.push_back(toggle(Tnop("VSync"), Tnop("Synchronizes the frame rate with the screen refresh rate. Recommended"), config::VSync));
++		video.items.push_back(toggle(Tnop("Show FPS Counter"), Tnop("Show on-screen frame/sec counter"), config::ShowFPS));
++		video.items.push_back(pick(Tnop("Automatic Frame Skipping"), Tnop("Skip a frame when the GPU and CPU are both running slow"), config::AutoSkipFrame,
++				{ { T("Disabled"), 0 }, { T("Normal"), 1 }, { T("Maximum"), 2 } }));
++		video.items.push_back(pick(Tnop("Texture Filtering"), Tnop("Use the game's default texture filtering"), config::TextureFiltering,
++				{ { T("Default"), 0 }, { T("Force Nearest-Neighbor"), 1 }, { T("Force Linear"), 2 } }));
++		video.items.push_back(pick(Tnop("Anisotropic Filtering"), Tnop("Higher values make textures viewed at oblique angles look sharper, but are more demanding on the GPU. This option only has a visible impact on mipmapped textures."),
++				config::AnisotropicFiltering, { { T("Off"), 1 }, { "2x", 2 }, { "4x", 4 }, { "8x", 8 }, { "16x", 16 } }));
++		video.items.push_back(pick(Tnop("Transparent Sorting"), Tnop("Sort transparent polygons per triangle. Fast but may produce graphical glitches"), config::PerStripSorting,
++				{ { T("Per Triangle"), 0 }, { T("Per Strip"), 1 } }));
++		video.items.push_back(toggle(Tnop("Shadows"), Tnop("Enable modifier volumes, usually used for shadows"), config::ModifierVolumes));
++		video.items.push_back(toggle(Tnop("Fog"), Tnop("Enable fog effects"), config::Fog));
++		video.items.push_back(toggle(Tnop("Delay Frame Swapping"), Tnop("Useful to avoid flashing screen or glitchy videos. Not recommended on slow platforms"), config::DelayFrameSwapping));
++		video.items.push_back(toggle(Tnop("Copy Rendered Textures to VRAM"), Tnop("Copy rendered-to textures back to VRAM. Slower but accurate"), config::RenderToTextureBuffer));
++		video.items.push_back(toggle(Tnop("Full Framebuffer Emulation"), Tnop("Fully accurate VRAM framebuffer emulation. Helps games that directly access the framebuffer for special effects. Very slow and incompatible with upscaling and wide screen."), config::EmulateFramebuffer));
++		video.items.push_back(toggle(Tnop("Native Depth Interpolation"), Tnop("Helps with texture corruption and depth issues on AMD GPUs. Can also help Intel GPUs in some cases."), config::NativeDepthInterpolation));
++		video.items.push_back(toggle(Tnop("Load Custom Textures"), Tnop("Load custom/high-res textures from data/textures/<game id>"), config::CustomTextures));
++		video.items.push_back(toggle(Tnop("Show VMU In-game"), Tnop("Show the VMU LCD screens while in-game"), config::FloatVMUs));
++		groups.push_back(std::move(video));
++
++		Group audio { ICON_FA_VOLUME_HIGH, T("Audio Settings"), T("Volume, sound processor"), {} };
++		{
++			std::vector<Choice> vol;
++			for (int v = 0; v <= 100; v += 10)
++				vol.push_back({ std::to_string(v) + "%", v });
++			Setting s = pick(Tnop("Volume Level"), Tnop("Adjust the emulator's audio level"), config::AudioVolume, vol);
++			s.set = [](int v) { config::AudioVolume.set(v); config::AudioVolume.calcDbPower(); };
++			audio.items.push_back(s);
++		}
++		audio.items.push_back(toggle(Tnop("Enable DSP"), Tnop("Enable the Dreamcast Digital Sound Processor. Only recommended on fast platforms"), config::DSPEnabled));
++		audio.items.push_back(toggle(Tnop("Enable VMU Sounds"), Tnop("Play VMU beeps when enabled."), config::VmuSound));
++		groups.push_back(std::move(audio));
++
++		Group pads { ICON_FA_GAMEPAD, T("Controller Settings"), T("Devices in the Dreamcast's ports"), {} };
++		const std::vector<Choice> devices = {
++			{ T("Sega Controller"), MDT_SegaController }, { T("Light Gun"), MDT_LightGun }, { T("Keyboard"), MDT_Keyboard },
++			{ T("Mouse"), MDT_Mouse }, { T("Twin Stick"), MDT_TwinStick }, { T("Arcade/Ascii Stick"), MDT_AsciiStick },
++			{ T("Racing Controller"), MDT_RacingController }, { T("None"), MDT_None },
++		};
++		const std::vector<Choice> expansions = {
++			{ T("Sega VMU"), MDT_SegaVMU }, { T("Vibration Pack"), MDT_PurupuruPack }, { T("Microphone"), MDT_Microphone }, { T("None"), MDT_None },
++		};
++		for (int port = 0; port < 4; port++)
++		{
++			snprintf(buf, sizeof(buf), T("Port %c"), 'A' + port);
++			const std::string portName = buf;
++			Setting dev { portName, T("Dreamcast Devices"), devices,
++				[port] { return (int)config::MapleMainDevices[port].get(); },
++				[this, port](int v) { config::MapleMainDevices[port].set((MapleDeviceType)v); mapleChanged[port] = true; } };
++			pads.items.push_back(dev);
++			for (int slot = 0; slot < 2; slot++)
++			{
++				snprintf(buf, sizeof(buf), T("Slot %d"), slot + 1);
++				Setting exp { portName + "  \xC2\xB7  " + buf, T("Dreamcast Devices"), expansions,
++					[port, slot] { return (int)config::MapleExpansionDevices[port][slot].get(); },
++					[this, port, slot](int v) { config::MapleExpansionDevices[port][slot].set((MapleDeviceType)v); expansionChanged[port][slot] = true; } };
++				pads.items.push_back(exp);
++			}
++		}
++		groups.push_back(std::move(pads));
++
++		Group system { ICON_FA_MICROCHIP, T("System Settings"), T("Region, language, BIOS, CPU"), {} };
++		system.items.push_back(pick(Tnop("Dreamcast Language"), Tnop("The language as configured in the Dreamcast BIOS"), config::Language,
++				{ { T("Japanese"), 0 }, { T("English"), 1 }, { T("German"), 2 }, { T("French"), 3 }, { T("Spanish"), 4 }, { T("Italian"), 5 }, { T("Default"), 6 } }, true));
++		system.items.push_back(pick(Tnop("Region"), Tnop("BIOS region"), config::Region,
++				{ { T("Japan"), 0 }, { T("USA"), 1 }, { T("Europe"), 2 }, { T("Default"), 3 } }, true));
++		system.items.push_back(pick(Tnop("Broadcast"), Tnop("TV broadcasting standard for non-VGA modes"), config::Broadcast,
++				{ { "NTSC", 0 }, { "PAL", 1 }, { "PAL/M", 2 }, { "PAL/N", 3 }, { T("Default"), 4 } }, true));
++		system.items.push_back(pick(Tnop("Cable"), Tnop("Video connection type"), config::Cable,
++				{ { T("VGA"), 0 }, { T("RGB Component"), 2 }, { T("TV Composite"), 3 } }, true));
++		system.items.push_back(toggle(Tnop("HLE BIOS"), Tnop("Force high-level BIOS emulation"), config::UseReios, true));
++		system.items.push_back(pick(Tnop("CPU Mode"), Tnop("Use the dynamic recompiler. Recommended in most cases"), config::DynarecEnabled,
++				{ { T("Dynarec"), 1 }, { T("Interpreter"), 0 } }, true));
++		{
++			std::vector<Choice> clocks;
++			for (int mhz : { 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300 })
++				clocks.push_back({ std::to_string(mhz) + " MHz", mhz });
++			system.items.push_back(pick(Tnop("SH4 Clock"), Tnop("Over/Underclock the main SH4 CPU. Default is 200 MHz. Other values may crash, freeze or trigger unexpected nuclear reactions."),
++					config::Sh4Clock, clocks, true));
++		}
++		system.items.push_back(toggle(Tnop("Multi-threaded emulation"), Tnop("Run the emulated CPU and GPU on different threads"), config::ThreadedRendering, true));
++		system.items.push_back(toggle(Tnop("Dreamcast 32MB RAM Mod"), Tnop("Enables 32MB RAM Mod for Dreamcast. May affect compatibility"), config::RamMod32MB, true));
++		system.items.push_back(toggle(Tnop("Load State at Start"), Tnop("Load the last saved state of the game when starting"), config::AutoLoadState));
++		system.items.push_back(toggle(Tnop("Save State on Exit"), Tnop("Save the state of the game when stopping"), config::AutoSaveState));
++		groups.push_back(std::move(system));
++
++		Group home { ICON_FA_HOUSE, T("Home Screen Settings"), T("Theme, language, covers, opening"), {} };
++		{
++			std::vector<Choice> themes;
++			for (int i = 0; i < THEME_COUNT; i++)
++				themes.push_back({ themeName(i), i });
++			home.items.push_back(Setting { T("Home Screen Theme"), "", themes,
++				[] { return config::loadInt("resonance", "LauncherTheme", 0); },
++				[](int v) { config::saveInt("resonance", "LauncherTheme", v); requestTheme(v); } });
++			std::vector<Choice> langs;
++			for (int i = 0; i < languageCount(); i++)
++				langs.push_back({ languageName(i), i });
++			home.items.push_back(Setting { T("Menu Language"), T("Press X to change the menu language"), langs,
++				[] { return currentLanguage(); },
++				[this](int v) { setLanguage(v); rebuildPending = true; } });
++		}
++		home.items.push_back(toggle(Tnop("Fetch Box Art"), Tnop("Cover pictures from the libretro thumbnail server, by disc serial"), config::FetchBoxart));
++		home.items.push_back(Setting { T("Opening Animation"), T("Plays when the app starts"), onOff(),
++			[] { return introEnabled() ? 1 : 0; },
++			[](int v) { setIntroEnabled(v != 0); } });
++		groups.push_back(std::move(home));
++	}
++	bool rebuildPending = false;
++
++	int current(const Setting& s) const
++	{
++		const int v = s.get();
++		for (int i = 0; i < (int)s.choices.size(); i++)
++			if (s.choices[i].value == v)
++				return i;
++		return -1;
++	}
++	std::string valueText(const Setting& s) const
++	{
++		const int i = current(s);
++		return i >= 0 ? s.choices[i].label : std::to_string(s.get());
++	}
++	bool locked(const Setting& s) const {
++		return s.lockedInGame && gui_ps4_game_running();
++	}
++};
++
++SettingsPanel::SettingsPanel() : impl(std::make_unique<Impl>()) {
++	impl->build();
++}
++SettingsPanel::~SettingsPanel() = default;
++
++int SettingsPanel::groupCount() const {
++	return (int)impl->groups.size();
++}
++const char *SettingsPanel::groupIcon(int g) const {
++	return impl->groups[g].icon;
++}
++std::string SettingsPanel::groupName(int g) const {
++	return impl->groups[g].name;
++}
++std::string SettingsPanel::groupSummary(int g) const {
++	return impl->groups[g].summary;
++}
++bool SettingsPanel::isOpen() const {
++	return impl->open;
++}
++
++void SettingsPanel::openGroup(int g, float t)
++{
++	impl->build();	// labels in the current language, values as they are now
++	impl->open = true;
++	impl->group = std::clamp(g, 0, groupCount() - 1);
++	impl->sel = 0;
++	impl->selPos = 0;
++	impl->selVel = 0;
++	impl->dropOpen = false;
++	impl->openedAt = t;
++	playSound(Sound::Confirm);
++}
++
++void SettingsPanel::close()
++{
++	Impl& m = *impl;
++	m.open = false;
++	m.dropOpen = false;
++	if (m.changed)
++	{
++		gui_ps4_apply_settings(m.mapleChanged, m.expansionChanged);
++		m.changed = false;
++		for (int i = 0; i < 4; i++)
++			m.mapleChanged[i] = m.expansionChanged[i][0] = m.expansionChanged[i][1] = false;
++	}
++	playSound(Sound::Back);
++}
++
++void SettingsPanel::input(const MenuInput& in, float t)
++{
++	Impl& m = *impl;
++	if (!m.open)
++		return;
++	std::vector<Setting>& items = m.groups[m.group].items;
++	if (m.dropOpen)
++	{
++		Setting& s = items[m.sel];
++		const int n = (int)s.choices.size();
++		if (in.dy != 0)
++		{
++			const int next = std::clamp(m.dropSel + in.dy, 0, n - 1);
++			if (next != m.dropSel)
++			{
++				m.dropSel = next;
++				playSound(Sound::Move);
++			}
++		}
++		if (in.cross)
++		{
++			if (m.current(s) != m.dropSel)
++			{
++				s.set(s.choices[m.dropSel].value);
++				m.changed = true;
++			}
++			m.dropOpen = false;
++			playSound(Sound::Confirm);
++			if (m.rebuildPending)
++			{
++				// the menu language changed: the labels again, same place
++				m.rebuildPending = false;
++				const int g = m.group, sel = m.sel;
++				m.build();
++				m.group = g;
++				m.sel = sel;
++			}
++		}
++		else if (in.circle || in.dx < 0)
++		{
++			m.dropOpen = false;
++			playSound(Sound::Back);
++		}
++		return;
++	}
++	const int n = (int)items.size();
++	if (in.dy != 0)
++	{
++		const int next = std::clamp(m.sel + in.dy, 0, n - 1);
++		if (next != m.sel)
++		{
++			m.sel = next;
++			playSound(Sound::Move);
++		}
++	}
++	if (in.l1 || in.r1)
++	{
++		m.sel = in.l1 ? 0 : n - 1;
++		playSound(Sound::Move);
++	}
++	if (in.cross || in.dx > 0)
++	{
++		Setting& s = items[m.sel];
++		if (m.locked(s))
++			playSound(Sound::Error);
++		else
++		{
++			m.dropOpen = true;
++			m.dropSel = std::max(0, m.current(s));
++			m.dropPos = (float)m.dropSel;
++			m.dropVel = 0;
++			m.dropAt = t;
++			playSound(Sound::Confirm);
++		}
++	}
++	else if (in.circle || in.dx < 0)
++		close();
++}
++
++void SettingsPanel::draw(Frame& f, float alpha)
++{
++	Impl& m = *impl;
++	if (!m.open || alpha <= 0)
++		return;
++	ImDrawList *dl = f.dl;
++	const Group& g = m.groups[m.group];
++	const float in = easeOut((f.t - m.openedAt) / .3f) * alpha;
++	spring(m.selPos, m.selVel, (float)m.sel, 160.f, 26.f, f.dt);
++
++	// the group, top left
++	const float hs = f.h * .034f;
++	xmbText(dl, bodyFont(), hs * 1.2f, ImVec2(f.w * .07f, f.h * .1f), in, g.icon);
++	xmbText(dl, bodyFont(), hs, ImVec2(f.w * .07f + hs * 1.9f, f.h * .1f + hs * .1f), in, g.name);
++
++	// the options: the selected one stays near the upper third, the list scrolls under it
++	const float x0 = f.w * .12f + (1 - in) * f.w * .04f, x1 = f.w * .88f;
++	const float rowH = f.h * .062f, top = f.h * .2f, bottom = f.h * .83f;
++	const int rows = (int)((bottom - top) / rowH);
++	const int n = (int)g.items.size();
++	float scroll = std::clamp(m.selPos - rows * .35f, 0.f, std::max(0.f, (float)n - rows));
++	const float ts = f.h * .028f;
++	for (int i = 0; i < n; i++)
++	{
++		const float y = top + (i - scroll) * rowH;
++		if (y < top - rowH * .5f || y > bottom)
++			continue;
++		const float edge = clamp01(std::min((y - top + rowH) / rowH, (bottom - y) / rowH));
++		const Setting& s = g.items[i];
++		const bool sel = i == m.sel;
++		const bool lock = m.locked(s);
++		const float a = in * edge * (lock ? .4f : 1.f);
++		if (sel)
++		{
++			// the PS3's highlight: a soft lit band with fine lines
++			const ImU32 band = IM_COL32(255, 255, 255, (int)(34 * in)), clear = IM_COL32(255, 255, 255, 0);
++			dl->AddRectFilledMultiColor(ImVec2(x0 - f.w * .02f, y), ImVec2(x1 + f.w * .02f, y + rowH), clear, band, band, clear);
++			dl->AddLine(ImVec2(x0, y), ImVec2(x1, y), IM_COL32(255, 255, 255, (int)(60 * in)), 1.f);
++			dl->AddLine(ImVec2(x0, y + rowH), ImVec2(x1, y + rowH), IM_COL32(255, 255, 255, (int)(60 * in)), 1.f);
++		}
++		const float ty = y + (rowH - ts) * .5f;
++		xmbText(dl, bodyFont(), ts * (sel ? 1.06f : 1.f), ImVec2(x0, ty), a, s.name, 0, (x1 - x0) * .55f);
++		xmbText(dl, bodyFont(), ts * .95f, ImVec2(x1, ty), a * (sel ? 1.f : .75f), m.valueText(s), 1.f, (x1 - x0) * .4f,
++				sel ? IM_COL32(255, 255, 255, 255) : IM_COL32(210, 220, 235, 255));
++	}
++	// scroll marks
++	if (scroll > .05f)
++		xmbText(dl, bodyFont(), ts, ImVec2(f.w * .5f, top - rowH * .9f), in * .7f, ICON_FA_CHEVRON_UP, .5f);
++	if (scroll < n - rows - .05f)
++		xmbText(dl, bodyFont(), ts, ImVec2(f.w * .5f, bottom + rowH * .1f), in * .7f, ICON_FA_CHEVRON_DOWN, .5f);
++
++	// what the selected option does
++	const Setting& cur = g.items[m.sel];
++	std::string help = cur.help;
++	const size_t nl = help.find('\n');
++	if (nl != std::string::npos)
++		help = help.substr(0, nl);
++	xmbText(dl, bodyFont(), f.h * .022f, ImVec2(f.w * .07f, f.h * .875f), in * .85f, help, 0, f.w * .86f, IM_COL32(220, 228, 240, 255));
++
++	// the drop-down list beside the value
++	if (m.dropOpen)
++	{
++		spring(m.dropPos, m.dropVel, (float)m.dropSel, 180.f, 27.f, f.dt);
++		const float da = easeOut((f.t - m.dropAt) / .18f) * alpha;
++		const int cn = (int)cur.choices.size();
++		const float ch = f.h * .052f, cs = f.h * .026f;
++		float w = f.w * .16f;
++		for (const Choice& c : cur.choices)
++			w = std::max(w, textWidth(bodyFont(), cs, c.label) + cs * 3.f);
++		w = std::min(w, f.w * .4f);
++		const int show = std::min(cn, 9);
++		const float rowY = top + (m.selPos - scroll) * rowH + rowH * .5f;
++		const float panelH = show * ch + ch * .4f;
++		float py = rowY - panelH * .5f;
++		py = std::clamp(py, f.h * .1f, f.h * .86f - panelH);
++		const float px = x1 - w + f.w * .01f;
++		dl->AddRectFilled(ImVec2(px + 6, py + 8), ImVec2(px + w + 6, py + panelH + 8), IM_COL32(0, 0, 0, (int)(90 * da)), ch * .2f);
++		dl->AddRectFilled(ImVec2(px, py), ImVec2(px + w, py + panelH), IM_COL32(12, 16, 26, (int)(225 * da)), ch * .2f);
++		dl->AddRect(ImVec2(px, py), ImVec2(px + w, py + panelH), IM_COL32(255, 255, 255, (int)(70 * da)), ch * .2f, 0, 1.5f);
++		const float first = std::clamp(m.dropPos - show * .5f + .5f, 0.f, (float)std::max(0, cn - show));
++		dl->PushClipRect(ImVec2(px, py + 2), ImVec2(px + w, py + panelH - 2), true);
++		const int curIdx = m.current(cur);
++		for (int i = 0; i < cn; i++)
++		{
++			const float y = py + ch * .2f + (i - first) * ch;
++			if (y < py - ch || y > py + panelH)
++				continue;
++			if (i == m.dropSel)
++			{
++				dl->AddRectFilled(ImVec2(px + 4, y), ImVec2(px + w - 4, y + ch), xmbTone().u32(.55f * da), ch * .15f);
++				dl->AddRect(ImVec2(px + 4, y), ImVec2(px + w - 4, y + ch), IM_COL32(255, 255, 255, (int)(110 * da)), ch * .15f, 0, 1.f);
++			}
++			if (i == curIdx)
++				xmbText(dl, bodyFont(), cs * .8f, ImVec2(px + cs * .6f, y + (ch - cs * .8f) * .5f), da, ICON_FA_CHECK);
++			xmbText(dl, bodyFont(), cs, ImVec2(px + cs * 1.8f, y + (ch - cs) * .5f), da, cur.choices[i].label, 0, w - cs * 2.4f);
++		}
++		dl->PopClipRect();
++	}
++	xmbHints(f, m.dropOpen ? std::vector<Hint> { { 'x', T("OK") }, { 'o', T("Back") } }
++			: std::vector<Hint> { { 'x', T("Change") }, { 'o', T("Back") } }, in);
++}
++
++} // namespace launcher
++
++using namespace launcher;
++
++// ---- the settings screen (GuiState::Settings) ----
++
++namespace
++{
++SettingsPanel *gScreenPanel;
++MenuInput gScreenInput;
++int gScreenSel;
++float gScreenPos, gScreenVel;
++int gScreenLastFrame = -10;
++float gScreenOpenedAt;
++}
++
++bool launcher_settings_draw()
++{
++	Frame f = menuFrame();
++	if (gScreenPanel == nullptr)
++		gScreenPanel = new SettingsPanel();
++	SettingsPanel& panel = *gScreenPanel;
++	const int frame = ImGui::GetFrameCount();
++	if (frame != gScreenLastFrame + 1)
++	{
++		// just opened
++		gScreenSel = 0;
++		gScreenPos = 0;
++		gScreenOpenedAt = f.t;
++		soundStart();
++	}
++	gScreenLastFrame = frame;
++	gScreenInput.read(f.t);
++
++	const bool overGame = gui_ps4_game_running();
++	xmbBackground(f, overGame);
++	xmbClock(f, 1.f);
++
++	const int n = panel.groupCount();
++	if (panel.isOpen())
++		panel.input(gScreenInput, f.t);
++	else
++	{
++		if (gScreenInput.dy != 0)
++		{
++			const int next = std::clamp(gScreenSel + gScreenInput.dy, 0, n - 1);
++			if (next != gScreenSel)
++			{
++				gScreenSel = next;
++				playSound(Sound::Move);
++			}
++		}
++		if (gScreenInput.cross || gScreenInput.dx > 0)
++			panel.openGroup(gScreenSel, f.t);
++		else if (gScreenInput.circle)
++		{
++			playSound(Sound::Back);
++			gui_ps4_settings_done();
++			return true;
++		}
++	}
++
++	// the Settings column, as on the Cross bar; it steps aside while a group is open
++	spring(gScreenPos, gScreenVel, (float)gScreenSel, 130.f, 23.f, f.dt);
++	const float colA = panel.isOpen() ? .0f : easeOut((f.t - gScreenOpenedAt) / .3f);
++	const ImVec2 cat(f.w * .24f, f.h * .25f);
++	if (colA > 0)
++	{
++		xmbText(f.dl, bodyFont(), f.h * .085f, ImVec2(cat.x, cat.y - f.h * .046f), colA, ICON_FA_GEAR, .5f);
++		xmbText(f.dl, bodyFont(), f.h * .024f, ImVec2(cat.x, cat.y + f.h * .055f), colA, i18n::T("Settings"), .5f);
++		for (int i = 0; i < n; i++)
++		{
++			const float d = i - gScreenPos;
++			if (d < -.5f)
++				continue;
++			const float y = cat.y + f.h * .2f + d * f.h * .11f;
++			const float focus = clamp01(1 - std::fabs(d));
++			xmbItem(f, ImVec2(cat.x, y), panel.groupIcon(i), nullptr, panel.groupName(i), panel.groupSummary(i), focus,
++					colA * (i == gScreenSel ? 1.f : .7f));
++		}
++		xmbHints(f, { { 'x', i18n::T("Select") }, { 'o', i18n::T("Back") } }, colA);
++	}
++	panel.draw(f, 1.f);
++	return true;
++}
 diff --git a/shell/ps4/launcher/sound.cpp b/shell/ps4/launcher/sound.cpp
 new file mode 100644
-index 000000000..dd665471f
+index 000000000..7a22276dc
 --- /dev/null
 +++ b/shell/ps4/launcher/sound.cpp
 @@ -0,0 +1,193 @@
 +/*
-+	DeCast-S4 launcher sounds: short WAVs (48 kHz stereo 16-bit, /app0/launcher/sounds) mixed on
++	Resonance launcher sounds: short WAVs (48 kHz stereo 16-bit, /app0/launcher/sounds) mixed on
 +	an audio-out port of their own while the home screen is up. The port closes when a game starts,
 +	so the game's audio backend has the output to itself.
 +
@@ -45782,12 +47771,12 @@ index 000000000..dd665471f
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_channel.cpp b/shell/ps4/launcher/theme_channel.cpp
 new file mode 100644
-index 000000000..23ca313f7
+index 000000000..bb102f16b
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_channel.cpp
 @@ -0,0 +1,326 @@
 +/*
-+	DeCast-S4 launcher, theme "Channel": every game is a TV channel. The cover fills the screen
++	Resonance launcher, theme "Channel": every game is a TV channel. The cover fills the screen
 +	like a broadcast with a slow camera drift (a synthwave scene in the game's colours when there
 +	is no cover); changing channel rolls the picture through static. Starting a game switches the
 +	set off.
@@ -46114,12 +48103,12 @@ index 000000000..23ca313f7
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_orbit.cpp b/shell/ps4/launcher/theme_orbit.cpp
 new file mode 100644
-index 000000000..015dd0485
+index 000000000..12f382dab
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_orbit.cpp
 @@ -0,0 +1,315 @@
 +/*
-+	DeCast-S4 launcher, theme "Orbit": the library as discs on a slowly turning ring. Each disc
++	Resonance launcher, theme "Orbit": the library as discs on a slowly turning ring. Each disc
 +	has its cover printed on the label and a silver rim that catches a fixed light as it spins;
 +	the room takes on the selected game's colours.
 +
@@ -46435,12 +48424,12 @@ index 000000000..015dd0485
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_shelf.cpp b/shell/ps4/launcher/theme_shelf.cpp
 new file mode 100644
-index 000000000..cb2b950b3
+index 000000000..ffb01c986
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_shelf.cpp
 @@ -0,0 +1,267 @@
 +/*
-+	DeCast-S4 launcher, theme "Shelf": box art standing on a glossy shelf in perspective. The
++	Resonance launcher, theme "Shelf": box art standing on a glossy shelf in perspective. The
 +	selected box faces you and the others turn away on either side; starting a game turns the box
 +	around to its back.
 +
@@ -46708,13 +48697,15 @@ index 000000000..cb2b950b3
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/theme_xmb.cpp b/shell/ps4/launcher/theme_xmb.cpp
 new file mode 100644
-index 000000000..b0639be51
+index 000000000..bbbc87d0a
 --- /dev/null
 +++ b/shell/ps4/launcher/theme_xmb.cpp
-@@ -0,0 +1,388 @@
+@@ -0,0 +1,217 @@
 +/*
-+	DeCast-S4 launcher, theme "Cross bar": categories across, items down, over slow light ribbons
-+	that take the selected game's colour. Settings and the theme choice live in the bar too.
++	Resonance's home screen, theme "Cross bar": the PS3's XMB, kept simple. Two categories across
++	(Settings, Games), the selected one's items down: the games with their covers, or the settings
++	groups. A settings group opens its options in place, PS3 style, with drop-down lists
++	(settings_menu.cpp). The month's colour and the slow wave behind (xmb_style.cpp).
 +
 +	This file is part of Flycast.
 +
@@ -46735,27 +48726,21 @@ index 000000000..b0639be51
 +#include "ui/IconsFontAwesome6.h"
 +
 +#include <algorithm>
-+#include <ctime>
 +
 +namespace launcher
 +{
 +namespace
 +{
 +
-+enum Category { SETTINGS, THEMES, GAMES, CATEGORY_COUNT };
-+const char *const kCategoryIcon[CATEGORY_COUNT] = { ICON_FA_GEAR, ICON_FA_PALETTE, ICON_FA_GAMEPAD };
-+const char *const kCategoryName[CATEGORY_COUNT] = { Tnop("Settings"), Tnop("Themes"), Tnop("Games") };
-+const char *const kThemeBlurb[THEME_COUNT] = {
-+	Tnop("Discs on a turning ring"), Tnop("Every game is a TV channel"), Tnop("Box art on a glossy shelf"), Tnop("This menu"),
-+};
-+// the Settings column
-+enum SettingsItem { EMULATOR_SETTINGS, LANGUAGE, COVERS, SETTINGS_COUNT };
++enum Category { SETTINGS, GAMES, CATEGORY_COUNT };
++const char *const kCategoryIcon[CATEGORY_COUNT] = { ICON_FA_TOOLBOX, ICON_FA_GAMEPAD };
++const char *const kCategoryName[CATEGORY_COUNT] = { Tnop("Settings"), Tnop("Games") };
 +
 +class CrossBar : public Theme
 +{
 +public:
 +	const char *name() const override { return "Cross bar"; }
-+	float launchSeconds() const override { return 1.2f; }
++	float launchSeconds() const override { return .9f; }
 +
 +	bool navigate(Frame& f, int dx, int dy) override
 +	{
@@ -46771,326 +48756,159 @@ index 000000000..b0639be51
 +			return true;
 +		}
 +		if (cat == GAMES)
-+		{
 +			moveSelection(dy);
-+			return true;
-+		}
-+		const int count = itemCount(f);
-+		const int next = std::clamp(item[cat] + dy, 0, count - 1);
-+		if (next != item[cat])
++		else
 +		{
-+			item[cat] = next;
-+			itemChangedAt = f.t;
-+			playSound(Sound::Move);
++			const int next = std::clamp(setSel + dy, 0, panel.groupCount() - 1);
++			if (next != setSel)
++			{
++				setSel = next;
++				playSound(Sound::Move);
++			}
 +		}
 +		return true;
 +	}
 +
 +	bool activate(Frame& f) override
 +	{
-+		switch (cat)
-+		{
-+		case GAMES:
++		if (cat == GAMES)
 +			return false;	// the core starts the game
-+		case THEMES:
-+			if (item[THEMES] == currentTheme())
-+				playSound(Sound::Confirm);
-+			else
-+				requestTheme(item[THEMES]);
-+			return true;
-+		default:
-+			if (item[SETTINGS] == EMULATOR_SETTINGS)
-+				openSettings();
-+			else if (item[SETTINGS] == LANGUAGE)
-+			{
-+				setLanguage((currentLanguage() + 1) % languageCount());
-+				itemChangedAt = f.t;
-+				playSound(Sound::Confirm);
-+			}
-+			else
-+				playSound(Sound::Error);	// the covers folder: information only
-+			return true;
-+		}
++		panel.openGroup(setSel, f.t);
++		return true;
++	}
++
++	bool busy() const override {
++		return panel.isOpen();
++	}
++
++	void menuInput(Frame& f, const MenuInput& in) override {
++		panel.input(in, f.t);
 +	}
 +
 +	void draw(Frame& f) override
 +	{
-+		std::vector<Game>& games = *f.games;
-+		const int n = (int)games.size();
++		const int n = (int)f.games->size();
 +		if (!started)
 +		{
 +			started = true;
-+			catPos = (float)cat;
-+			item[THEMES] = currentTheme();
-+			for (int c = 0; c < CATEGORY_COUNT; c++)
-+				itemPos[c] = c == GAMES ? (float)f.goal : (float)item[c];
++			gamePos = (float)f.goal;
 +		}
 +		const float launch = f.launchAt >= 0 ? clamp01((f.t - f.launchAt) / launchSeconds()) : 0.f;
-+		spring(catPos, catVel, (float)cat, 110.f, 21.f, f.dt);
-+		for (int c = 0; c < CATEGORY_COUNT; c++)
-+			spring(itemPos[c], itemVel[c], c == GAMES ? (float)f.goal : (float)item[c], 130.f, 23.f, f.dt);
++		spring(catPos, catVel, (float)cat, 120.f, 22.f, f.dt);
++		spring(gamePos, gameVel, (float)f.goal, 140.f, 24.f, f.dt);
++		spring(setPos, setVel, (float)setSel, 140.f, 24.f, f.dt);
++		// the bar steps aside while a settings group is open
++		spring(aside, asideVel, panel.isOpen() ? 1.f : 0.f, 150.f, 25.f, f.dt);
 +
-+		// the colour of the moment: the selected game's on the Games row, deep blue elsewhere
-+		const Color want1 = cat == GAMES && n > 0 ? games[f.sel].c1 : Color { .3f, .5f, 1.f };
-+		const Color want2 = cat == GAMES && n > 0 ? games[f.sel].c2 : Color { .03f, .06f, .16f };
-+		approach(tone1, want1, 2.2f, f.dt);
-+		approach(tone2, want2, 2.2f, f.dt);
-+
-+		drawBackdrop(f);
-+		const float ui = 1 - easeOut(launch / .35f);
-+		drawCategories(f, ui);
-+		drawItems(f, ui, launch);
-+		drawClock(f, ui);
-+		drawHints(f, ui);
-+		if (launch > .7f)
-+			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * clamp01((launch - .7f) / .3f))));
++		xmbBackground(f);
++		const float ui = (1 - easeOut(launch / .5f)) * clamp01(1 - aside);
++		if (ui > .01f)
++		{
++			drawCategories(f, ui);
++			drawColumn(f, ui, n);
++			if (cat == GAMES)
++				xmbHints(f, n > 0 ? std::vector<Hint> { { 'x', i18n::T("Start") }, { 't', i18n::T("Settings") } }
++						: std::vector<Hint> {}, ui);
++			else
++				xmbHints(f, { { 'x', i18n::T("Select") } }, ui);
++		}
++		panel.draw(f, clamp01(aside));
++		xmbClock(f, 1 - easeOut(launch / .5f));
++		if (launch > 0)
++			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, (int)(255 * easeOut(launch))));
 +	}
 +
 +private:
-+	int itemCount(const Frame& f) const
-+	{
-+		switch (cat)
-+		{
-+		case GAMES: return std::max(1, (int)f.games->size());
-+		case THEMES: return THEME_COUNT;
-+		default: return SETTINGS_COUNT;
-+		}
-+	}
-+
-+	// Gradient sky and three ribbons of light, each a soft-edged strip that breathes
-+	void drawBackdrop(Frame& f)
-+	{
-+		ImDrawList *dl = f.dl;
-+		const Color top = mix(tone2, { 0, 0, 0 }, .15f), bottom = mix(tone2, tone1, .22f);
-+		dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(f.w, f.h), top.u32(), top.u32(), bottom.u32(), bottom.u32());
-+		drawBlob(dl, ImVec2(f.w * .8f, f.h * .2f), f.h * .9f, tone1.u32(.10f));
-+
-+		constexpr int COLS = 96;
-+		for (int r = 0; r < 3; r++)
-+		{
-+			const float base = f.h * (.6f + .06f * r);
-+			const float amp = f.h * (.07f - .015f * r), speed = .22f + .09f * r, freq = 1.6f + .5f * r;
-+			const float thick = f.h * (.05f + .025f * std::sin(f.t * .3f + r));
-+			const Color c = mix(tone1, { 1, 1, 1 }, .35f + .15f * r);
-+			const float peak = .20f - .045f * r;
-+			ImVec2 mid[COLS + 1];
-+			float width[COLS + 1];
-+			for (int i = 0; i <= COLS; i++)
-+			{
-+				const float x = (float)i / COLS;
-+				const float y = base + amp * std::sin(x * freq * PI + f.t * speed + r * 1.7f)
-+						+ amp * .45f * std::sin(x * freq * 2.3f * PI - f.t * speed * 1.4f + r);
-+				mid[i] = ImVec2(x * f.w, y);
-+				// the ribbon twists: thin where it turns over
-+				width[i] = thick * (.25f + .75f * std::fabs(std::cos(x * 2.4f * PI + f.t * speed * .8f + r * 2.2f)));
-+			}
-+			const ImVec2 white = whiteUV(dl);
-+			// two halves: clear at the edges, bright along the middle
-+			dl->PrimReserve(COLS * 12, (COLS + 1) * 3);
-+			const u32 v0 = dl->_VtxCurrentIdx;
-+			for (int i = 0; i <= COLS; i++)
-+			{
-+				const float edgeFade = clamp01(std::min(i, COLS - i) / 10.f);
-+				dl->PrimWriteVtx(ImVec2(mid[i].x, mid[i].y - width[i]), white, c.u32(0));
-+				dl->PrimWriteVtx(mid[i], white, c.u32(peak * edgeFade * (.6f + .4f * width[i] / thick)));
-+				dl->PrimWriteVtx(ImVec2(mid[i].x, mid[i].y + width[i] * .6f), white, c.u32(0));
-+			}
-+			for (int i = 0; i < COLS; i++)
-+			{
-+				const ImDrawIdx a = (ImDrawIdx)(v0 + i * 3), b = (ImDrawIdx)(v0 + (i + 1) * 3);
-+				dl->PrimWriteIdx(a); dl->PrimWriteIdx(b); dl->PrimWriteIdx(b + 1);
-+				dl->PrimWriteIdx(a); dl->PrimWriteIdx(b + 1); dl->PrimWriteIdx(a + 1);
-+				dl->PrimWriteIdx(a + 1); dl->PrimWriteIdx(b + 1); dl->PrimWriteIdx(b + 2);
-+				dl->PrimWriteIdx(a + 1); dl->PrimWriteIdx(b + 2); dl->PrimWriteIdx(a + 2);
-+			}
-+			// sparks riding the ribbon
-+			for (int s = 0; s < 6; s++)
-+			{
-+				const float u = std::fmod(s / 6.f + f.t * (.012f + .004f * s) + r * .13f, 1.f);
-+				const int i = (int)(u * COLS);
-+				const float tw = .5f + .5f * std::sin(f.t * 2.f + s * 1.3f + r);
-+				drawBlob(dl, mid[i], f.h * .012f * (1 + tw), IM_COL32(255, 255, 255, (int)(90 * tw)));
-+			}
-+		}
-+	}
-+
 +	ImVec2 barOrigin(const Frame& f) const {
-+		return ImVec2(f.w * .26f, f.h * .26f);
++		return ImVec2(f.w * .24f - aside * f.w * .1f, f.h * .25f);
 +	}
 +
 +	void drawCategories(Frame& f, float alpha)
 +	{
 +		const ImVec2 o = barOrigin(f);
-+		const float step = f.w * .13f;
-+		ImFont *icons = bodyFont();
++		const float step = f.w * .12f;
 +		for (int c = 0; c < CATEGORY_COUNT; c++)
 +		{
 +			const float k = c - catPos;
 +			const float near = clamp01(1 - std::fabs(k));
 +			const float x = o.x + k * step;
-+			const float size = f.h * (.055f + .025f * near);
-+			const float a = alpha * (.45f + .55f * near);
-+			// glow under the current category
-+			if (near > .01f)
-+				drawBlob(f.dl, ImVec2(x, o.y), size * 1.6f, tone1.u32(.35f * near * alpha));
-+			drawText(f.dl, icons, size, ImVec2(x, o.y - size * .55f), IM_COL32(255, 255, 255, (int)(255 * a)), kCategoryIcon[c], .5f);
-+			const char *label = i18n::T(kCategoryName[c]);
++			const float size = f.h * (.062f + .024f * near);
++			const float a = alpha * (.55f + .45f * near);
++			xmbText(f.dl, bodyFont(), size, ImVec2(x, o.y - size * .55f), a, kCategoryIcon[c], .5f);
 +			if (near > .01f)
 +			{
-+				const float e = easeOut((f.t - catChangedAt) / .3f);
-+				drawText(f.dl, displayFont(), f.h * .022f, ImVec2(x, o.y + size * .65f + (1 - e) * 6), IM_COL32(255, 255, 255, (int)(255 * near * e * alpha)),
-+						label, .5f);
++				const float e = easeOut((f.t - catChangedAt) / .25f);
++				xmbText(f.dl, bodyFont(), f.h * .024f, ImVec2(x, o.y + f.h * .055f), alpha * near * e, i18n::T(kCategoryName[c]), .5f);
 +			}
 +		}
 +	}
 +
-+	// The column under the current category: the selected item just below the bar, earlier ones above it
-+	void drawItems(Frame& f, float alpha, float launch)
++	// The selected category's items: the chosen one just under the bar, the ones after it below,
++	// the ones before it above the bar (as on the PS3)
++	void drawColumn(Frame& f, float alpha, int n)
 +	{
 +		const ImVec2 o = barOrigin(f);
-+		const float step = f.w * .13f;
++		const float step = f.w * .12f;
 +		for (int c = 0; c < CATEGORY_COUNT; c++)
 +		{
 +			const float k = c - catPos;
-+			const float colAlpha = clamp01(1 - std::fabs(k) * 1.6f);
-+			if (colAlpha <= 0)
++			const float colA = clamp01(1 - std::fabs(k) * 1.8f) * alpha;
++			if (colA <= .01f)
 +				continue;
 +			const float x = o.x + k * step;
-+			const int count = c == GAMES ? (int)f.games->size() : c == THEMES ? THEME_COUNT : SETTINGS_COUNT;
++			const int count = c == GAMES ? n : panel.groupCount();
 +			if (count == 0)
 +			{
-+				drawText(f.dl, displayFont(), f.h * .03f, ImVec2(x - f.h * .04f, o.y + f.h * .13f), IM_COL32(255, 255, 255, (int)(230 * colAlpha * alpha)),
-+						i18n::T("No games yet"));
-+				drawText(f.dl, bodyFont(), f.h * .022f, ImVec2(x - f.h * .04f, o.y + f.h * .18f), IM_COL32(200, 205, 220, (int)(200 * colAlpha * alpha)),
-+						i18n::T("Copy games to /data/DeCast-S4/games"));
++				xmbText(f.dl, bodyFont(), f.h * .03f, ImVec2(x - f.h * .03f, o.y + f.h * .17f), colA, i18n::T("No games yet"));
++				xmbText(f.dl, bodyFont(), f.h * .022f, ImVec2(x - f.h * .03f, o.y + f.h * .22f), colA * .8f,
++						i18n::T("Copy games to /data/Resonance/games"));
 +				continue;
 +			}
-+			const int selected = c == GAMES ? f.goal : item[c];
-+			for (int i = (int)std::floor(itemPos[c]) - 4; i <= (int)std::ceil(itemPos[c]) + 7; i++)
++			const float pos = c == GAMES ? gamePos : setPos;
++			const int selected = c == GAMES ? f.goal : setSel;
++			const int before = std::min(3, count - 1);
++			for (int i = (int)std::floor(pos) - 3; i <= (int)std::ceil(pos) + 7; i++)
 +			{
 +				if (c != GAMES && (i < 0 || i >= count))
 +					continue;
-+				if (c == GAMES && count < 12 && (i - selected > count - 1 - 3 || selected - i > 3))
-+					continue;	// a short library: no repeats on screen
-+				const float d = i - itemPos[c];
-+				const bool isSel = i == selected;
-+				const float near = clamp01(1 - std::fabs(d));
-+				// below the bar for the selected and later items, above it for earlier ones
-+				const float below = o.y + f.h * .14f, above = o.y - f.h * .1f;
++				// games wrap round; each shows once
++				if (c == GAMES && (selected - i > before || i - selected > count - 1 - before))
++					continue;
++				const float d = i - pos;
++				const float below = o.y + f.h * .2f, above = o.y - f.h * .1f;
 +				float y;
 +				if (d >= 0)
 +					y = below + d * f.h * .11f;
 +				else if (d <= -1)
 +					y = above + (d + 1) * f.h * .09f;
 +				else
-+					y = below + (above - below) * -d;	// passing the bar
-+				const float fade = clamp01(1.4f - std::fabs(d) * .22f) * colAlpha;
-+				float a = fade * (isSel ? 1.f : .62f);
-+				if (isSel && launch > 0)
-+					a = 1.f;
-+				else
-+					a *= alpha;
-+				if (a <= .01f)
++					y = below + (above - below) * -d;
++				if (y > f.h * 1.05f || y < -f.h * .1f)
 +					continue;
-+				drawItem(f, c, ((i % count) + count) % count, ImVec2(x, y), near * colAlpha, a, isSel ? launch : 0.f);
++				const float focus = clamp01(1 - std::fabs(d));
++				const float a = colA * (i == selected ? 1.f : .7f) * clamp01(1.3f - std::fabs(d) * .12f);
++				const int idx = ((i % count) + count) % count;
++				if (c == GAMES)
++				{
++					const Game& g = (*f.games)[idx];
++					std::string sub = g.format;
++					if (!g.regionName.empty())
++						sub += "   \xC2\xB7   " + g.regionName;
++					if (!g.e.productId.empty())
++						sub += "   \xC2\xB7   " + g.e.productId;
++					xmbItem(f, ImVec2(x, y), nullptr, &g, g.e.title, sub, focus, a);
++				}
++				else
++					xmbItem(f, ImVec2(x, y), panel.groupIcon(idx), nullptr, panel.groupName(idx), panel.groupSummary(idx), focus, a);
 +			}
 +		}
 +	}
 +
-+	void drawItem(Frame& f, int c, int index, ImVec2 p, float focus, float alpha, float launch)
-+	{
-+		ImDrawList *dl = f.dl;
-+		const float iconSize = f.h * (.075f + .045f * focus) * (1 + launch * 1.5f);
-+		const ImVec2 i0(p.x - iconSize / 2, p.y - iconSize / 2), i1(p.x + iconSize / 2, p.y + iconSize / 2);
-+		std::string title, detail;
-+		if (c == GAMES)
-+		{
-+			const Game& g = (*f.games)[index];
-+			if (focus > .01f)
-+			{
-+				// a breathing halo around the focused game
-+				const float pulse = .5f + .5f * std::sin(f.t * 2.4f);
-+				drawBlob(dl, p, iconSize * (1.1f + .1f * pulse), g.c1.u32(.4f * focus * alpha));
-+			}
-+			const ImTextureID tex = coverTexture(g);
-+			if (tex != ImTextureID())
-+				dl->AddImageRounded(tex, i0, i1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, (int)(255 * alpha)), iconSize * .06f);
-+			else
-+			{
-+				dl->AddRectFilledMultiColor(i0, i1, g.c1.u32(alpha), g.c2.u32(alpha), g.c2.u32(alpha), g.c1.u32(alpha));
-+				drawText(dl, bodyFont(), iconSize * .4f, ImVec2(p.x, p.y - iconSize * .22f), IM_COL32(255, 255, 255, (int)(200 * alpha)), ICON_FA_COMPACT_DISC, .5f);
-+			}
-+			dl->AddRect(i0, i1, IM_COL32(255, 255, 255, (int)(110 * focus * alpha)), iconSize * .06f, 0, 1.5f);
-+			title = g.e.title;
-+			detail = g.format;
-+			if (!g.regionName.empty())
-+				detail += "   \xC2\xB7   " + g.regionName;
-+			if (!g.e.productId.empty())
-+				detail += "   \xC2\xB7   " + g.e.productId;
-+		}
-+		else
-+		{
-+			const char *icon;
-+			if (c == THEMES)
-+			{
-+				icon = index == currentTheme() ? ICON_FA_CHECK : index == 0 ? ICON_FA_COMPACT_DISC : index == 1 ? ICON_FA_TV
-+						: index == 2 ? ICON_FA_LAYER_GROUP : ICON_FA_BARS;
-+				title = themeName(index);
-+				detail = i18n::T(kThemeBlurb[index]);
-+			}
-+			else if (index == EMULATOR_SETTINGS)
-+			{
-+				icon = ICON_FA_SLIDERS;
-+				title = i18n::T("Emulator settings");
-+				detail = i18n::T("Video, audio, controls, BIOS, content folders");
-+			}
-+			else if (index == LANGUAGE)
-+			{
-+				icon = ICON_FA_LANGUAGE;
-+				title = std::string(i18n::T("Language")) + ":  " + languageName(currentLanguage());
-+				detail = i18n::T("Press X to change the menu language");
-+			}
-+			else
-+			{
-+				icon = ICON_FA_IMAGE;
-+				title = i18n::T("Covers");
-+				detail = i18n::T("Your own: /data/DeCast-S4/covers/<game file or serial>.png");
-+			}
-+			drawText(dl, bodyFont(), iconSize * .6f, ImVec2(p.x, p.y - iconSize * .33f), IM_COL32(255, 255, 255, (int)(255 * alpha)), icon, .5f);
-+		}
-+		if (launch > 0)
-+			return;
-+		const float tx = p.x + f.h * .1f;
-+		const float ts = f.h * (.026f + .01f * focus);
-+		drawText(dl, focus > .5f ? displayFont() : bodyFont(), ts, ImVec2(tx, p.y - ts * (.55f + .45f * focus)), IM_COL32(255, 255, 255, (int)(255 * alpha)),
-+				title, 0, f.w * .95f - tx);
-+		if (focus > .01f)
-+		{
-+			const float e = easeOut((f.t - std::max(f.selectedAt, itemChangedAt)) / .35f) * focus;
-+			drawText(dl, bodyFont(), f.h * .022f, ImVec2(tx + (1 - e) * 10, p.y + ts * .45f), mix(tone1, { 1, 1, 1 }, .55f).u32(alpha * e),
-+					detail, 0, f.w * .95f - tx);
-+		}
-+	}
-+
-+	void drawClock(Frame& f, float alpha)
-+	{
-+		char clock[32], date[32];
-+		const time_t now = time(nullptr);
-+		const tm *lt = localtime(&now);
-+		strftime(clock, sizeof(clock), "%H:%M", lt);
-+		strftime(date, sizeof(date), "%d/%m", lt);
-+		const float x = f.w * .95f, y = f.h * .06f;
-+		const float tw = drawText(f.dl, displayFont(), f.h * .03f, ImVec2(x, y), IM_COL32(255, 255, 255, (int)(235 * alpha)), clock, 1.f);
-+		drawText(f.dl, bodyFont(), f.h * .024f, ImVec2(x - tw - f.h * .02f, y + f.h * .004f), IM_COL32(220, 225, 235, (int)(180 * alpha)), date, 1.f);
-+	}
-+
++	SettingsPanel panel;
 +	bool started = false;
-+	int cat = GAMES;
-+	int item[CATEGORY_COUNT] {};
-+	float catPos = GAMES, catVel = 0;
-+	float itemPos[CATEGORY_COUNT] {}, itemVel[CATEGORY_COUNT] {};
-+	float catChangedAt = -10.f, itemChangedAt = -10.f;
-+	Color tone1 { .3f, .5f, 1.f }, tone2 { .03f, .06f, .16f };
++	int cat = GAMES, setSel = 0;
++	float catPos = GAMES, catVel = 0, gamePos = 0, gameVel = 0, setPos = 0, setVel = 0;
++	float aside = 0, asideVel = 0, catChangedAt = -10;
 +};
 +
 +} // namespace
@@ -47100,14 +48918,262 @@ index 000000000..b0639be51
 +}
 +
 +} // namespace launcher
+diff --git a/shell/ps4/launcher/xmb_style.cpp b/shell/ps4/launcher/xmb_style.cpp
+new file mode 100644
+index 000000000..0506dd1cb
+--- /dev/null
++++ b/shell/ps4/launcher/xmb_style.cpp
+@@ -0,0 +1,242 @@
++/*
++	Resonance's PS3 look, shared by the Cross bar, the settings and the quick menu: the month's
++	colour (the PS3 changes it every month), the slow wave, white text with a soft shadow, the
++	clock, button hints, items with an icon and a title. And the pad as menus read it.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++#include "ps4_gamepad.h"
++#include "imgui_internal.h"
++#include "ui/IconsFontAwesome6.h"
++
++#include <chrono>
++#include <ctime>
++
++namespace launcher
++{
++
++Color xmbTone()
++{
++	// January silver, February gold, March lime, April pink, May green, June violet, July teal,
++	// August blue, September purple, October amber, November brown, December red
++	static const Color months[12] = {
++		{ .62f, .64f, .70f }, { .80f, .64f, .16f }, { .46f, .66f, .16f }, { .84f, .42f, .60f },
++		{ .14f, .56f, .26f }, { .56f, .34f, .76f }, { .10f, .56f, .64f }, { .16f, .38f, .82f },
++		{ .44f, .24f, .66f }, { .76f, .56f, .12f }, { .52f, .32f, .18f }, { .74f, .14f, .16f },
++	};
++	const time_t now = time(nullptr);
++	const tm *lt = localtime(&now);
++	return months[lt != nullptr ? lt->tm_mon % 12 : 7];
++}
++
++void xmbBackground(Frame& f, bool overGame)
++{
++	ImDrawList *dl = f.dl;
++	const Color tone = xmbTone();
++	const Color top = mix(tone, { 0, 0, 0 }, .55f), mid = mix(tone, { 0, 0, 0 }, .15f), bottom = mix(tone, { 0, 0, 0 }, .6f);
++	const float a = overGame ? .82f : 1.f;
++	const float split = f.h * .55f;
++	dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(f.w, split), top.u32(a), top.u32(a), mid.u32(a), mid.u32(a));
++	dl->AddRectFilledMultiColor(ImVec2(0, split), ImVec2(f.w, f.h), mid.u32(a), mid.u32(a), bottom.u32(a), bottom.u32(a));
++
++	// the wave: two thin sheets of light rolling slowly across the middle
++	constexpr int N = 120;
++	const ImVec2 white = whiteUV(dl);
++	for (int s = 0; s < 2; s++)
++	{
++		ImVec2 upper[N + 1], lower[N + 1];
++		for (int i = 0; i <= N; i++)
++		{
++			const float x = (float)i / N;
++			const float ph = f.t * (.18f + .07f * s) + s * 1.9f;
++			const float y = f.h * (.56f + .03f * s) + f.h * .045f * std::sin(x * 5.2f + ph) + f.h * .02f * std::sin(x * 11.f - ph * 1.3f);
++			const float thick = f.h * (.035f + .025f * std::sin(x * 3.1f + ph * .7f + s));
++			upper[i] = ImVec2(x * f.w, y - thick * .5f);
++			lower[i] = ImVec2(x * f.w, y + thick * .5f);
++		}
++		dl->PrimReserve(N * 6, (N + 1) * 2);
++		const u32 base = dl->_VtxCurrentIdx;
++		for (int i = 0; i <= N; i++)
++		{
++			const float edge = clamp01(std::min(i, N - i) / 14.f);
++			dl->PrimWriteVtx(upper[i], white, IM_COL32(255, 255, 255, (int)(26 * edge * a)));
++			dl->PrimWriteVtx(lower[i], white, IM_COL32(255, 255, 255, (int)(6 * edge * a)));
++		}
++		for (int i = 0; i < N; i++)
++		{
++			const ImDrawIdx v = (ImDrawIdx)(base + i * 2);
++			dl->PrimWriteIdx(v); dl->PrimWriteIdx(v + 1); dl->PrimWriteIdx(v + 3);
++			dl->PrimWriteIdx(v); dl->PrimWriteIdx(v + 3); dl->PrimWriteIdx(v + 2);
++		}
++		// the bright edge of the sheet
++		dl->AddPolyline(upper, N + 1, IM_COL32(255, 255, 255, (int)(70 * a)), 0, 1.5f);
++	}
++}
++
++float xmbText(ImDrawList *dl, ImFont *font, float size, ImVec2 pos, float alpha, const std::string& text,
++		float align, float maxWidth, ImU32 color)
++{
++	if (alpha <= 0)
++		return 0;
++	const float off = std::max(1.f, size * .06f);
++	drawText(dl, font, size, ImVec2(pos.x + off, pos.y + off), IM_COL32(0, 0, 0, (int)(110 * alpha)), text, align, maxWidth);
++	const ImU32 c = (color & ~IM_COL32_A_MASK) | ((ImU32)(((color >> IM_COL32_A_SHIFT) & 0xff) * alpha) << IM_COL32_A_SHIFT);
++	return drawText(dl, font, size, pos, c, text, align, maxWidth);
++}
++
++void xmbClock(Frame& f, float alpha)
++{
++	char clock[32];
++	const time_t now = time(nullptr);
++	const tm *lt = localtime(&now);
++	strftime(clock, sizeof(clock), "%d/%m  %H:%M", lt);
++	const float size = f.h * .026f;
++	const float w = xmbText(f.dl, bodyFont(), size, ImVec2(f.w * .94f, f.h * .055f), alpha, clock, 1.f);
++	// the PS3's little clock face beside it
++	const ImVec2 c(f.w * .94f - w - size * .9f, f.h * .055f + size * .55f);
++	f.dl->AddCircle(c, size * .45f, IM_COL32(255, 255, 255, (int)(220 * alpha)), 20, 1.5f);
++	const float h = (lt->tm_hour % 12 + lt->tm_min / 60.f) / 12.f * 2 * PI, m = lt->tm_min / 60.f * 2 * PI;
++	f.dl->AddLine(c, ImVec2(c.x + std::sin(h) * size * .25f, c.y - std::cos(h) * size * .25f), IM_COL32(255, 255, 255, (int)(220 * alpha)), 1.5f);
++	f.dl->AddLine(c, ImVec2(c.x + std::sin(m) * size * .36f, c.y - std::cos(m) * size * .36f), IM_COL32(255, 255, 255, (int)(220 * alpha)), 1.5f);
++}
++
++void xmbHints(Frame& f, const std::vector<Hint>& hints, float alpha)
++{
++	if (alpha <= 0)
++		return;
++	ImFont *font = bodyFont();
++	const float size = f.h * .028f, fs = f.h * .022f, y = f.h * .935f, gap = size * .5f;
++	float total = 0;
++	for (const Hint& h : hints)
++		total += size + gap + textWidth(font, fs, h.label) + size * 1.2f;
++	float x = f.w * .94f - total;
++	for (const Hint& h : hints)
++	{
++		drawButton(f.dl, h.button, ImVec2(x + size / 2, y), size, alpha);
++		x += size + gap;
++		x += xmbText(f.dl, font, fs, ImVec2(x, y - fs * .62f), alpha * .9f, h.label);
++		x += size * 1.2f;
++	}
++}
++
++void xmbItem(Frame& f, ImVec2 c, const char *glyph, const Game *game, const std::string& title,
++		const std::string& subtitle, float focus, float alpha)
++{
++	if (alpha <= .01f)
++		return;
++	ImDrawList *dl = f.dl;
++	const float icon = f.h * (.07f + .03f * focus);
++	if (focus > .01f)
++		drawBlob(dl, c, icon * 1.3f, IM_COL32(255, 255, 255, (int)(40 * focus * alpha)));
++	if (game != nullptr)
++	{
++		// a game: its cover (wider than tall, like a PS3 game icon), else its colours and a disc
++		const ImVec2 a(c.x - icon * .75f, c.y - icon * .5f), b(c.x + icon * .75f, c.y + icon * .5f);
++		const ImTextureID tex = coverTexture(*game);
++		dl->AddRectFilled(ImVec2(a.x + 3, a.y + 4), ImVec2(b.x + 3, b.y + 4), IM_COL32(0, 0, 0, (int)(70 * alpha)), icon * .05f);
++		if (tex != ImTextureID())
++			// the cover's middle band
++			dl->AddImageRounded(tex, a, b, ImVec2(0, .17f), ImVec2(1, .83f), IM_COL32(255, 255, 255, (int)(255 * alpha)), icon * .05f);
++		else
++		{
++			dl->AddRectFilledMultiColor(a, b, game->c1.u32(alpha), game->c2.u32(alpha), game->c2.u32(alpha), game->c1.u32(alpha));
++			drawText(dl, bodyFont(), icon * .5f, ImVec2(c.x, c.y - icon * .28f), IM_COL32(255, 255, 255, (int)(200 * alpha)), ICON_FA_COMPACT_DISC, .5f);
++		}
++	}
++	else if (glyph != nullptr)
++		xmbText(dl, bodyFont(), icon * .78f, ImVec2(c.x, c.y - icon * .42f), alpha, glyph, .5f);
++	const float tx = c.x + f.h * .1f;
++	const float ts = f.h * (.028f + .006f * focus);
++	const float maxW = f.w * .94f - tx;
++	if (subtitle.empty() || focus < .01f)
++		xmbText(dl, bodyFont(), ts, ImVec2(tx, c.y - ts * .6f), alpha, title, 0, maxW);
++	else
++	{
++		xmbText(dl, bodyFont(), ts, ImVec2(tx, c.y - ts * (.6f + .55f * focus)), alpha, title, 0, maxW);
++		xmbText(dl, bodyFont(), f.h * .021f, ImVec2(tx, c.y + ts * .35f), alpha * focus, subtitle, 0, maxW, IM_COL32(220, 226, 236, 255));
++	}
++}
++
++Frame menuFrame()
++{
++	static auto start = std::chrono::steady_clock::now();
++	ImGuiIO& io = ImGui::GetIO();
++	Frame f {};
++	f.dl = ImGui::GetBackgroundDrawList();
++	f.w = io.DisplaySize.x;
++	f.h = io.DisplaySize.y;
++	f.t = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
++	f.dt = std::min(.05f, io.DeltaTime);
++	f.games = nullptr;
++	f.launchAt = -1;
++	return f;
++}
++
++void MenuInput::read(float t)
++{
++	u32 buttons = 0;
++	float lx = 0, ly = 0;
++	ps4_pad_state(buttons, lx, ly);
++	const int frame = ImGui::GetFrameCount();
++	if (frame != lastFrame + 1)
++	{
++		// (re)appearing: what's held now was pressed for something else
++		prev = buttons;
++		held = -1;
++	}
++	lastFrame = frame;
++	const u32 pressed = buttons & ~prev;
++	prev = buttons;
++	cross = pressed & ORBIS_PAD_BUTTON_CROSS;
++	circle = pressed & ORBIS_PAD_BUTTON_CIRCLE;
++	triangle = pressed & ORBIS_PAD_BUTTON_TRIANGLE;
++	square = pressed & ORBIS_PAD_BUTTON_SQUARE;
++	l1 = pressed & ORBIS_PAD_BUTTON_L1;
++	r1 = pressed & ORBIS_PAD_BUTTON_R1;
++	int dir = 0;
++	if ((buttons & ORBIS_PAD_BUTTON_LEFT) || lx < -.55f) dir = 1;
++	else if ((buttons & ORBIS_PAD_BUTTON_RIGHT) || lx > .55f) dir = 2;
++	else if ((buttons & ORBIS_PAD_BUTTON_UP) || ly < -.55f) dir = 3;
++	else if ((buttons & ORBIS_PAD_BUTTON_DOWN) || ly > .55f) dir = 4;
++	dx = dy = 0;
++	if (held == -1)
++	{
++		// wait for a direction held across the change to be let go
++		if (dir == 0)
++			held = 0;
++		return;
++	}
++	bool fire = false;
++	if (dir != held)
++	{
++		held = dir;
++		fire = dir != 0;
++		repeatAt = t + .38f;
++	}
++	else if (dir != 0 && t >= repeatAt)
++	{
++		fire = true;
++		repeatAt = t + .085f;
++	}
++	if (fire)
++	{
++		dx = dir == 1 ? -1 : dir == 2 ? 1 : 0;
++		dy = dir == 3 ? -1 : dir == 4 ? 1 : 0;
++	}
++}
++
++} // namespace launcher
 diff --git a/shell/ps4/ps4_gamepad.cpp b/shell/ps4/ps4_gamepad.cpp
 new file mode 100644
-index 000000000..72d31c782
+index 000000000..a7c2fd3ee
 --- /dev/null
 +++ b/shell/ps4/ps4_gamepad.cpp
-@@ -0,0 +1,392 @@
+@@ -0,0 +1,397 @@
 +/*
-+	DeCast-S4: DualShock 4 input through ScePad.
++	Resonance: DualShock 4 input through ScePad.
 +
 +	Every signed-in user's pad is a Flycast gamepad: the first user's on port A, the others on
 +	B to D in sign-in order. A user who signs in later gets a pad on the next free port.
@@ -47128,6 +49194,7 @@ index 000000000..72d31c782
 +    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
 + */
 +#include "ps4_gamepad.h"
++#include "launcher/launcher.h"
 +#include "oslib/i18n.h"
 +#include "stdclass.h"
 +
@@ -47345,6 +49412,10 @@ index 000000000..72d31c782
 +	}
 +
 +	const u32 buttons = data.buttons;
++	// L3+R3: Resonance's quick menu (as in DolphinPS4 and Crema)
++	constexpr u32 combo = ORBIS_PAD_BUTTON_L3 | ORBIS_PAD_BUTTON_R3;
++	if ((buttons & combo) == combo && (lastButtons & combo) != combo)
++		launcher_open_quick_menu();
 +	const u32 changed = buttons ^ lastButtons;
 +	if (changed != 0)
 +		for (u32 button : kButtons)
@@ -47500,12 +49571,12 @@ index 000000000..72d31c782
 +}
 diff --git a/shell/ps4/ps4_gamepad.h b/shell/ps4/ps4_gamepad.h
 new file mode 100644
-index 000000000..da82a4b66
+index 000000000..8cf0835cc
 --- /dev/null
 +++ b/shell/ps4/ps4_gamepad.h
 @@ -0,0 +1,82 @@
 +/*
-+	DeCast-S4: DualShock 4 input through ScePad.
++	Resonance: DualShock 4 input through ScePad.
 +
 +	This file is part of Flycast.
 +
@@ -47588,17 +49659,17 @@ index 000000000..da82a4b66
 +bool ps4_pad_state(u32& buttons, float& lx, float& ly);
 diff --git a/shell/ps4/ps4_main.cpp b/shell/ps4/ps4_main.cpp
 new file mode 100644
-index 000000000..58d3226f6
+index 000000000..1c00f944a
 --- /dev/null
 +++ b/shell/ps4/ps4_main.cpp
-@@ -0,0 +1,328 @@
+@@ -0,0 +1,365 @@
 +/*
-+	DeCast-S4: Flycast's PS4 frontend.
++	Resonance: Flycast's PS4 frontend.
 +
 +	  /app0                       packaged files (eboot.bin, version.txt)
-+	  /data/DeCast-S4             emu.cfg, logs (boot-trace.log, crash.log, hang.log, flycast.log)
-+	  /data/DeCast-S4/data        BIOS and flash (dc_boot.bin, dc_flash.bin), VMUs, save states
-+	  /data/DeCast-S4/games       games (GDI, CHD, CDI, ...), the default content folder
++	  /data/Resonance             emu.cfg, logs (boot-trace.log, crash.log, hang.log, flycast.log)
++	  /data/Resonance/data        BIOS and flash (dc_boot.bin, dc_flash.bin), VMUs, save states
++	  /data/Resonance/games       games (GDI, CHD, CDI, ...), the default content folder
 +
 +	Flycast's own menu (ImGui) is the frontend; the DualShock 4's touchpad click opens it in game.
 +
@@ -47663,7 +49734,7 @@ index 000000000..58d3226f6
 +
 +namespace
 +{
-+const std::string kDataRoot = "/data/DeCast-S4";
++const std::string kDataRoot = "/data/Resonance";
 +
 +void trace(const std::string& line) {
 +	ps4_boot_trace(line.c_str());
@@ -47703,7 +49774,7 @@ index 000000000..58d3226f6
 +	return v;
 +}
 +
-+bool profiling;		// /data/DeCast-S4/profile.txt exists: the sampling profiler runs
++bool profiling;		// /data/Resonance/profile.txt exists: the sampling profiler runs
 +
 +// Performance monitor: every 5 s a line in boot-trace.log with the frame rate, the emulation speed
 +// (emulated vblanks against the console's rate), how busy the GPU was (GPU timestamps around each
@@ -47779,6 +49850,42 @@ index 000000000..58d3226f6
 +}
 +
 +// Exceptions thrown for the first time take a slow path (unwinder setup); do it before the JIT.
++// The app was called DeCast-S4: the folder has been renamed (port/ps4_crashlog.cpp); the paths and
++// the settings section written inside its files follow
++void migrateFromDeCast()
++{
++	auto rewrite = [](const std::string& from, const std::string& to) {
++		FILE *f = fopen(from.c_str(), "rb");
++		if (f == nullptr)
++			return;
++		std::string text;
++		char buf[16384];
++		size_t n;
++		while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
++			text.append(buf, n);
++		fclose(f);
++		const std::string original = text;
++		auto replaceAll = [&text](const std::string& a, const std::string& b) {
++			for (size_t p = text.find(a); p != std::string::npos; p = text.find(a, p + b.size()))
++				text.replace(p, a.size(), b);
++		};
++		replaceAll("/data/DeCast-S4", "/data/Resonance");
++		replaceAll("[decast]", "[resonance]");
++		if (text == original && from == to)
++			return;
++		f = fopen(to.c_str(), "wb");
++		if (f == nullptr)
++			return;
++		fwrite(text.data(), 1, text.size(), f);
++		fclose(f);
++		if (from != to)
++			remove(from.c_str());
++		trace("migrated " + from + " -> " + to);
++	};
++	rewrite(kDataRoot + "/emu.cfg", kDataRoot + "/emu.cfg");
++	rewrite(kDataRoot + "/data/boxart/decast-gamedb.json", kDataRoot + "/data/boxart/resonance-gamedb.json");
++}
++
 +void warmUpExceptions()
 +{
 +	try {
@@ -47791,8 +49898,9 @@ index 000000000..58d3226f6
 +int main(int argc, char *argv[])
 +{
 +	loadSystemModules();
-+	trace("DeCast-S4 " + appVersion() + " starting");
++	trace("Resonance " + appVersion() + " starting");
 +
++	migrateFromDeCast();
 +	flycast::mkdir(kDataRoot.c_str(), 0777);
 +	flycast::mkdir((kDataRoot + "/data").c_str(), 0777);
 +	flycast::mkdir((kDataRoot + "/games").c_str(), 0777);
@@ -47824,10 +49932,10 @@ index 000000000..58d3226f6
 +		return 1;
 +	}
 +	// the frame rate and speed on screen, once (the user can turn it off in Video settings)
-+	if (!config::loadBool("decast", "ShowFPSDefault", false))
++	if (!config::loadBool("resonance", "ShowFPSDefault", false))
 +	{
 +		config::ShowFPS.set(true);
-+		config::saveBool("decast", "ShowFPSDefault", true);
++		config::saveBool("resonance", "ShowFPSDefault", true);
 +		SaveSettings();
 +	}
 +	startPerfMonitor();
@@ -47922,12 +50030,12 @@ index 000000000..58d3226f6
 +}
 diff --git a/shell/ps4/ps4_stats.h b/shell/ps4/ps4_stats.h
 new file mode 100644
-index 000000000..efaa5a0c5
+index 000000000..d0ad34db7
 --- /dev/null
 +++ b/shell/ps4/ps4_stats.h
 @@ -0,0 +1,46 @@
 +/*
-+	DeCast-S4: counters for the performance monitor (shell/ps4/ps4_main.cpp).
++	Resonance: counters for the performance monitor (shell/ps4/ps4_main.cpp).
 +
 +	This file is part of Flycast.
 +
@@ -47974,12 +50082,12 @@ index 000000000..efaa5a0c5
 +};
 diff --git a/shell/ps4/ps4_stubs.c b/shell/ps4/ps4_stubs.c
 new file mode 100644
-index 000000000..4cad82eb3
+index 000000000..fb08d6cd5
 --- /dev/null
 +++ b/shell/ps4/ps4_stubs.c
 @@ -0,0 +1,25 @@
 +/*
-+	DeCast-S4: definitions for weak references the PS4 loader can't leave unresolved
++	Resonance: definitions for weak references the PS4 loader can't leave unresolved
 +	(create-fself refuses an executable with undefined weak symbols).
 +
 +	This file is part of Flycast.
@@ -48005,12 +50113,12 @@ index 000000000..4cad82eb3
 +void ZSTD_trace_decompress_end(unsigned long long ctx, const void *trace) {}
 diff --git a/shell/ps4/ps4_vmem.cpp b/shell/ps4/ps4_vmem.cpp
 new file mode 100644
-index 000000000..53612e149
+index 000000000..4176407c5
 --- /dev/null
 +++ b/shell/ps4/ps4_vmem.cpp
 @@ -0,0 +1,333 @@
 +/*
-+	DeCast-S4: virtual memory (fast memory) on the PS4.
++	Resonance: virtual memory (fast memory) on the PS4.
 +
 +	The PS4 kernel can't reserve hundreds of MiB with mmap(PROT_NONE) and has no anonymous
 +	shared memory to map at fixed addresses, so, like DolphinPS4's MemArenaPS4:
@@ -48344,12 +50452,12 @@ index 000000000..53612e149
 +} // namespace virtmem
 diff --git a/shell/ps4/ps4_wsi.cpp b/shell/ps4/ps4_wsi.cpp
 new file mode 100644
-index 000000000..c65a93c0f
+index 000000000..1c2ff9222
 --- /dev/null
 +++ b/shell/ps4/ps4_wsi.cpp
 @@ -0,0 +1,559 @@
 +/*
-+	DeCast-S4: Vulkan window system integration on the PS4 (from Crema's PS4WSI.cpp).
++	Resonance: Vulkan window system integration on the PS4 (from Crema's PS4WSI.cpp).
 +
 +	RADV (DolphinPS4's GNM port) is linked into the executable and has no WSI. This file adds
 +	VK_EXT_headless_surface and VK_KHR_swapchain on top of it the way DolphinPS4 presents: the
@@ -48442,7 +50550,7 @@ index 000000000..c65a93c0f
 +		ERROR_LOG(RENDERER, "PS4WSI: sceVideoOutOpen failed: %x", sVideo);
 +		return false;
 +	}
-+	sceKernelCreateEqueue(&sFlipQueue, "decast flip");
++	sceKernelCreateEqueue(&sFlipQueue, "resonance flip");
 +	sceVideoOutAddFlipEvent(sFlipQueue, sVideo, nullptr);
 +	return true;
 +}
@@ -48909,12 +51017,12 @@ index 000000000..c65a93c0f
 +}
 diff --git a/shell/ps4/ps4_wsi.h b/shell/ps4/ps4_wsi.h
 new file mode 100644
-index 000000000..010c50413
+index 000000000..5bad18c77
 --- /dev/null
 +++ b/shell/ps4/ps4_wsi.h
 @@ -0,0 +1,31 @@
 +/*
-+	DeCast-S4: Vulkan window system integration on the PS4 (ps4_wsi.cpp).
++	Resonance: Vulkan window system integration on the PS4 (ps4_wsi.cpp).
 +
 +	This file is part of Flycast.
 +

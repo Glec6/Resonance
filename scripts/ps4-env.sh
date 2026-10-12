@@ -1,5 +1,5 @@
 # Source to build like love-ps4: PacBrew OpenOrbis toolchain (clang 12, ld.lld, create-fself).
-PS4_BUILD_ROOT="${PS4_BUILD_ROOT:-$HOME/decast-build}"
+PS4_BUILD_ROOT="${PS4_BUILD_ROOT:-$HOME/resonance-build}"
 OPENORBIS="${OPENORBIS:-/opt/pacbrew/ps4/openorbis}"
 # shellcheck disable=SC1091
 source "$OPENORBIS/ps4vars.sh"

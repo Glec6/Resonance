@@ -2,9 +2,9 @@
 //
 // PS4 coredumps are encrypted and klog is shared with other tools, so the app reports its own
 // crashes: a constructor that runs before all others (priority 101) starts
-// /data/DeCast-S4/boot-trace.log and installs a handler for fatal signals that appends the
+// /data/Resonance/boot-trace.log and installs a handler for fatal signals that appends the
 // signal, fault address, registers and the code addresses found on the stack to
-// /data/DeCast-S4/crash.log. Addresses are printed relative to the start of .text, i.e. as ELF
+// /data/Resonance/crash.log. Addresses are printed relative to the start of .text, i.e. as ELF
 // virtual addresses: symbolize with `llvm-symbolizer --obj=<elf> 0x...`.
 //
 // Handlers installed later (Dolphin's fastmem handler) chain to this one for faults they don't
@@ -86,8 +86,12 @@ bool readable(const void* address) {
 // Opened on first use: the heap may log before this file's constructor runs.
 int traceFd() {
     if (g_traceFd < 0) {
-        mkdir("/data/DeCast-S4", 0777);
-        g_traceFd = open("/data/DeCast-S4/boot-trace.log", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        // The app was called DeCast-S4: its folder (games, saves, settings) takes the new name once.
+        struct stat st;
+        if (stat("/data/Resonance", &st) != 0 && stat("/data/DeCast-S4", &st) == 0)
+            rename("/data/DeCast-S4", "/data/Resonance");
+        mkdir("/data/Resonance", 0777);
+        g_traceFd = open("/data/Resonance/boot-trace.log", O_WRONLY | O_CREAT | O_TRUNC, 0666);
     }
     return g_traceFd;
 }
@@ -137,7 +141,7 @@ void crashHandler(int sig, siginfo_t* info, void* context) {
     if (s_depth++ > 0)
         _exit(128 + sig);
 
-    const int fd = open("/data/DeCast-S4/crash.log", O_WRONLY | O_CREAT | O_APPEND, 0666);
+    const int fd = open("/data/Resonance/crash.log", O_WRONLY | O_CREAT | O_APPEND, 0666);
     if (fd >= 0) {
         const auto* regs = reinterpret_cast<const uint64_t*>(static_cast<char*>(context) + kMcontextOffset);
         const uint64_t rip = regs[kRipIndex];
@@ -180,8 +184,8 @@ void crashHandler(int sig, siginfo_t* info, void* context) {
         _exit(126);
     }, nullptr);
     // Where every other thread was (stacks, and the lock each one waits on), after the crash.
-    ps4_dump_thread_stacks("/data/DeCast-S4/crash.log", "every thread at the crash");
-    // The emulator's view of the crash (DeCast-S4: the SH4 registers, into crash.log).
+    ps4_dump_thread_stacks("/data/Resonance/crash.log", "every thread at the crash");
+    // The emulator's view of the crash (Resonance: the SH4 registers, into crash.log).
     if (ps4_crash_guest_info) {
         ps4_crash_guest_info();
         if (traceFd() >= 0)
@@ -210,7 +214,7 @@ void crashHandler(int sig, siginfo_t* info, void* context) {
         }
         snprintf(message, sizeof(message), "uncaught exception %s: %s", name ? name : type->name(), what);
     }
-    const int fd = open("/data/DeCast-S4/crash.log", O_WRONLY | O_CREAT | O_APPEND, 0666);
+    const int fd = open("/data/Resonance/crash.log", O_WRONLY | O_CREAT | O_APPEND, 0666);
     if (fd >= 0) {
         writeFormat(fd, "\n=== %s\n", message);
         close(fd);
@@ -258,7 +262,7 @@ extern "C" __attribute__((noinline)) void ps4_trace_callers(const char* what) {
     ps4_boot_trace(line);
 }
 
-// Appends a line to /data/DeCast-S4/boot-trace.log (startup milestones), prefixed with the
+// Appends a line to /data/Resonance/boot-trace.log (startup milestones), prefixed with the
 // seconds since the first trace line.
 extern "C" void ps4_boot_trace(const char* stage) {
     const int fd = traceFd();

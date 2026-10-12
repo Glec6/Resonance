@@ -1,4 +1,4 @@
-<title>DeCast-S4 Shell Studies</title>
+<title>Resonance Shell Studies</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -107,9 +107,9 @@ footer{color:var(--faint);font-size:13px;border-top:1px solid var(--line);paddin
 
 <div class="wrap">
 <header>
-  <div class="eyebrow">DeCast-S4 · home screen studies</div>
+  <div class="eyebrow">Resonance · home screen studies</div>
   <h1>Five moving shells for the Dreamcast emulator on PS4</h1>
-  <p class="lede">Each stage below runs live at TV proportions, the way it would on the console. Browse the sample library, start a game, or leave a stage alone and it plays its own attract loop. The two games marked <span style="color:var(--accent)">on console</span> are the ones already in /data/DeCast-S4/games; the rest are sample titles.</p>
+  <p class="lede">Each stage below runs live at TV proportions, the way it would on the console. Browse the sample library, start a game, or leave a stage alone and it plays its own attract loop. The two games marked <span style="color:var(--accent)">on console</span> are the ones already in /data/Resonance/games; the rest are sample titles.</p>
   <div class="keys"><span><kbd>←</kbd> <kbd>→</kbd> browse</span><span><kbd>↑</kbd> <kbd>↓</kbd> lists in studies B and E</span><span><kbd>Enter</kbd> start</span><span>click a stage to give it the keys</span></div>
   <nav class="jump" aria-label="Studies"><a href="#orbit">A · Orbit</a><a href="#lcd">B · Memory unit</a><a href="#channel">C · Channel</a><a href="#shelf">D · Cover shelf</a><a href="#xmb">E · XMB</a><a href="#covers">Where covers come from</a></nav>
 </header>
@@ -193,15 +193,15 @@ footer{color:var(--faint);font-size:13px;border-top:1px solid var(--line);paddin
 </section>
 
 <section class="study" id="covers">
-  <div class="study-head"><span class="tag">COVERS</span><h2>Where the box art comes from</h2><p>DeCast-S4 can fetch covers by itself, the way RetroArch does, from the libretro thumbnail library. Every disc carries a product number that Flycast already reads at boot, and libretro's Dreamcast database ties that number to the exact image name.</p></div>
+  <div class="study-head"><span class="tag">COVERS</span><h2>Where the box art comes from</h2><p>Resonance can fetch covers by itself, the way RetroArch does, from the libretro thumbnail library. Every disc carries a product number that Flycast already reads at boot, and libretro's Dreamcast database ties that number to the exact image name.</p></div>
   <div class="spec" style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px">
     <div><h3>1 · Automatic</h3><p>Read the product number from the disc (T13002N, MK-51117), look it up in a table of 1,897 Dreamcast discs built into the app, and download that game's box art once from thumbnails.libretro.com. Both games on your console are there.</p></div>
-    <div><h3>2 · Your own</h3><p>Drop any PNG or JPG into /data/DeCast-S4/covers named after the game file or the product number. Your image always wins over a downloaded one.</p></div>
+    <div><h3>2 · Your own</h3><p>Drop any PNG or JPG into /data/Resonance/covers named after the game file or the product number. Your image always wins over a downloaded one.</p></div>
     <div><h3>3 · Fallback</h3><p>No cover and no network: the shelf generates a case in the game's colours, like the ones on this page, so nothing ever shows a blank square.</p></div>
   </div>
 </section>
 
-<footer>Studies for the DeCast-S4 launcher. Motion stops when your system asks for reduced motion; the stages still respond to keys and taps.</footer>
+<footer>Studies for the Resonance launcher. Motion stops when your system asks for reduced motion; the stages still respond to keys and taps.</footer>
 </div>
 
 <script>
@@ -601,7 +601,7 @@ function xmb(st) {
     { k: "games", n: "Games", items: GAMES.map(g => ({ l: g.t, s: `${g.y} · ${g.g}${g.here ? " · on console" : ""}`, tile: coverURL(g, 96), game: true })) },
     { k: "cards", n: "Memory cards", items: [["Port A · card 1", "Sample: 4 saves, 72 of 200 blocks"], ["Port A · card 2", "Sample: empty"], ["Port B · card 1", "Sample: 1 save"]].map(([l, s]) => ({ l, s, tile: tileFor("VMU", "#9daa8b") })) },
     { k: "captures", n: "Captures", items: [["Screenshots", "Saved from the in-game menu"], ["Save states", "Ten slots per game"]].map(([l, s]) => ({ l, s, tile: tileFor(l, "#ff7a2e") })) },
-    { k: "system", n: "System", items: [["Network", "Box art downloads"], ["About DeCast-S4", "Version, licences"]].map(([l, s]) => ({ l, s, tile: tileFor(l, "#b9c0d2") })) },
+    { k: "system", n: "System", items: [["Network", "Box art downloads"], ["About Resonance", "Version, licences"]].map(([l, s]) => ({ l, s, tile: tileFor(l, "#b9c0d2") })) },
   ];
   let cat = 1, catPos = 1, catVel = 0, sel = CATS.map(() => 0), itemPos = 0, itemVel = 0, boot = -1, toastT = -10;
   const catEls = CATS.map(c => { const d = document.createElement("div"); d.className = "xmb-cat"; d.innerHTML = ICON[c.k] + `<span>${c.n}</span>`; root.appendChild(d); return d; });

@@ -714,9 +714,9 @@
 2007	Temalar
 2008	Dil
 2009	Kitaplığın boş
-2010	GDI, CHD veya CDI oyunlarını /data/DeCast-S4/games klasörüne kopyala, burada görünürler.
+2010	GDI, CHD veya CDI oyunlarını /data/Resonance/games klasörüne kopyala, burada görünürler.
 2011	Henüz oyun yok
-2012	Oyunları /data/DeCast-S4/games klasörüne kopyala
+2012	Oyunları /data/Resonance/games klasörüne kopyala
 2013	CANLI
 2014	Dönen bir halkada diskler
 2015	Her oyun bir TV kanalı
@@ -725,5 +725,28 @@
 2018	Öykünücü ayarları
 2019	Video, ses, kontroller, BIOS, içerik klasörleri
 2020	Kapaklar
-2021	Kendi kapakların: /data/DeCast-S4/covers/<oyun dosyası veya seri no>.png
+2021	Kendi kapakların: /data/Resonance/covers/<oyun dosyası veya seri no>.png
 2022	Menü dilini değiştirmek için X'e bas
+2023	Video ayarları
+2024	Çözünürlük, geniş ekran, filtreleme, kare hızı
+2025	Ses ayarları
+2026	Ses düzeyi, ses işlemcisi
+2027	Kontrolcü ayarları
+2028	Dreamcast bağlantı noktalarındaki aygıtlar
+2029	Sistem ayarları
+2030	Bölge, dil, BIOS, CPU
+2031	Ana ekran ayarları
+2032	Tema, dil, kapaklar, açılış
+2033	Açık
+2034	Kapalı
+2035	Otomatik kare atlama
+2036	Doku filtreleme
+2037	Başlarken durumu yükle
+2038	Çıkarken durumu kaydet
+2039	Ana ekran teması
+2040	Menü dili
+2041	Disk seri numarasına göre libretro küçük resim sunucusundan kapaklar
+2042	Açılış animasyonu
+2043	Uygulama açılırken oynar
+2044	Değiştir
+2045	DURAKLATILDI

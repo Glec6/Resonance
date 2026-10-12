@@ -1,7 +1,7 @@
 # Shared settings for the modern PS4 toolchain (clang 21 + libc++ 21 on top
 # of the OpenOrbis C runtime). Source this from the other scripts.
 
-export PSB="${PSB:-$HOME/decast-build}"          # build tree lives in WSL, not on J:
+export PSB="${PSB:-$HOME/resonance-build}"          # build tree lives in WSL, not on J:
 export OPENORBIS="${OPENORBIS:-/opt/pacbrew/ps4/openorbis}"
 export PS4_SYSROOT="$PSB/sysroot"                    # our libc++, ICU, ... install here
 export PS4_TARGET="x86_64-pc-freebsd12-elf"

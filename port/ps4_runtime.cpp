@@ -99,7 +99,7 @@ void logStack() {
     int found = 0;
     for (int i = 0; i < 512 && found < 16; i++) {
         if (stack[i] >= base && stack[i] < base + 0x1000000) {
-            heapLog("[decast] heap:   stack elf 0x%llx\n", static_cast<unsigned long long>(stack[i] - base));
+            heapLog("[resonance] heap:   stack elf 0x%llx\n", static_cast<unsigned long long>(stack[i] - base));
             found++;
         }
     }
@@ -108,19 +108,19 @@ void logStack() {
 mspace createMspace(const char* pool, void* base, size_t size) {
     mspace msp = create_mspace_with_base(base, size, 1);
     if (!msp) {
-        heapLog("[decast] heap: create_mspace_with_base on %zu MiB of %s failed\n", size / MB, pool);
+        heapLog("[resonance] heap: create_mspace_with_base on %zu MiB of %s failed\n", size / MB, pool);
         return nullptr;
     }
     void* test = mspace_malloc(msp, 4096);
     if (!test) {
-        heapLog("[decast] heap: %zu MiB of %s at %p: self-test allocation failed\n", size / MB, pool, base);
+        heapLog("[resonance] heap: %zu MiB of %s at %p: self-test allocation failed\n", size / MB, pool, base);
         return nullptr;
     }
     mspace_free(msp, test);
     g_heapPool = pool;
     g_heapBase = reinterpret_cast<uintptr_t>(base);
     g_heapSize = size;
-    heapLog("[decast] heap: dlmalloc on %zu MiB of %s at %p\n", size / MB, pool, base);
+    heapLog("[resonance] heap: dlmalloc on %zu MiB of %s at %p\n", size / MB, pool, base);
     return msp;
 }
 
@@ -134,7 +134,7 @@ void* reserveAwayFromKernel(size_t size) {
         if (sceKernelReserveVirtualRange(&address, size, 0, PAGE) == 0) {
             if (reinterpret_cast<uintptr_t>(address) >= 0x400000000ull)
                 return address;
-            heapLog("[decast] heap: reservation hint %p gave %p, trying another\n", reinterpret_cast<void*>(hint),
+            heapLog("[resonance] heap: reservation hint %p gave %p, trying another\n", reinterpret_cast<void*>(hint),
                     address);
         }
     }
@@ -149,10 +149,10 @@ mspace mapAndCreate(bool systemPool, size_t size) {
         return nullptr;
     void* base = static_cast<char*>(guard) + PAGE;
     int32_t ret = systemPool
-                      ? sceKernelMapNamedSystemFlexibleMemory(&base, size, PROT_CPU_RW, MAP_FIXED_FLAG, "decast heap")
-                      : sceKernelMapNamedFlexibleMemory(&base, size, PROT_CPU_RW, MAP_FIXED_FLAG, "decast heap");
+                      ? sceKernelMapNamedSystemFlexibleMemory(&base, size, PROT_CPU_RW, MAP_FIXED_FLAG, "resonance heap")
+                      : sceKernelMapNamedFlexibleMemory(&base, size, PROT_CPU_RW, MAP_FIXED_FLAG, "resonance heap");
     if (ret != 0) {
-        heapLog("[decast] heap: mapping %zu MiB of %s flexible memory failed (0x%x)\n", size / MB,
+        heapLog("[resonance] heap: mapping %zu MiB of %s flexible memory failed (0x%x)\n", size / MB,
                 systemPool ? "system" : "regular", ret);
         return nullptr;  // the leaked VA reservation doesn't matter in a 47-bit address space
     }
@@ -173,12 +173,12 @@ mspace createDirectHeap(size_t size) {
 mspace createHeap() {
     size_t available = 0;
     int32_t ret = sceKernelAvailableFlexibleMemorySize(&available);
-    heapLog("[decast] heap: flexible memory available %zu MiB (0x%x)\n", available / MB, ret);
+    heapLog("[resonance] heap: flexible memory available %zu MiB (0x%x)\n", available / MB, ret);
     // Where does the kernel library put its own objects? (8 bytes reserved even if the
     // headers' pthread_mutexattr_t is the 4-byte musl one.)
     void* attr[2] = {nullptr, nullptr};
     if (pthread_mutexattr_init(reinterpret_cast<pthread_mutexattr_t*>(attr)) == 0) {
-        heapLog("[decast] heap: kernel pthread objects live around %p\n", attr[0]);
+        heapLog("[resonance] heap: kernel pthread objects live around %p\n", attr[0]);
         pthread_mutexattr_destroy(reinterpret_cast<pthread_mutexattr_t*>(attr));
     }
     // Preferred: the system flexible memory pool, leaving regular flexible memory to Piglet.
@@ -202,7 +202,7 @@ mspace createHeap() {
         if (mspace msp = createDirectHeap(direct))
             return msp;
     }
-    heapLog("[decast] heap: could not create a heap, out of memory\n");
+    heapLog("[resonance] heap: could not create a heap, out of memory\n");
     return nullptr;
 }
 
@@ -243,7 +243,7 @@ mspace overflowHeap() {
         void* base = reinterpret_cast<void*>(0x1800000000ull);
         const int32_t ret = sceKernelMapDirectMemory(&base, size, PROT_CPU_RW, 0, phys, 2 * MB);
         if (ret != 0 || reinterpret_cast<uintptr_t>(base) < 0x400000000ull) {
-            heapLog("[decast] heap: overflow heap: mapping %zu MiB of direct memory failed (0x%x, %p)\n",
+            heapLog("[resonance] heap: overflow heap: mapping %zu MiB of direct memory failed (0x%x, %p)\n",
                     size / MB, ret, base);
             continue;
         }
@@ -253,11 +253,11 @@ mspace overflowHeap() {
         g_overflowBase = reinterpret_cast<uintptr_t>(base);
         g_overflowSize = size;
         __atomic_store_n(&g_overflow, msp, __ATOMIC_RELEASE);
-        heapLog("[decast] heap: main heap full: overflow heap of %zu MiB of direct memory at %p\n", size / MB,
+        heapLog("[resonance] heap: main heap full: overflow heap of %zu MiB of direct memory at %p\n", size / MB,
                 base);
         return msp;
     }
-    heapLog("[decast] heap: main heap full and no direct memory for an overflow heap\n");
+    heapLog("[resonance] heap: main heap full and no direct memory for an overflow heap\n");
     return nullptr;
 }
 
@@ -320,12 +320,12 @@ void checkHeap(const char* op, const void* caller) {
     g_ops++;
     if (g_heap && !g_heapBroken && !ps4_heap_ok(g_heap)) {
         g_heapBroken = true;
-        heapLog("[decast] heap: CONTROL BLOCK OVERWRITTEN, noticed at operation #%llu (%s from elf 0x%llx); "
+        heapLog("[resonance] heap: CONTROL BLOCK OVERWRITTEN, noticed at operation #%llu (%s from elf 0x%llx); "
                 "previous operation %s from elf 0x%llx\n",
                 g_ops, op, elf(caller), g_prevOp, elf(g_prevCaller));
         const auto* words = reinterpret_cast<const unsigned long long*>(g_heapBase);
         for (int i = 0; i < 16; i += 4)
-            heapLog("[decast] heap:   +0x%02x: %016llx %016llx %016llx %016llx\n", i * 8, words[i], words[i + 1],
+            heapLog("[resonance] heap:   +0x%02x: %016llx %016llx %016llx %016llx\n", i * 8, words[i], words[i + 1],
                     words[i + 2], words[i + 3]);
         logStack();
     }
@@ -335,7 +335,7 @@ void checkHeap(const char* op, const void* caller) {
 
 void reportFailure(const char* what, size_t size) {
     if (g_errors++ < 8) {
-        heapLog("[decast] heap: %s(%zu) failed, caller elf 0x%llx\n", what, size, elf(t_caller));
+        heapLog("[resonance] heap: %s(%zu) failed, caller elf 0x%llx\n", what, size, elf(t_caller));
         logStack();
     }
 }
@@ -367,7 +367,7 @@ extern "C" {
 // dlmalloc found a corrupted heap (corruption = 1) or was asked to free/realloc something it
 // didn't allocate (corruption = 0).
 void ps4_heap_error(void* msp, void* chunk, int corruption) {
-    heapLog("[decast] heap: %s during %s from elf 0x%llx (chunk %p)\n",
+    heapLog("[resonance] heap: %s during %s from elf 0x%llx (chunk %p)\n",
             corruption ? "CORRUPTION DETECTED" : "invalid pointer", t_op, elf(t_caller), chunk);
     logStack();
     if (corruption)
@@ -397,7 +397,7 @@ void __wrap_free(void* ptr) {
     checkHeap(t_op, t_caller);
     if (!ownsPointer(ptr)) {
         if (g_errors++ < 8) {
-            heapLog("[decast] heap: free(%p) of memory not from this heap, caller elf 0x%llx (ignored)\n", ptr,
+            heapLog("[resonance] heap: free(%p) of memory not from this heap, caller elf 0x%llx (ignored)\n", ptr,
                     elf(t_caller));
             logStack();
         }
@@ -426,7 +426,7 @@ void* __wrap_realloc(void* ptr, size_t size) {
     t_caller = __builtin_return_address(0);
     checkHeap(t_op, t_caller);
     if (ptr && !ownsPointer(ptr)) {
-        heapLog("[decast] heap: realloc(%p) of memory not from this heap, caller elf 0x%llx\n", ptr,
+        heapLog("[resonance] heap: realloc(%p) of memory not from this heap, caller elf 0x%llx\n", ptr,
                 elf(t_caller));
         logStack();
         return nullptr;
@@ -500,7 +500,7 @@ void ps4_heap_private_arena(const char* name) {
     unlockFreeArenas();
     if (t_arena) {
         pthread_setspecific(g_arenaKey, t_arena);
-        heapLog("[decast] heap: reused arena for '%s'\n", name);
+        heapLog("[resonance] heap: reused arena for '%s'\n", name);
         return;
     }
     if (g_arenaCount.fetch_add(1) >= MAX_ARENAS)
@@ -511,7 +511,7 @@ void ps4_heap_private_arena(const char* name) {
     t_arena = create_mspace_with_base(block, ARENA_SIZE, 1);
     if (t_arena)
         pthread_setspecific(g_arenaKey, t_arena);
-    heapLog("[decast] heap: private %zu MiB arena for '%s'%s\n", ARENA_SIZE / MB, name,
+    heapLog("[resonance] heap: private %zu MiB arena for '%s'%s\n", ARENA_SIZE / MB, name,
             t_arena ? "" : " FAILED");
 }
 
@@ -591,13 +591,13 @@ void* __wrap_mmap(void* addr, size_t len, int prot, int flags, int fd, off_t off
         void* base = reserveAwayFromKernel(size);
         if (base) {
             const int32_t ret = sceKernelMapNamedSystemFlexibleMemory(&base, size, prot & 0x7, MAP_FIXED_FLAG,
-                                                                      "decast mmap");
+                                                                      "resonance mmap");
             if (ret == 0) {
-                heapLog("[decast] mmap: %zu KiB prot %d from system flexible memory at %p, caller elf 0x%llx\n",
+                heapLog("[resonance] mmap: %zu KiB prot %d from system flexible memory at %p, caller elf 0x%llx\n",
                         size / 1024, prot, base, elf(__builtin_return_address(0)));
                 return base;
             }
-            heapLog("[decast] mmap: %zu KiB prot %d not possible from system flexible memory (0x%x)\n",
+            heapLog("[resonance] mmap: %zu KiB prot %d not possible from system flexible memory (0x%x)\n",
                     size / 1024, prot, ret);
             sceKernelMunmap(base, size);
         }
@@ -606,7 +606,7 @@ void* __wrap_mmap(void* addr, size_t len, int prot, int flags, int fd, off_t off
     if (anonymous && len >= MB) {
         size_t available = 0;
         sceKernelAvailableFlexibleMemorySize(&available);
-        heapLog("[decast] mmap: %zu KiB prot %d from regular flexible memory = %p, caller elf 0x%llx, "
+        heapLog("[resonance] mmap: %zu KiB prot %d from regular flexible memory = %p, caller elf 0x%llx, "
                 "%zu MiB flexible left\n",
                 len / 1024, prot, result, elf(__builtin_return_address(0)), available / MB);
     }

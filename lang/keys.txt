@@ -1,4 +1,4 @@
-# English texts: Flycast's flycast.pot, then the home screen's (lang/decast-keys.txt).
+# English texts: Flycast's flycast.pot, then the home screen's (lang/resonance-keys.txt).
 # <number><TAB>[context] text || plural. Written by scripts/make-lang.py keys.
 1	User %s authenticated
 2	RetroAchievements authentication failed
@@ -714,9 +714,9 @@
 2007	Themes
 2008	Language
 2009	Your library is empty
-2010	Copy GDI, CHD or CDI games to /data/DeCast-S4/games and they appear here.
+2010	Copy GDI, CHD or CDI games to /data/Resonance/games and they appear here.
 2011	No games yet
-2012	Copy games to /data/DeCast-S4/games
+2012	Copy games to /data/Resonance/games
 2013	LIVE
 2014	Discs on a turning ring
 2015	Every game is a TV channel
@@ -725,5 +725,28 @@
 2018	Emulator settings
 2019	Video, audio, controls, BIOS, content folders
 2020	Covers
-2021	Your own: /data/DeCast-S4/covers/<game file or serial>.png
+2021	Your own: /data/Resonance/covers/<game file or serial>.png
 2022	Press X to change the menu language
+2023	Video Settings
+2024	Resolution, widescreen, filtering, frame rate
+2025	Audio Settings
+2026	Volume, sound processor
+2027	Controller Settings
+2028	Devices in the Dreamcast's ports
+2029	System Settings
+2030	Region, language, BIOS, CPU
+2031	Home Screen Settings
+2032	Theme, language, covers, opening
+2033	On
+2034	Off
+2035	Automatic Frame Skipping
+2036	Texture Filtering
+2037	Load State at Start
+2038	Save State on Exit
+2039	Home Screen Theme
+2040	Menu Language
+2041	Cover pictures from the libretro thumbnail server, by disc serial
+2042	Opening Animation
+2043	Plays when the app starts
+2044	Change
+2045	PAUSED
