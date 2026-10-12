@@ -43845,10 +43845,10 @@ index 000000000..26f3b7021
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/intro.cpp b/shell/ps4/launcher/intro.cpp
 new file mode 100644
-index 000000000..5df0b7c63
+index 000000000..bc5eaffc5
 --- /dev/null
 +++ b/shell/ps4/launcher/intro.cpp
-@@ -0,0 +1,615 @@
+@@ -0,0 +1,653 @@
 +/*
 +	Resonance's opening, played once when the app starts: Sonic spin-dashes into the spotlight as a
 +	ball, skids to the middle of the stage and hops up as the Dreamcast drops out of the sky, uncurls
@@ -43917,7 +43917,30 @@ index 000000000..5df0b7c63
 +class Intro
 +{
 +public:
++	// The layout, then the pictures; false until they are all up (the UI driver refuses textures
++	// for its first frames: try again on the next)
 +	bool load()
++	{
++		if (!layoutRead && !readLayout())
++			return false;
++		const char *const names[] = { "bg.jpg", "sonic.png", "console.png" };
++		Layer *const dest[] = { &bg, &sonic, &console };
++		for (int i = 0; i < 3; i++)
++			if (dest[i]->tex == ImTextureID())
++			{
++				dest[i]->tex = loadTexture(std::string(kDir) + names[i]);
++				if (dest[i]->tex == ImTextureID())
++					return false;
++			}
++		return true;
++	}
++
++	bool layoutOk() const {
++		return layoutRead;
++	}
++
++private:
++	bool readLayout()
 +	{
 +		std::map<std::string, Layer> layout;
 +		FILE *f = fopen((std::string(kDir) + "layout.txt").c_str(), "r");
@@ -43945,12 +43968,12 @@ index 000000000..5df0b7c63
 +			if (it == layout.end())
 +				return false;
 +			*dest[i] = it->second;
-+			dest[i]->tex = loadTexture(std::string(kDir) + names[i]);
-+			if (dest[i]->tex == ImTextureID())
-+				return false;
 +		}
-+		return srcH > 0;
++		layoutRead = srcH > 0;
++		return layoutRead;
 +	}
++
++public:
 +
 +	// false once finished (or skipped)
 +	bool draw(Frame& f)
@@ -44427,6 +44450,7 @@ index 000000000..5df0b7c63
 +	}
 +
 +	Layer bg, sonic, console;
++	bool layoutRead = false;
 +	float srcW = 0, srcH = 0;
 +	float k = 1, cx = 0, fh = 1080, zoom = 1;
 +	ImVec2 shake;
@@ -44445,16 +44469,30 @@ index 000000000..5df0b7c63
 +{
 +	if (gIntroDone)
 +		return false;
++	static float firstTry = -1;
++	static bool loaded;
 +	if (!gIntro)
 +	{
 +		gIntro = std::make_unique<Intro>();
-+		if (!gIntro->load())
++		firstTry = f.t;
++	}
++	if (!loaded)
++	{
++		loaded = gIntro->load();
++		if (!loaded)
 +		{
-+			ps4_boot_trace("intro: pictures missing, skipped");
-+			gIntro.reset();
-+			gIntroDone = true;
-+			return false;
++			if (!gIntro->layoutOk() || f.t - firstTry > 3.f)
++			{
++				ps4_boot_trace(gIntro->layoutOk() ? "intro: pictures didn't load, skipped" : "intro: layout.txt missing, skipped");
++				gIntro.reset();
++				gIntroDone = true;
++				return false;
++			}
++			// black until the pictures are up
++			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 255));
++			return true;
 +		}
++		ps4_boot_trace("intro: playing");
 +	}
 +	if (gIntro->draw(f))
 +		return true;
@@ -48306,10 +48344,10 @@ index 000000000..53612e149
 +} // namespace virtmem
 diff --git a/shell/ps4/ps4_wsi.cpp b/shell/ps4/ps4_wsi.cpp
 new file mode 100644
-index 000000000..6ec3651bd
+index 000000000..c65a93c0f
 --- /dev/null
 +++ b/shell/ps4/ps4_wsi.cpp
-@@ -0,0 +1,554 @@
+@@ -0,0 +1,559 @@
 +/*
 +	DeCast-S4: Vulkan window system integration on the PS4 (from Crema's PS4WSI.cpp).
 +
@@ -48341,6 +48379,7 @@ index 000000000..6ec3651bd
 +#include <vulkan/vulkan.h>
 +#include <orbis/VideoOut.h>
 +#include <orbis/libkernel.h>
++#include <orbis/SystemService.h>
 +
 +#include <algorithm>
 +#include <chrono>
@@ -48805,6 +48844,10 @@ index 000000000..6ec3651bd
 +		{
 +			sFlipsSubmitted++;
 +			CountPresent();
++			// the PS4 keeps its boot splash (the app's picture) over everything until the app
++			// says it has a picture of its own
++			if (sFlipsSubmitted == 1)
++				sceSystemServiceHideSplashScreen();
 +			if (sFlipsSubmitted <= 3)
 +				NOTICE_LOG(RENDERER, "PS4WSI: flip %llu of buffer %u (%s)", (unsigned long long)sFlipsSubmitted, buffer,
 +						gpuFlip ? "GPU-side" : "CPU wait");
