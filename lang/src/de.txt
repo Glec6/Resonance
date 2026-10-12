@@ -810,3 +810,5 @@
 2103	Löschen
 2104	Diese Speicherkarte ist leer
 2105	%d Blöcke
+2106	Disc wechseln
+2107	Disc %d

@@ -810,3 +810,5 @@
 2103	Usuń
 2104	Ta karta pamięci jest pusta
 2105	Bloki: %d
+2106	Zmień płytę
+2107	Płyta %d

@@ -810,3 +810,5 @@
 2103	Elimina
 2104	Questa scheda di memoria è vuota
 2105	%d blocchi
+2106	Cambia disco
+2107	Disco %d

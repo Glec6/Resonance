@@ -49,10 +49,14 @@ if [ "${1:-}" = upload ]; then
     # seconds (the old file comes back, the new one goes, even after a listing showed them right):
     # the new build first, the old ones only once it has stood for 30 s, then 45 s more of checks
     SIZE="$(stat -c %s "$HERE/../out/$NAME")"
+    # Windows' curl when there is one: uploads sent from WSL have been the ones the console lost
+    upload() {
+        if command -v curl.exe > /dev/null; then curl.exe -sS -T "$(wslpath -w "$(realpath "$1")")" "$HOST/data/pkg/"; else curl -sS -T "$1" "$HOST/data/pkg/"; fi
+    }
     present() { curl -sS "$HOST/data/pkg/" | tr -d '\r' | awk -v n="$NAME" -v s="$SIZE" '$NF == n && $5 == s { f = 1 } END { exit !f }'; }
     settled() { for _ in 1 2 3; do sleep 10; present || return 1; done; }
     for try in 1 2 3; do
-        curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
+        upload "$HERE/../out/$NAME"
         echo "uploaded $NAME"
         settled && break
         echo "console: $NAME didn't stay, uploading again"
@@ -65,7 +69,7 @@ if [ "${1:-}" = upload ]; then
         sleep 15
         settled && break
         echo "console: $NAME went missing after the cleanup, uploading again"
-        curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
+        upload "$HERE/../out/$NAME"
         sleep 30
     done
     listing | grep -E '^(Resonance|DeCast)' | sed 's/^/console has: /'

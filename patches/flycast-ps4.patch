@@ -1532,7 +1532,7 @@ index d2096c491..87f7b411b 100644
 +#endif
  };
 diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
-index 614739abc..ba6990ab7 100644
+index 614739abc..11199923a 100644
 --- a/core/ui/gui.cpp
 +++ b/core/ui/gui.cpp
 @@ -17,6 +17,7 @@
@@ -1553,12 +1553,70 @@ index 614739abc..ba6990ab7 100644
  #include "profiler/fc_profiler.h"
  #include "hw/naomi/card_reader.h"
  #include "oslib/resources.h"
-@@ -451,6 +455,45 @@ void gui_open_settings()
+@@ -451,6 +455,173 @@ void gui_open_settings()
  	}
  }
  
 +#ifdef __ORBIS__
 +// Resonance launcher (shell/ps4/launcher): the library as the scanner and box-art database see it
++// "Name (Disc 2)", "Name [Disc 2 of 3]", "Name - Disc 2", "Name CD2": 2, and the name without it;
++// 0 when there is no disc number
++static int ps4DiscNumber(const std::string& name, std::string& base)
++{
++	std::string lower = name;
++	for (char& c : lower)
++		c = (char)tolower((unsigned char)c);
++	for (const char *word : { "disc", "disk", "cd" })
++	{
++		size_t at = 0;
++		while ((at = lower.find(word, at)) != std::string::npos)
++		{
++			const size_t start = at;
++			at += strlen(word);
++			if (start > 0 && isalnum((unsigned char)lower[start - 1]))
++				continue;
++			size_t p = at;
++			while (p < lower.size() && (lower[p] == ' ' || lower[p] == '_' || lower[p] == '-'))
++				p++;
++			if (p >= lower.size() || !isdigit((unsigned char)lower[p]))
++				continue;
++			int n = 0;
++			while (p < lower.size() && isdigit((unsigned char)lower[p]))
++				n = n * 10 + (lower[p++] - '0');
++			if (n < 1 || n > 9)
++				continue;
++			// " of 3"
++			if (lower.compare(p, 4, " of ") == 0)
++			{
++				size_t q = p + 4;
++				while (q < lower.size() && isdigit((unsigned char)lower[q]))
++					q++;
++				p = q;
++			}
++			size_t from = start, to = p;
++			if (from > 0 && (lower[from - 1] == '(' || lower[from - 1] == '[') && to < lower.size() && (lower[to] == ')' || lower[to] == ']'))
++			{
++				from--;
++				to++;
++			}
++			base = name.substr(0, from) + name.substr(to);
++			// spaces and dashes left at the join or the ends
++			while (!base.empty() && (base.back() == ' ' || base.back() == '-' || base.back() == '_'))
++				base.pop_back();
++			size_t b = 0;
++			while (b < base.size() && base[b] == ' ')
++				b++;
++			base.erase(0, b);
++			for (size_t d; (d = base.find("  ")) != std::string::npos; )
++				base.erase(d, 1);
++			if (base.empty())
++				continue;
++			return n;
++		}
++	}
++	return 0;
++}
++
 +void gui_ps4_list_games(std::vector<LauncherEntry>& out)
 +{
 +	out.clear();
@@ -1578,6 +1636,76 @@ index 614739abc..ba6990ab7 100644
 +		e.coverPath = art.boxartPath;
 +		out.push_back(std::move(e));
 +	}
++	// A .cue next to the same disc's .gdi or .chd (or with its title elsewhere in the library) is
++	// a second entry for one game: hidden. A game that is only a .cue stays.
++	auto isCue = [](const LauncherEntry& e) {
++		const std::string& n = e.path;
++		return n.size() > 4 && strcasecmp(n.c_str() + n.size() - 4, ".cue") == 0;
++	};
++	auto folder = [](const std::string& path) {
++		const size_t slash = path.find_last_of('/');
++		return slash == std::string::npos ? std::string() : path.substr(0, slash);
++	};
++	std::vector<LauncherEntry> kept;
++	for (const LauncherEntry& e : out)
++	{
++		bool duplicate = false;
++		if (isCue(e))
++			for (const LauncherEntry& other : out)
++				if (&other != &e && !isCue(other) && (folder(other.path) == folder(e.path) || other.title == e.title))
++				{
++					duplicate = true;
++					break;
++				}
++		if (!duplicate)
++			kept.push_back(e);
++	}
++	out = std::move(kept);
++
++	// Games on several discs ("Shenmue II (Disc 1)", "... (Disc 2)") become one entry that starts
++	// with disc 1; the quick menu changes discs
++	std::map<std::string, std::vector<std::pair<int, size_t>>> sets;
++	std::vector<std::string> bases(out.size());
++	for (size_t i = 0; i < out.size(); i++)
++	{
++		std::string stem = out[i].fileName;
++		const size_t dot = stem.find_last_of('.');
++		if (dot != std::string::npos)
++			stem.resize(dot);
++		std::string base;
++		int disc = ps4DiscNumber(stem, base);
++		if (disc == 0)
++			disc = ps4DiscNumber(out[i].title, base);
++		if (disc == 0)
++			continue;
++		for (char& c : base)
++			c = (char)tolower((unsigned char)c);
++		sets[base].emplace_back(disc, i);
++	}
++	std::vector<bool> drop(out.size(), false);
++	for (auto& [base, discs] : sets)
++	{
++		if (discs.size() < 2)
++			continue;
++		std::sort(discs.begin(), discs.end());
++		LauncherEntry& first = out[discs[0].second];
++		std::string title;
++		if (ps4DiscNumber(first.title, title) != 0)
++			first.title = title;
++		for (const auto& [n, i] : discs)
++		{
++			first.discs.push_back(out[i].path);
++			if (first.coverPath.empty())
++				first.coverPath = out[i].coverPath;
++			if (i != discs[0].second)
++				drop[i] = true;
++		}
++	}
++	kept.clear();
++	for (size_t i = 0; i < out.size(); i++)
++		if (!drop[i])
++			kept.push_back(std::move(out[i]));
++	out = std::move(kept);
 +}
 +
 +void ps4_plug_pad_ports();	// shell/ps4/ps4_gamepad.cpp
@@ -1599,7 +1727,7 @@ index 614739abc..ba6990ab7 100644
  void gui_start_game(const std::string& path)
  {
  	const LockGuard lock(guiMutex);
-@@ -1233,8 +1276,57 @@ static bool checkUWPProtocolActivation()
+@@ -1233,8 +1404,57 @@ static bool checkUWPProtocolActivation()
  }
  #endif
  
@@ -1657,7 +1785,7 @@ index 614739abc..ba6990ab7 100644
  	drawBoxartBackground();
  	centerNextWindow();
  	ImGui::SetNextWindowSize(ScaledVec2(330, 0));
-@@ -1345,6 +1437,9 @@ void gui_display_ui()
+@@ -1345,6 +1565,9 @@ void gui_display_ui()
  		}
  	}
  
@@ -1667,7 +1795,7 @@ index 614739abc..ba6990ab7 100644
  	gui_newFrame();
  	ImGui::NewFrame();
  	error_msg_shown = false;
-@@ -1353,9 +1448,19 @@ void gui_display_ui()
+@@ -1353,9 +1576,19 @@ void gui_display_ui()
  	switch (gui_state)
  	{
  	case GuiState::Settings:
@@ -1687,7 +1815,7 @@ index 614739abc..ba6990ab7 100644
  		gui_display_commands();
  		break;
  	case GuiState::Pause:
-@@ -1364,6 +1469,11 @@ void gui_display_ui()
+@@ -1364,6 +1597,11 @@ void gui_display_ui()
  		break;
  	case GuiState::Main:
  		//gui_display_demo();
@@ -1699,7 +1827,7 @@ index 614739abc..ba6990ab7 100644
  		gui_display_content();
  		break;
  	case GuiState::Closed:
-@@ -1408,6 +1518,10 @@ void gui_display_ui()
+@@ -1408,6 +1646,10 @@ void gui_display_ui()
  		emu.start();
  }
  
@@ -1710,7 +1838,7 @@ index 614739abc..ba6990ab7 100644
  static u64 LastFPSTime;
  static int lastFrameCount = 0;
  static float fps = -1;
-@@ -1422,6 +1536,25 @@ static std::string getFPSNotification()
+@@ -1422,6 +1664,25 @@ static std::string getFPSNotification()
  			LastFPSTime = now;
  			lastFrameCount = MainFrameCount;
  		}
@@ -1736,7 +1864,7 @@ index 614739abc..ba6990ab7 100644
  		if (fps >= 0.f && fps < 9999.f) {
  			char text[32];
  			snprintf(text, sizeof(text), "F:%4.1f%s", fps, settings.input.fastForwardMode ? " >>" : "");
-@@ -1669,6 +1802,25 @@ void gui_runOnUiThread(std::function<void()> function) {
+@@ -1669,6 +1930,25 @@ void gui_runOnUiThread(std::function<void()> function) {
  	uiThreadRunner.runOnThread(function);
  }
  
@@ -1762,7 +1890,7 @@ index 614739abc..ba6990ab7 100644
  void gui_takeScreenshot()
  {
  	if (!game_started)
-@@ -1705,3 +1857,99 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
+@@ -1705,3 +1985,141 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
  	return false;
  }
  #endif
@@ -1815,15 +1943,57 @@ index 614739abc..ba6990ab7 100644
 +	return gdr::isOpen();
 +}
 +
++// Resonance: the disc taken out goes back in (no file list)
++static std::string ps4EjectedDisc;
++
 +void gui_ps4_swap_disc()
 +{
 +	if (gdr::isOpen())
-+		gui_setState(GuiState::SelectDisk);
++	{
++		try {
++			emu.insertGdrom(ps4EjectedDisc.empty() ? settings.content.path : ps4EjectedDisc);
++		} catch (const FlycastException& e) {
++			gui_error(e.what());
++			return;
++		}
++		gui_setState(GuiState::Closed);
++	}
 +	else
 +	{
++		ps4EjectedDisc = settings.content.path;
 +		emu.openGdrom();
 +		gui_setState(GuiState::Closed);
 +	}
++}
++
++std::string gui_ps4_disc_path() {
++	return gdr::isOpen() && !ps4EjectedDisc.empty() ? ps4EjectedDisc : settings.content.path;
++}
++
++void gui_ps4_change_disc(const std::string& path)
++{
++	ps4EjectedDisc = path;
++	if (!gdr::isOpen())
++		emu.openGdrom();
++	gui_setState(GuiState::Closed);
++	// the game sees the lid open for a moment (some ask for the next disc only then)
++	std::thread([path] {
++		std::this_thread::sleep_for(std::chrono::milliseconds(1500));
++		gui_runOnUiThread([path] {
++			if (!game_started || !gdr::isOpen())
++				return;
++			const bool running = gui_state == GuiState::Closed;
++			try {
++				if (running)
++					emu.stop();
++				emu.insertGdrom(path);
++			} catch (const FlycastException& e) {
++				ERROR_LOG(COMMON, "disc change: %s", e.what());
++			}
++			if (running)
++				emu.start();
++		});
++	}).detach();
 +}
 +
 +void gui_ps4_quit_game() {
@@ -1959,10 +2129,10 @@ index 8f3b8733e..b98e14d43 100644
  	// Determine the preview text
 diff --git a/resources/i18n/ar.po b/resources/i18n/ar.po
 new file mode 100644
-index 000000000..69b2f8a3b
+index 000000000..d300b2ab7
 --- /dev/null
 +++ b/resources/i18n/ar.po
-@@ -0,0 +1,2448 @@
+@@ -0,0 +1,2454 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -4411,11 +4581,17 @@ index 000000000..69b2f8a3b
 +
 +msgid "%d blocks"
 +msgstr "%d كتلة"
++
++msgid "Change Disc"
++msgstr "تغيير القرص"
++
++msgid "Disc %d"
++msgstr "القرص %d"
 diff --git a/resources/i18n/de.po b/resources/i18n/de.po
-index fb8203ba2..610c01678 100644
+index fb8203ba2..8f5152df6 100644
 --- a/resources/i18n/de.po
 +++ b/resources/i18n/de.po
-@@ -1,2963 +1,2444 @@
+@@ -1,2963 +1,2450 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -8403,14 +8579,20 @@ index fb8203ba2..610c01678 100644
 +
 +msgid "This memory card is empty"
 +msgstr "Diese Speicherkarte ist leer"
- 
++
 +msgid "%d blocks"
 +msgstr "%d Blöcke"
++
++msgid "Change Disc"
++msgstr "Disc wechseln"
+ 
++msgid "Disc %d"
++msgstr "Disc %d"
 diff --git a/resources/i18n/es.po b/resources/i18n/es.po
-index 2735f014b..f010a3ac3 100644
+index 2735f014b..7f58be788 100644
 --- a/resources/i18n/es.po
 +++ b/resources/i18n/es.po
-@@ -1,2964 +1,2444 @@
+@@ -1,2964 +1,2450 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -12393,14 +12575,20 @@ index 2735f014b..f010a3ac3 100644
 +
 +msgid "This memory card is empty"
 +msgstr "Esta tarjeta de memoria está vacía"
- 
++
 +msgid "%d blocks"
 +msgstr "%d bloques"
++
++msgid "Change Disc"
++msgstr "Cambiar disco"
+ 
++msgid "Disc %d"
++msgstr "Disco %d"
 diff --git a/resources/i18n/fr.po b/resources/i18n/fr.po
-index f3754825e..139ed8b93 100644
+index f3754825e..062c22f2f 100644
 --- a/resources/i18n/fr.po
 +++ b/resources/i18n/fr.po
-@@ -1,2967 +1,2444 @@
+@@ -1,2967 +1,2450 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -15693,11 +15881,17 @@ index f3754825e..139ed8b93 100644
 +
 +msgid "%d blocks"
 +msgstr "%d blocs"
++
++msgid "Change Disc"
++msgstr "Changer de disque"
++
++msgid "Disc %d"
++msgstr "Disque %d"
 diff --git a/resources/i18n/it.po b/resources/i18n/it.po
-index ee92eb28e..fa83d81f1 100644
+index ee92eb28e..b9e57fdaf 100644
 --- a/resources/i18n/it.po
 +++ b/resources/i18n/it.po
-@@ -1,2963 +1,2444 @@
+@@ -1,2963 +1,2450 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -19685,14 +19879,20 @@ index ee92eb28e..fa83d81f1 100644
 +
 +msgid "This memory card is empty"
 +msgstr "Questa scheda di memoria è vuota"
- 
++
 +msgid "%d blocks"
 +msgstr "%d blocchi"
++
++msgid "Change Disc"
++msgstr "Cambia disco"
+ 
++msgid "Disc %d"
++msgstr "Disco %d"
 diff --git a/resources/i18n/ja.po b/resources/i18n/ja.po
-index a79c6a14b..8b9ea133e 100644
+index a79c6a14b..89edd2b9c 100644
 --- a/resources/i18n/ja.po
 +++ b/resources/i18n/ja.po
-@@ -1,2966 +1,2443 @@
+@@ -1,2966 +1,2449 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -22984,11 +23184,17 @@ index a79c6a14b..8b9ea133e 100644
 +
 +msgid "%d blocks"
 +msgstr "%d ブロック"
++
++msgid "Change Disc"
++msgstr "ディスクを交換"
++
++msgid "Disc %d"
++msgstr "ディスク %d"
 diff --git a/resources/i18n/ko.po b/resources/i18n/ko.po
-index a5e70db54..6d7de5fd6 100644
+index a5e70db54..4845c46aa 100644
 --- a/resources/i18n/ko.po
 +++ b/resources/i18n/ko.po
-@@ -1,2962 +1,2443 @@
+@@ -1,2962 +1,2449 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -26974,15 +27180,21 @@ index a5e70db54..6d7de5fd6 100644
 +
 +msgid "This memory card is empty"
 +msgstr "이 메모리 카드는 비어 있습니다"
- 
++
 +msgid "%d blocks"
 +msgstr "%d 블록"
++
++msgid "Change Disc"
++msgstr "디스크 교체"
+ 
++msgid "Disc %d"
++msgstr "디스크 %d"
 diff --git a/resources/i18n/nl.po b/resources/i18n/nl.po
 new file mode 100644
-index 000000000..2b0e8773b
+index 000000000..38a281d0e
 --- /dev/null
 +++ b/resources/i18n/nl.po
-@@ -0,0 +1,2444 @@
+@@ -0,0 +1,2450 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -29427,11 +29639,17 @@ index 000000000..2b0e8773b
 +
 +msgid "%d blocks"
 +msgstr "%d blokken"
++
++msgid "Change Disc"
++msgstr "Disc wisselen"
++
++msgid "Disc %d"
++msgstr "Disc %d"
 diff --git a/resources/i18n/pl.po b/resources/i18n/pl.po
-index 548cbb44d..8d4643ff1 100644
+index 548cbb44d..df7bec0c5 100644
 --- a/resources/i18n/pl.po
 +++ b/resources/i18n/pl.po
-@@ -1,2965 +1,2445 @@
+@@ -1,2965 +1,2451 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -33423,14 +33641,20 @@ index 548cbb44d..8d4643ff1 100644
 +
 +msgid "This memory card is empty"
 +msgstr "Ta karta pamięci jest pusta"
- 
++
 +msgid "%d blocks"
 +msgstr "Bloki: %d"
++
++msgid "Change Disc"
++msgstr "Zmień płytę"
+ 
++msgid "Disc %d"
++msgstr "Płyta %d"
 diff --git a/resources/i18n/pt_BR.po b/resources/i18n/pt_BR.po
-index 6ec100a1e..8e5fc0dbb 100644
+index 6ec100a1e..ee2737818 100644
 --- a/resources/i18n/pt_BR.po
 +++ b/resources/i18n/pt_BR.po
-@@ -1,2966 +1,2444 @@
+@@ -1,2966 +1,2450 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -36737,12 +36961,18 @@ index 6ec100a1e..8e5fc0dbb 100644
 +
 +msgid "%d blocks"
 +msgstr "%d blocos"
++
++msgid "Change Disc"
++msgstr "Trocar disco"
++
++msgid "Disc %d"
++msgstr "Disco %d"
 diff --git a/resources/i18n/ru.po b/resources/i18n/ru.po
 new file mode 100644
-index 000000000..b6e814866
+index 000000000..27affd0b4
 --- /dev/null
 +++ b/resources/i18n/ru.po
-@@ -0,0 +1,2445 @@
+@@ -0,0 +1,2451 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -39188,11 +39418,17 @@ index 000000000..b6e814866
 +
 +msgid "%d blocks"
 +msgstr "Блоков: %d"
++
++msgid "Change Disc"
++msgstr "Сменить диск"
++
++msgid "Disc %d"
++msgstr "Диск %d"
 diff --git a/resources/i18n/tr.po b/resources/i18n/tr.po
-index 8c8d8bc08..c840ffec5 100644
+index 8c8d8bc08..ecee7586f 100644
 --- a/resources/i18n/tr.po
 +++ b/resources/i18n/tr.po
-@@ -1,2965 +1,2444 @@
+@@ -1,2965 +1,2450 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -42885,14 +43121,20 @@ index 8c8d8bc08..c840ffec5 100644
 +
 +msgid "This memory card is empty"
 +msgstr "Bu hafıza kartı boş"
- 
++
 +msgid "%d blocks"
 +msgstr "%d blok"
++
++msgid "Change Disc"
++msgstr "Diski değiştir"
+ 
++msgid "Disc %d"
++msgstr "Disk %d"
 diff --git a/resources/i18n/zh_CN.po b/resources/i18n/zh_CN.po
-index 3ecabd349..4bb8f2bd8 100644
+index 3ecabd349..233dc3f54 100644
 --- a/resources/i18n/zh_CN.po
 +++ b/resources/i18n/zh_CN.po
-@@ -1,2962 +1,2443 @@
+@@ -1,2962 +1,2449 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -46878,9 +47120,15 @@ index 3ecabd349..4bb8f2bd8 100644
 +
 +msgid "This memory card is empty"
 +msgstr "此记忆卡是空的"
- 
++
 +msgid "%d blocks"
 +msgstr "%d 块"
++
++msgid "Change Disc"
++msgstr "更换光盘"
+ 
++msgid "Disc %d"
++msgstr "光盘 %d"
 diff --git a/resources/resources.cmake b/resources/resources.cmake
 index 9bf4830a7..1ed162421 100644
 --- a/resources/resources.cmake
@@ -48940,10 +49188,10 @@ index 000000000..d8426aabd
 +} // namespace launcher
 diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
 new file mode 100644
-index 000000000..297177b5c
+index 000000000..f75688e70
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.cpp
-@@ -0,0 +1,940 @@
+@@ -0,0 +1,1050 @@
 +/*
 +	Resonance launcher core: the library, covers and colours, DualShock 4 input, theme switching
 +	and starting games. The themes draw; this file decides what they draw.
@@ -49416,33 +49664,142 @@ index 000000000..297177b5c
 +	return io.FontDefault != nullptr ? io.FontDefault : io.Fonts->Fonts[0];
 +}
 +
-+ImTextureID coverTexture(const Game& g)
++namespace
 +{
-+	static int loadsThisFrame;
-+	static float frameTime = -1;
-+	if (frameTime != gTime) {
-+		frameTime = gTime;
-+		loadsThisFrame = 0;
-+	}
-+	if (g.cover.empty() || imguiDriver == nullptr)
-+		return {};
-+	ImTextureID id = imguiDriver->getTexture(g.cover);
-+	if (id != ImTextureID() || loadsThisFrame >= 2)
-+		return id;
-+	loadsThisFrame++;
-+	FILE *f = nowide::fopen(g.cover.c_str(), "rb");
++// Covers decoded on a thread of their own and kept in memory: the UI's textures are dropped
++// whenever the swap chain is rebuilt (a game starting or ending) and come back from here at once
++// instead of from the disk, which is slow while a disc is being read
++struct CoverPixels
++{
++	std::vector<u8> rgba;
++	int w = 0, h = 0;
++};
++constexpr size_t COVER_CACHE_BYTES = 64u << 20;
++constexpr int COVER_MAX_SIZE = 640;		// larger covers are scaled down
++std::mutex gCoverMutex;
++std::condition_variable gCoverCv;
++std::deque<std::string> gCoverQueue;
++std::unordered_map<std::string, std::shared_ptr<const CoverPixels>> gCoverPixels;	// null: unreadable
++std::unordered_map<std::string, bool> gCoverQueued;
++std::deque<std::string> gCoverOrder;	// oldest first, for eviction
++size_t gCoverBytes;
++
++std::shared_ptr<const CoverPixels> decodeCover(const std::string& path)
++{
++	FILE *f = nowide::fopen(path.c_str(), "rb");
 +	if (f == nullptr)
-+		return {};
++		return nullptr;
 +	int w, h, n;
 +	u8 *data = stbi_load_from_file(f, &w, &h, &n, 4);
 +	fclose(f);
 +	if (data == nullptr)
-+		return {};
-+	try {
-+		id = imguiDriver->updateTexture(g.cover, data, w, h, false);
-+	} catch (...) {
++		return nullptr;
++	auto px = std::make_shared<CoverPixels>();
++	const int k = std::max(1, (std::max(w, h) + COVER_MAX_SIZE - 1) / COVER_MAX_SIZE);
++	if (k == 1)
++	{
++		px->w = w;
++		px->h = h;
++		px->rgba.assign(data, data + (size_t)w * h * 4);
++	}
++	else
++	{
++		// box filter by an integer factor
++		px->w = w / k;
++		px->h = h / k;
++		px->rgba.resize((size_t)px->w * px->h * 4);
++		for (int y = 0; y < px->h; y++)
++			for (int x = 0; x < px->w; x++)
++				for (int c = 0; c < 4; c++)
++				{
++					u32 sum = 0;
++					for (int j = 0; j < k; j++)
++						for (int i = 0; i < k; i++)
++							sum += data[(((size_t)(y * k + j) * w) + x * k + i) * 4 + c];
++					px->rgba[((size_t)y * px->w + x) * 4 + c] = (u8)(sum / (k * k));
++				}
 +	}
 +	stbi_image_free(data);
++	return px;
++}
++
++void coverWorker()
++{
++	ThreadName _("LauncherCoverDecode");
++	for (;;)
++	{
++		std::string path;
++		{
++			std::unique_lock<std::mutex> lock(gCoverMutex);
++			gCoverCv.wait(lock, [] { return !gCoverQueue.empty(); });
++			// the newest request first: what is on screen now
++			path = gCoverQueue.back();
++			gCoverQueue.pop_back();
++		}
++		std::shared_ptr<const CoverPixels> px = decodeCover(path);
++		std::lock_guard<std::mutex> lock(gCoverMutex);
++		gCoverPixels[path] = px;
++		gCoverOrder.push_back(path);
++		gCoverBytes += px ? px->rgba.size() : 0;
++		while (gCoverBytes > COVER_CACHE_BYTES && gCoverOrder.size() > 1)
++		{
++			const std::string old = gCoverOrder.front();
++			gCoverOrder.pop_front();
++			auto it = gCoverPixels.find(old);
++			if (it != gCoverPixels.end())
++			{
++				gCoverBytes -= it->second ? it->second->rgba.size() : 0;
++				gCoverPixels.erase(it);
++			}
++			gCoverQueued.erase(old);
++		}
++	}
++}
++} // namespace
++
++ImTextureID coverTexture(const Game& g)
++{
++	static int uploadsThisFrame;
++	static float frameTime = -1;
++	if (frameTime != gTime) {
++		frameTime = gTime;
++		uploadsThisFrame = 0;
++	}
++	if (g.cover.empty() || imguiDriver == nullptr)
++		return {};
++	ImTextureID id = imguiDriver->getTexture(g.cover);
++	if (id != ImTextureID())
++		return id;
++	std::shared_ptr<const CoverPixels> px;
++	{
++		std::lock_guard<std::mutex> lock(gCoverMutex);
++		static bool started;
++		if (!started)
++		{
++			started = true;
++			std::thread(coverWorker).detach();
++		}
++		auto it = gCoverPixels.find(g.cover);
++		if (it == gCoverPixels.end())
++		{
++			if (!gCoverQueued[g.cover])
++			{
++				gCoverQueued[g.cover] = true;
++				gCoverQueue.push_back(g.cover);
++				gCoverCv.notify_one();
++			}
++			return {};
++		}
++		px = it->second;
++	}
++	// a few uploads a frame keep the frame time even when every cover comes back at once
++	if (px == nullptr || uploadsThisFrame >= 6)
++		return {};
++	uploadsThisFrame++;
++	try {
++		id = imguiDriver->updateTexture(g.cover, px->rgba.data(), px->w, px->h, false);
++	} catch (...) {
++	}
 +	return id;
 +}
 +
@@ -49867,6 +50224,7 @@ index 000000000..297177b5c
 +			ps4_boot_trace(line);
 +			soundStop();
 +			currentGameCover = g.cover;
++			currentGameDiscs = g.e.discs;
 +			gLaunched = g;
 +			gLaunchedPixels.clear();
 +			if (FILE *cf = g.cover.empty() ? nullptr : nowide::fopen(g.cover.c_str(), "rb"))
@@ -49886,10 +50244,10 @@ index 000000000..297177b5c
 +}
 diff --git a/shell/ps4/launcher/launcher.h b/shell/ps4/launcher/launcher.h
 new file mode 100644
-index 000000000..e74d98a9f
+index 000000000..99f97610a
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.h
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,76 @@
 +/*
 +	Resonance: the PS4 home screen (launcher) that replaces Flycast's game list.
 +
@@ -49925,6 +50283,7 @@ index 000000000..e74d98a9f
 +	std::string productId;	// e.g. T13002N, MK-51117 (empty until the disc has been read)
 +	u32 region = 0;			// GameBoxart::Region bits
 +	std::string coverPath;	// box art on disk, if any
++	std::vector<std::string> discs;	// a game on several discs: every disc's path, disc 1 first (path)
 +};
 +
 +// ui/gui.cpp, PS4 only
@@ -49942,6 +50301,9 @@ index 000000000..e74d98a9f
 +void *gui_ps4_state_picture(bool reload);	// ImTextureID of the current slot's picture, or 0
 +bool gui_ps4_disc_open();
 +void gui_ps4_swap_disc();
++// Another disc of the running game: the lid opens, the game runs a moment to see it, the disc goes in
++void gui_ps4_change_disc(const std::string& path);
++std::string gui_ps4_disc_path();	// the disc in the drive
 +void gui_ps4_quit_game();
 +void gui_ps4_open_quick_menu();
 +void gui_ps4_rescan_games();	// after a network share was added or removed
@@ -49964,10 +50326,10 @@ index 000000000..e74d98a9f
 +void launcher_loading_draw(const char *label, float progress);
 diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
 new file mode 100644
-index 000000000..5dddd6b41
+index 000000000..b283af665
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher_internal.h
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,270 @@
 +/*
 +	Resonance launcher internals: what the core (launcher.cpp) shares with the themes
 +	(theme_*.cpp), covers (covers.cpp) and sounds (sound.cpp).
@@ -50222,6 +50584,7 @@ index 000000000..5dddd6b41
 +
 +// The cover of the game being played, for the quick menu (the launcher sets it when starting one)
 +extern std::string currentGameCover;
++extern std::vector<std::string> currentGameDiscs;	// several: the game is on more than one disc
 +
 +// covers.cpp
 +// The cover to show for a game: the user's own file in /data/Resonance/covers wins, else the
@@ -50296,10 +50659,10 @@ index 000000000..5605ef4cb
 +};
 diff --git a/shell/ps4/launcher/quick_menu.cpp b/shell/ps4/launcher/quick_menu.cpp
 new file mode 100644
-index 000000000..edb1ccd3b
+index 000000000..9d053b1c3
 --- /dev/null
 +++ b/shell/ps4/launcher/quick_menu.cpp
-@@ -0,0 +1,299 @@
+@@ -0,0 +1,335 @@
 +/*
 +	Resonance's quick menu during a game (L3+R3, or the touchpad), in place of Flycast's commands
 +	window: the game paused behind a side panel with its cover and name; Resume, Save State and Load
@@ -50333,6 +50696,7 @@ index 000000000..edb1ccd3b
 +namespace launcher
 +{
 +std::string currentGameCover;
++std::vector<std::string> currentGameDiscs;
 +}
 +
 +using namespace launcher;
@@ -50350,6 +50714,16 @@ index 000000000..edb1ccd3b
 +bool gChanged;
 +bool gReloadPicture = true;
 +Game gCover;
++int gDiscPick;		// the disc the Disc row shows (several discs)
++
++int currentDisc()
++{
++	const std::string path = gui_ps4_disc_path();
++	for (size_t i = 0; i < currentGameDiscs.size(); i++)
++		if (currentGameDiscs[i] == path)
++			return (int)i;
++	return 0;
++}
 +
 +void changeSlot(int step)
 +{
@@ -50373,6 +50747,7 @@ index 000000000..edb1ccd3b
 +		gCover = Game();
 +		gCover.cover = currentGameCover;
 +		gInCheats = false;
++		gDiscPick = currentDisc();
 +		soundStart();
 +		playSound(Sound::Category);
 +	}
@@ -50410,6 +50785,13 @@ index 000000000..edb1ccd3b
 +			config::ShowFPS.set(!config::ShowFPS);
 +			gChanged = true;
 +			playSound(Sound::Move);
++			break;
++		case DISC:
++			if (currentGameDiscs.size() > 1)
++			{
++				gDiscPick = (gDiscPick + gIn.dx + (int)currentGameDiscs.size()) % (int)currentGameDiscs.size();
++				playSound(Sound::Move);
++			}
 +			break;
 +		}
 +	}
@@ -50453,6 +50835,19 @@ index 000000000..edb1ccd3b
 +			cheatsOpen(f.t);
 +			break;
 +		case DISC:
++			if (currentGameDiscs.size() > 1)
++			{
++				if (gDiscPick == currentDisc() && !gui_ps4_disc_open())
++				{
++					playSound(Sound::Error);
++					break;
++				}
++				playSound(Sound::Confirm);
++				if (gChanged)
++					SaveSettings();
++				gui_ps4_change_disc(currentGameDiscs[gDiscPick]);
++				return true;
++			}
 +			playSound(Sound::Confirm);
 +			gui_ps4_swap_disc();
 +			return true;
@@ -50519,6 +50914,9 @@ index 000000000..edb1ccd3b
 +	struct RowView { const char *icon; std::string label, value; bool arrows; bool dim; };
 +	snprintf(buf, sizeof(buf), T("Slot %d"), (int)config::SavestateSlot + 1);
 +	const std::string slot = buf;
++	snprintf(buf, sizeof(buf), T("Disc %d"), gDiscPick + 1);
++	const bool severalDiscs = currentGameDiscs.size() > 1;
++	const std::string discValue = severalDiscs ? std::string(buf) : std::string();
 +	const RowView rows[ROWS] = {
 +		{ ICON_FA_PLAY, T("Resume"), "", false, false },
 +		{ ICON_FA_DOWNLOAD, T("Save State"), slot, true, false },
@@ -50526,7 +50924,8 @@ index 000000000..edb1ccd3b
 +		{ ICON_FA_VOLUME_HIGH, T("Volume Level"), std::to_string(config::AudioVolume.get()) + "%", true, false },
 +		{ ICON_FA_GAUGE_HIGH, T("Show FPS Counter"), config::ShowFPS ? T("On") : T("Off"), true, false },
 +		{ ICON_FA_MASK, T("Cheats"), "", false, false },
-+		{ ICON_FA_COMPACT_DISC, gui_ps4_disc_open() ? T("Insert Disk") : T("Eject Disk"), "", false, false },
++		{ ICON_FA_COMPACT_DISC, severalDiscs ? T("Change Disc") : gui_ps4_disc_open() ? T("Insert Disk") : T("Eject Disk"), discValue,
++				severalDiscs, false },
 +		{ ICON_FA_GEAR, T("Settings"), "", false, false },
 +		{ ICON_FA_POWER_OFF, T("Close Game"), "", false, false },
 +	};

@@ -105,3 +105,5 @@
 2103	Supprimer
 2104	Cette carte mémoire est vide
 2105	%d blocs
+2106	Changer de disque
+2107	Disque %d

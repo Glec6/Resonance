@@ -810,3 +810,5 @@
 2103	Borrar
 2104	Esta tarjeta de memoria está vacía
 2105	%d bloques
+2106	Cambiar disco
+2107	Disco %d

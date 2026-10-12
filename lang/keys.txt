@@ -810,3 +810,5 @@
 2103	Delete
 2104	This memory card is empty
 2105	%d blocks
+2106	Change Disc
+2107	Disc %d

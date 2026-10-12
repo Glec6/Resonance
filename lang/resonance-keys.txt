@@ -112,3 +112,5 @@ Copy to
 Delete
 This memory card is empty
 %d blocks
+Change Disc
+Disc %d

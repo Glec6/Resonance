@@ -120,3 +120,5 @@
 2103	Apagar
 2104	Este cartão de memória está vazio
 2105	%d blocos
+2106	Trocar disco
+2107	Disco %d

@@ -810,3 +810,5 @@
 2103	Verwijderen
 2104	Deze geheugenkaart is leeg
 2105	%d blokken
+2106	Disc wisselen
+2107	Disc %d
