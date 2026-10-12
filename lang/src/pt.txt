@@ -59,3 +59,24 @@
 2043	Toca ao abrir o app
 2044	Alterar
 2045	PAUSADO
+2046	Biblioteca em rede
+2047	Jogos em compartilhamentos NFS e SMB
+2048	Adicionar compartilhamento NFS
+2049	Uma pasta exportada por um NAS ou PC (WinNFSd, servidor NFS do Linux)
+2050	Adicionar compartilhamento SMB
+2051	Uma pasta compartilhada do Windows, ou Samba em um NAS
+2052	Endereço do servidor (ex.: 192.168.0.10)
+2053	Pasta exportada (ex.: /d/games)
+2054	Nome do compartilhamento e pasta (ex.: Games/Dreamcast)
+2055	X: testar a conexão ou remover o compartilhamento
+2056	Testar conexão
+2057	Remover
+2058	Compartilhamento removido
+2059	Conectando...
+2060	Não foi possível conectar: %s
+2061	Conectado: %d itens na pasta principal
+2062	Versão, autor, créditos
+2063	Dreamcast para PlayStation 4
+2064	Criado por
+370	Emulador
+2065	Bibliotecas

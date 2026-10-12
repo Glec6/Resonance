@@ -844,6 +844,20 @@ index 9d308dfd3..318d79d09 100644
  #elif defined(USE_EVDEV)
  	input_evdev_handle();
  #endif
+diff --git a/core/oslib/storage.cpp b/core/oslib/storage.cpp
+index b61fc0f32..7f3b24805 100644
+--- a/core/oslib/storage.cpp
++++ b/core/oslib/storage.cpp
+@@ -28,7 +28,8 @@ std::string os_PrecomposedString(std::string string);
+ namespace hostfs
+ {
+ 
+-#if !defined(__ANDROID__) && !defined(LIBRETRO)
++// (PS4: network shares, shell/ps4/netfs.cpp)
++#if !defined(__ANDROID__) && !defined(LIBRETRO) && !defined(__ORBIS__)
+ CustomStorage& customStorage()
+ {
+ 	class NullStorage : public CustomStorage
 diff --git a/core/oslib/virtmem.h b/core/oslib/virtmem.h
 index 2a02ab625..a1d091484 100644
 --- a/core/oslib/virtmem.h
@@ -1268,7 +1282,7 @@ index d2096c491..87f7b411b 100644
 +#endif
  };
 diff --git a/core/ui/gui.cpp b/core/ui/gui.cpp
-index 614739abc..73a14152d 100644
+index 614739abc..db7c04058 100644
 --- a/core/ui/gui.cpp
 +++ b/core/ui/gui.cpp
 @@ -17,6 +17,7 @@
@@ -1436,7 +1450,7 @@ index 614739abc..73a14152d 100644
  void gui_takeScreenshot()
  {
  	if (!game_started)
-@@ -1705,3 +1804,93 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
+@@ -1705,3 +1804,99 @@ bool __cdecl Concurrency::details::_Task_impl_base::_IsNonBlockingThread() {
  	return false;
  }
  #endif
@@ -1530,6 +1544,12 @@ index 614739abc..73a14152d 100644
 +	gui_setState(game_started ? GuiState::Commands : GuiState::Main);
 +}
 +#endif
++
++#ifdef __ORBIS__
++void gui_ps4_rescan_games() {
++	scanner.refresh();
++}
++#endif
 diff --git a/core/ui/gui_font.cpp b/core/ui/gui_font.cpp
 index 3e3f1b215..cfe55168a 100644
 --- a/core/ui/gui_font.cpp
@@ -1617,10 +1637,10 @@ index 8f3b8733e..b98e14d43 100644
  	// Determine the preview text
 diff --git a/resources/i18n/ar.po b/resources/i18n/ar.po
 new file mode 100644
-index 000000000..f63070053
+index 000000000..01856b2a7
 --- /dev/null
 +++ b/resources/i18n/ar.po
-@@ -0,0 +1,2268 @@
+@@ -0,0 +1,2328 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -3889,11 +3909,71 @@ index 000000000..f63070053
 +
 +msgid "PAUSED"
 +msgstr "متوقف مؤقتا"
++
++msgid "Network Library"
++msgstr "مكتبة الشبكة"
++
++msgid "Games on NFS and SMB shares"
++msgstr "ألعاب على مشاركات NFS و SMB"
++
++msgid "Add NFS Share"
++msgstr "إضافة مشاركة NFS"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "مجلد يشاركه جهاز NAS أو حاسوب (WinNFSd أو خادم NFS على Linux)"
++
++msgid "Add SMB Share"
++msgstr "إضافة مشاركة SMB"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "مجلد مشترك في Windows أو Samba على جهاز NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "عنوان الخادم (مثلا 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "المجلد المشارك (مثلا /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "اسم المشاركة والمجلد (مثلا Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "X: اختبار الاتصال أو إزالة المشاركة"
++
++msgid "Test Connection"
++msgstr "اختبار الاتصال"
++
++msgid "Remove"
++msgstr "إزالة"
++
++msgid "Share removed"
++msgstr "تمت إزالة المشاركة"
++
++msgid "Connecting..."
++msgstr "جار الاتصال..."
++
++msgid "Couldn't connect: %s"
++msgstr "تعذر الاتصال: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "متصل: %d عنصر في المجلد الرئيسي"
++
++msgid "Version, author, credits"
++msgstr "الإصدار والمؤلف والشكر"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "Dreamcast على PlayStation 4"
++
++msgid "Made by"
++msgstr "من تطوير"
++
++msgid "Libraries"
++msgstr "المكتبات"
 diff --git a/resources/i18n/de.po b/resources/i18n/de.po
-index fb8203ba2..d9343727d 100644
+index fb8203ba2..958141cde 100644
 --- a/resources/i18n/de.po
 +++ b/resources/i18n/de.po
-@@ -1,2963 +1,2264 @@
+@@ -1,2963 +1,2324 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -7701,14 +7781,74 @@ index fb8203ba2..d9343727d 100644
 +
 +msgid "Change"
 +msgstr "Ändern"
- 
++
 +msgid "PAUSED"
 +msgstr "PAUSIERT"
++
++msgid "Network Library"
++msgstr "Netzwerk-Bibliothek"
++
++msgid "Games on NFS and SMB shares"
++msgstr "Spiele auf NFS- und SMB-Freigaben"
++
++msgid "Add NFS Share"
++msgstr "NFS-Freigabe hinzufügen"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Ein von einem NAS oder PC freigegebener Ordner (WinNFSd, Linux-NFS-Server)"
++
++msgid "Add SMB Share"
++msgstr "SMB-Freigabe hinzufügen"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Ein freigegebener Windows-Ordner oder Samba auf einem NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Serveradresse (z. B. 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Freigegebener Ordner (z. B. /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Freigabename und Ordner (z. B. Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "Kreuz: Verbindung testen oder Freigabe entfernen"
++
++msgid "Test Connection"
++msgstr "Verbindung testen"
++
++msgid "Remove"
++msgstr "Entfernen"
++
++msgid "Share removed"
++msgstr "Freigabe entfernt"
++
++msgid "Connecting..."
++msgstr "Verbinde..."
++
++msgid "Couldn't connect: %s"
++msgstr "Keine Verbindung: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Verbunden: %d Einträge im obersten Ordner"
++
++msgid "Version, author, credits"
++msgstr "Version, Autor, Mitwirkende"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "Dreamcast für PlayStation 4"
++
++msgid "Made by"
++msgstr "Erstellt von"
+ 
++msgid "Libraries"
++msgstr "Bibliotheken"
 diff --git a/resources/i18n/es.po b/resources/i18n/es.po
-index 2735f014b..adf730d89 100644
+index 2735f014b..759ab983a 100644
 --- a/resources/i18n/es.po
 +++ b/resources/i18n/es.po
-@@ -1,2964 +1,2264 @@
+@@ -1,2964 +1,2324 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -11511,14 +11651,74 @@ index 2735f014b..adf730d89 100644
 +
 +msgid "Change"
 +msgstr "Cambiar"
- 
++
 +msgid "PAUSED"
 +msgstr "EN PAUSA"
++
++msgid "Network Library"
++msgstr "Biblioteca en red"
++
++msgid "Games on NFS and SMB shares"
++msgstr "Juegos en carpetas compartidas NFS y SMB"
++
++msgid "Add NFS Share"
++msgstr "Añadir carpeta NFS"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Una carpeta exportada por un NAS o un PC (WinNFSd, servidor NFS de Linux)"
++
++msgid "Add SMB Share"
++msgstr "Añadir carpeta SMB"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Una carpeta compartida de Windows, o Samba en un NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Dirección del servidor (p. ej. 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Carpeta exportada (p. ej. /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Recurso y carpeta (p. ej. Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "Equis: probar la conexión o quitar la carpeta"
++
++msgid "Test Connection"
++msgstr "Probar conexión"
++
++msgid "Remove"
++msgstr "Quitar"
++
++msgid "Share removed"
++msgstr "Carpeta quitada"
++
++msgid "Connecting..."
++msgstr "Conectando..."
++
++msgid "Couldn't connect: %s"
++msgstr "No se pudo conectar: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Conectado: %d elementos en la carpeta principal"
++
++msgid "Version, author, credits"
++msgstr "Versión, autor, créditos"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "Dreamcast para PlayStation 4"
++
++msgid "Made by"
++msgstr "Creado por"
+ 
++msgid "Libraries"
++msgstr "Bibliotecas"
 diff --git a/resources/i18n/fr.po b/resources/i18n/fr.po
-index f3754825e..49088c813 100644
+index f3754825e..12bf8a5b9 100644
 --- a/resources/i18n/fr.po
 +++ b/resources/i18n/fr.po
-@@ -1,2967 +1,2264 @@
+@@ -1,2967 +1,2324 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -14631,11 +14831,71 @@ index f3754825e..49088c813 100644
 +
 +msgid "PAUSED"
 +msgstr "EN PAUSE"
++
++msgid "Network Library"
++msgstr "Bibliothèque réseau"
++
++msgid "Games on NFS and SMB shares"
++msgstr "Jeux sur des partages NFS et SMB"
++
++msgid "Add NFS Share"
++msgstr "Ajouter un partage NFS"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Un dossier exporté par un NAS ou un PC (WinNFSd, serveur NFS Linux)"
++
++msgid "Add SMB Share"
++msgstr "Ajouter un partage SMB"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Un dossier partagé Windows, ou Samba sur un NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Adresse du serveur (ex. 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Dossier exporté (ex. /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Nom du partage et dossier (ex. Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "Croix : tester la connexion ou retirer le partage"
++
++msgid "Test Connection"
++msgstr "Tester la connexion"
++
++msgid "Remove"
++msgstr "Retirer"
++
++msgid "Share removed"
++msgstr "Partage retiré"
++
++msgid "Connecting..."
++msgstr "Connexion..."
++
++msgid "Couldn't connect: %s"
++msgstr "Connexion impossible : %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Connecté : %d éléments dans le dossier principal"
++
++msgid "Version, author, credits"
++msgstr "Version, auteur, crédits"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "La Dreamcast sur PlayStation 4"
++
++msgid "Made by"
++msgstr "Créé par"
++
++msgid "Libraries"
++msgstr "Bibliothèques"
 diff --git a/resources/i18n/it.po b/resources/i18n/it.po
-index ee92eb28e..876746983 100644
+index ee92eb28e..a359c3d2e 100644
 --- a/resources/i18n/it.po
 +++ b/resources/i18n/it.po
-@@ -1,2963 +1,2264 @@
+@@ -1,2963 +1,2324 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -18443,14 +18703,74 @@ index ee92eb28e..876746983 100644
 +
 +msgid "Change"
 +msgstr "Cambia"
- 
++
 +msgid "PAUSED"
 +msgstr "IN PAUSA"
++
++msgid "Network Library"
++msgstr "Libreria di rete"
++
++msgid "Games on NFS and SMB shares"
++msgstr "Giochi su condivisioni NFS e SMB"
++
++msgid "Add NFS Share"
++msgstr "Aggiungi condivisione NFS"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Una cartella esportata da un NAS o da un PC (WinNFSd, server NFS Linux)"
++
++msgid "Add SMB Share"
++msgstr "Aggiungi condivisione SMB"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Una cartella condivisa di Windows, o Samba su un NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Indirizzo del server (es. 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Cartella esportata (es. /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Nome della condivisione e cartella (es. Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "Croce: prova la connessione o rimuovi la condivisione"
++
++msgid "Test Connection"
++msgstr "Prova connessione"
++
++msgid "Remove"
++msgstr "Rimuovi"
++
++msgid "Share removed"
++msgstr "Condivisione rimossa"
++
++msgid "Connecting..."
++msgstr "Connessione..."
++
++msgid "Couldn't connect: %s"
++msgstr "Impossibile connettersi: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Connesso: %d elementi nella cartella principale"
++
++msgid "Version, author, credits"
++msgstr "Versione, autore, riconoscimenti"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "Dreamcast per PlayStation 4"
++
++msgid "Made by"
++msgstr "Creato da"
+ 
++msgid "Libraries"
++msgstr "Librerie"
 diff --git a/resources/i18n/ja.po b/resources/i18n/ja.po
-index a79c6a14b..0d25f1615 100644
+index a79c6a14b..f464f804e 100644
 --- a/resources/i18n/ja.po
 +++ b/resources/i18n/ja.po
-@@ -1,2966 +1,2263 @@
+@@ -1,2966 +1,2323 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -21562,11 +21882,71 @@ index a79c6a14b..0d25f1615 100644
 +
 +msgid "PAUSED"
 +msgstr "一時停止中"
++
++msgid "Network Library"
++msgstr "ネットワークライブラリ"
++
++msgid "Games on NFS and SMB shares"
++msgstr "NFS と SMB の共有フォルダーのゲーム"
++
++msgid "Add NFS Share"
++msgstr "NFS 共有を追加"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "NAS や PC が公開しているフォルダー（WinNFSd、Linux の NFS サーバー）"
++
++msgid "Add SMB Share"
++msgstr "SMB 共有を追加"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Windows の共有フォルダー、または NAS の Samba"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "サーバーのアドレス（例: 192.168.0.10）"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "公開フォルダー（例: /d/games）"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "共有名とフォルダー（例: Games/Dreamcast）"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "×ボタン: 接続をテスト、または共有を削除"
++
++msgid "Test Connection"
++msgstr "接続をテスト"
++
++msgid "Remove"
++msgstr "削除"
++
++msgid "Share removed"
++msgstr "共有を削除しました"
++
++msgid "Connecting..."
++msgstr "接続中..."
++
++msgid "Couldn't connect: %s"
++msgstr "接続できません: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "接続しました: 最上位フォルダーに %d 項目"
++
++msgid "Version, author, credits"
++msgstr "バージョン、作者、クレジット"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "PlayStation 4 でドリームキャストを"
++
++msgid "Made by"
++msgstr "作者"
++
++msgid "Libraries"
++msgstr "ライブラリ"
 diff --git a/resources/i18n/ko.po b/resources/i18n/ko.po
-index a5e70db54..713dcad6d 100644
+index a5e70db54..405a81ce8 100644
 --- a/resources/i18n/ko.po
 +++ b/resources/i18n/ko.po
-@@ -1,2962 +1,2263 @@
+@@ -1,2962 +1,2323 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -25372,15 +25752,75 @@ index a5e70db54..713dcad6d 100644
 +
 +msgid "Change"
 +msgstr "변경"
- 
++
 +msgid "PAUSED"
 +msgstr "일시 정지"
++
++msgid "Network Library"
++msgstr "네트워크 라이브러리"
++
++msgid "Games on NFS and SMB shares"
++msgstr "NFS 및 SMB 공유의 게임"
++
++msgid "Add NFS Share"
++msgstr "NFS 공유 추가"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "NAS나 PC가 내보낸 폴더 (WinNFSd, Linux NFS 서버)"
++
++msgid "Add SMB Share"
++msgstr "SMB 공유 추가"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Windows 공유 폴더 또는 NAS의 Samba"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "서버 주소 (예: 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "내보낸 폴더 (예: /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "공유 이름과 폴더 (예: Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "X: 연결 테스트 또는 공유 제거"
++
++msgid "Test Connection"
++msgstr "연결 테스트"
++
++msgid "Remove"
++msgstr "제거"
++
++msgid "Share removed"
++msgstr "공유를 제거했습니다"
++
++msgid "Connecting..."
++msgstr "연결 중..."
++
++msgid "Couldn't connect: %s"
++msgstr "연결할 수 없음: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "연결됨: 최상위 폴더에 항목 %d개"
++
++msgid "Version, author, credits"
++msgstr "버전, 제작자, 크레딧"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "PlayStation 4용 드림캐스트"
++
++msgid "Made by"
++msgstr "제작"
+ 
++msgid "Libraries"
++msgstr "라이브러리"
 diff --git a/resources/i18n/nl.po b/resources/i18n/nl.po
 new file mode 100644
-index 000000000..e03ae2dd3
+index 000000000..c85357f5e
 --- /dev/null
 +++ b/resources/i18n/nl.po
-@@ -0,0 +1,2264 @@
+@@ -0,0 +1,2324 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -27645,11 +28085,71 @@ index 000000000..e03ae2dd3
 +
 +msgid "PAUSED"
 +msgstr "GEPAUZEERD"
++
++msgid "Network Library"
++msgstr "Netwerkbibliotheek"
++
++msgid "Games on NFS and SMB shares"
++msgstr "Games op NFS- en SMB-shares"
++
++msgid "Add NFS Share"
++msgstr "NFS-share toevoegen"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Een map die een NAS of pc deelt (WinNFSd, Linux-NFS-server)"
++
++msgid "Add SMB Share"
++msgstr "SMB-share toevoegen"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Een gedeelde Windows-map, of Samba op een NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Serveradres (bijv. 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Gedeelde map (bijv. /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Sharenaam en map (bijv. Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "Kruisje: verbinding testen of share verwijderen"
++
++msgid "Test Connection"
++msgstr "Verbinding testen"
++
++msgid "Remove"
++msgstr "Verwijderen"
++
++msgid "Share removed"
++msgstr "Share verwijderd"
++
++msgid "Connecting..."
++msgstr "Verbinden..."
++
++msgid "Couldn't connect: %s"
++msgstr "Kan geen verbinding maken: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Verbonden: %d items in de bovenste map"
++
++msgid "Version, author, credits"
++msgstr "Versie, maker, credits"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "Dreamcast voor PlayStation 4"
++
++msgid "Made by"
++msgstr "Gemaakt door"
++
++msgid "Libraries"
++msgstr "Bibliotheken"
 diff --git a/resources/i18n/pl.po b/resources/i18n/pl.po
-index 548cbb44d..16465370c 100644
+index 548cbb44d..f002cbd42 100644
 --- a/resources/i18n/pl.po
 +++ b/resources/i18n/pl.po
-@@ -1,2965 +1,2265 @@
+@@ -1,2965 +1,2325 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -31461,14 +31961,74 @@ index 548cbb44d..16465370c 100644
 +
 +msgid "Change"
 +msgstr "Zmień"
- 
++
 +msgid "PAUSED"
 +msgstr "WSTRZYMANO"
++
++msgid "Network Library"
++msgstr "Biblioteka sieciowa"
++
++msgid "Games on NFS and SMB shares"
++msgstr "Gry z udziałów NFS i SMB"
++
++msgid "Add NFS Share"
++msgstr "Dodaj udział NFS"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Folder udostępniony przez NAS lub PC (WinNFSd, serwer NFS w Linuksie)"
++
++msgid "Add SMB Share"
++msgstr "Dodaj udział SMB"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Udostępniony folder Windows lub Samba na NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Adres serwera (np. 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Udostępniony folder (np. /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Nazwa udziału i folder (np. Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "Krzyżyk: sprawdź połączenie lub usuń udział"
++
++msgid "Test Connection"
++msgstr "Sprawdź połączenie"
++
++msgid "Remove"
++msgstr "Usuń"
++
++msgid "Share removed"
++msgstr "Usunięto udział"
++
++msgid "Connecting..."
++msgstr "Łączenie..."
++
++msgid "Couldn't connect: %s"
++msgstr "Nie można połączyć: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Połączono: elementy w głównym folderze: %d"
++
++msgid "Version, author, credits"
++msgstr "Wersja, autor, podziękowania"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "Dreamcast na PlayStation 4"
++
++msgid "Made by"
++msgstr "Autor"
+ 
++msgid "Libraries"
++msgstr "Biblioteki"
 diff --git a/resources/i18n/pt_BR.po b/resources/i18n/pt_BR.po
-index 6ec100a1e..3b1544937 100644
+index 6ec100a1e..ec4dd3fa6 100644
 --- a/resources/i18n/pt_BR.po
 +++ b/resources/i18n/pt_BR.po
-@@ -1,2966 +1,2264 @@
+@@ -1,2966 +1,2324 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -34595,12 +35155,72 @@ index 6ec100a1e..3b1544937 100644
 +
 +msgid "PAUSED"
 +msgstr "PAUSADO"
++
++msgid "Network Library"
++msgstr "Biblioteca em rede"
++
++msgid "Games on NFS and SMB shares"
++msgstr "Jogos em compartilhamentos NFS e SMB"
++
++msgid "Add NFS Share"
++msgstr "Adicionar compartilhamento NFS"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Uma pasta exportada por um NAS ou PC (WinNFSd, servidor NFS do Linux)"
++
++msgid "Add SMB Share"
++msgstr "Adicionar compartilhamento SMB"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Uma pasta compartilhada do Windows, ou Samba em um NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Endereço do servidor (ex.: 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Pasta exportada (ex.: /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Nome do compartilhamento e pasta (ex.: Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "X: testar a conexão ou remover o compartilhamento"
++
++msgid "Test Connection"
++msgstr "Testar conexão"
++
++msgid "Remove"
++msgstr "Remover"
++
++msgid "Share removed"
++msgstr "Compartilhamento removido"
++
++msgid "Connecting..."
++msgstr "Conectando..."
++
++msgid "Couldn't connect: %s"
++msgstr "Não foi possível conectar: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Conectado: %d itens na pasta principal"
++
++msgid "Version, author, credits"
++msgstr "Versão, autor, créditos"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "Dreamcast para PlayStation 4"
++
++msgid "Made by"
++msgstr "Criado por"
++
++msgid "Libraries"
++msgstr "Bibliotecas"
 diff --git a/resources/i18n/ru.po b/resources/i18n/ru.po
 new file mode 100644
-index 000000000..5df28d878
+index 000000000..bde870149
 --- /dev/null
 +++ b/resources/i18n/ru.po
-@@ -0,0 +1,2265 @@
+@@ -0,0 +1,2325 @@
 +msgid ""
 +msgstr ""
 +"Project-Id-Version: flycast\n"
@@ -36866,11 +37486,71 @@ index 000000000..5df28d878
 +
 +msgid "PAUSED"
 +msgstr "ПАУЗА"
++
++msgid "Network Library"
++msgstr "Сетевая библиотека"
++
++msgid "Games on NFS and SMB shares"
++msgstr "Игры на общих ресурсах NFS и SMB"
++
++msgid "Add NFS Share"
++msgstr "Добавить ресурс NFS"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Папка, открытая NAS или ПК (WinNFSd, NFS-сервер Linux)"
++
++msgid "Add SMB Share"
++msgstr "Добавить ресурс SMB"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Общая папка Windows или Samba на NAS"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Адрес сервера (напр. 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Экспортированная папка (напр. /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Имя ресурса и папка (напр. Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "Крест: проверить подключение или удалить ресурс"
++
++msgid "Test Connection"
++msgstr "Проверить подключение"
++
++msgid "Remove"
++msgstr "Удалить"
++
++msgid "Share removed"
++msgstr "Ресурс удалён"
++
++msgid "Connecting..."
++msgstr "Подключение..."
++
++msgid "Couldn't connect: %s"
++msgstr "Не удалось подключиться: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Подключено: элементов в главной папке: %d"
++
++msgid "Version, author, credits"
++msgstr "Версия, автор, благодарности"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "Dreamcast для PlayStation 4"
++
++msgid "Made by"
++msgstr "Автор"
++
++msgid "Libraries"
++msgstr "Библиотеки"
 diff --git a/resources/i18n/tr.po b/resources/i18n/tr.po
-index 8c8d8bc08..af92cf7f1 100644
+index 8c8d8bc08..ecd4550a9 100644
 --- a/resources/i18n/tr.po
 +++ b/resources/i18n/tr.po
-@@ -1,2965 +1,2264 @@
+@@ -1,2965 +1,2324 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -40383,14 +41063,74 @@ index 8c8d8bc08..af92cf7f1 100644
 +
 +msgid "Change"
 +msgstr "Değiştir"
- 
++
 +msgid "PAUSED"
 +msgstr "DURAKLATILDI"
++
++msgid "Network Library"
++msgstr "Ağ kitaplığı"
++
++msgid "Games on NFS and SMB shares"
++msgstr "NFS ve SMB paylaşımlarındaki oyunlar"
++
++msgid "Add NFS Share"
++msgstr "NFS paylaşımı ekle"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "Bir NAS veya bilgisayarın dışa aktardığı klasör (WinNFSd, Linux NFS sunucusu)"
++
++msgid "Add SMB Share"
++msgstr "SMB paylaşımı ekle"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Paylaşılan bir Windows klasörü veya NAS üzerinde Samba"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "Sunucu adresi (örn. 192.168.0.10)"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "Dışa aktarılan klasör (örn. /d/games)"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "Paylaşım adı ve klasör (örn. Games/Dreamcast)"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "Çarpı: bağlantıyı dene veya paylaşımı kaldır"
++
++msgid "Test Connection"
++msgstr "Bağlantıyı dene"
++
++msgid "Remove"
++msgstr "Kaldır"
++
++msgid "Share removed"
++msgstr "Paylaşım kaldırıldı"
++
++msgid "Connecting..."
++msgstr "Bağlanılıyor..."
++
++msgid "Couldn't connect: %s"
++msgstr "Bağlanılamadı: %s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "Bağlandı: üst klasörde %d öğe"
++
++msgid "Version, author, credits"
++msgstr "Sürüm, yapımcı, katkıda bulunanlar"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "PlayStation 4 için Dreamcast"
++
++msgid "Made by"
++msgstr "Yapan"
+ 
++msgid "Libraries"
++msgstr "Kitaplıklar"
 diff --git a/resources/i18n/zh_CN.po b/resources/i18n/zh_CN.po
-index 3ecabd349..9b2be5c1f 100644
+index 3ecabd349..57044bc68 100644
 --- a/resources/i18n/zh_CN.po
 +++ b/resources/i18n/zh_CN.po
-@@ -1,2962 +1,2263 @@
+@@ -1,2962 +1,2323 @@
  msgid ""
  msgstr ""
  "Project-Id-Version: flycast\n"
@@ -44196,9 +44936,69 @@ index 3ecabd349..9b2be5c1f 100644
 +
 +msgid "Change"
 +msgstr "更改"
- 
++
 +msgid "PAUSED"
 +msgstr "已暂停"
++
++msgid "Network Library"
++msgstr "网络游戏库"
++
++msgid "Games on NFS and SMB shares"
++msgstr "NFS 和 SMB 共享上的游戏"
++
++msgid "Add NFS Share"
++msgstr "添加 NFS 共享"
++
++msgid "A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"
++msgstr "NAS 或电脑导出的文件夹（WinNFSd、Linux NFS 服务器）"
++
++msgid "Add SMB Share"
++msgstr "添加 SMB 共享"
++
++msgid "A shared Windows folder, or Samba on a NAS"
++msgstr "Windows 共享文件夹，或 NAS 上的 Samba"
++
++msgid "Server address (e.g. 192.168.0.10)"
++msgstr "服务器地址（例如 192.168.0.10）"
++
++msgid "Exported folder (e.g. /d/games)"
++msgstr "导出的文件夹（例如 /d/games）"
++
++msgid "Share name and folder (e.g. Games/Dreamcast)"
++msgstr "共享名和文件夹（例如 Games/Dreamcast）"
++
++msgid "Cross: test the connection or remove the share"
++msgstr "叉键：测试连接或移除共享"
++
++msgid "Test Connection"
++msgstr "测试连接"
++
++msgid "Remove"
++msgstr "移除"
++
++msgid "Share removed"
++msgstr "已移除共享"
++
++msgid "Connecting..."
++msgstr "正在连接..."
++
++msgid "Couldn't connect: %s"
++msgstr "无法连接：%s"
++
++msgid "Connected: %d items in the top folder"
++msgstr "已连接：顶层文件夹中有 %d 项"
++
++msgid "Version, author, credits"
++msgstr "版本、作者、致谢"
++
++msgid "Dreamcast for PlayStation 4"
++msgstr "PlayStation 4 上的 Dreamcast"
++
++msgid "Made by"
++msgstr "制作者"
+ 
++msgid "Libraries"
++msgstr "库"
 diff --git a/resources/resources.cmake b/resources/resources.cmake
 index 9bf4830a7..1ed162421 100644
 --- a/resources/resources.cmake
@@ -44223,10 +45023,10 @@ index 9bf4830a7..1ed162421 100644
 +endif()
 diff --git a/shell/ps4/CMakeLists.txt b/shell/ps4/CMakeLists.txt
 new file mode 100644
-index 000000000..b615840d5
+index 000000000..c8d300285
 --- /dev/null
 +++ b/shell/ps4/CMakeLists.txt
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,47 @@
 +# Resonance: Flycast on PS4 homebrew. Built with the Resonance toolchain (toolchain/ps4-decast.cmake,
 +# ps4-love-style.cmake: PS4_RUNTIME_SOURCES, ps4_link_mesa, ps4_add_eboot).
 +target_sources(${PROJECT_NAME} PRIVATE
@@ -44238,11 +45038,14 @@ index 000000000..b615840d5
 +	ps4_wsi.cpp
 +	ps4_wsi.h
 +	audiobackend_ps4.cpp
++	netfs.cpp
++	netfs.h
 +	launcher/launcher.cpp
 +	launcher/launcher.h
 +	launcher/launcher_internal.h
 +	launcher/covers.cpp
 +	launcher/intro.cpp
++	launcher/keyboard.cpp
 +	launcher/quick_menu.cpp
 +	launcher/settings_menu.cpp
 +	launcher/xmb_style.cpp
@@ -44263,12 +45066,13 @@ index 000000000..b615840d5
 +# curl + OpenSSL from the sysroot (Crema's PSChrome recipes) for box art and achievements
 +target_compile_definitions(${PROJECT_NAME} PRIVATE CURL_STATICLIB)
 +target_link_libraries(${PROJECT_NAME} PRIVATE
++	${PS4_SYSROOT}/lib/libnfs.a ${PS4_SYSROOT}/lib/libsmb2.a
 +	${PS4_SYSROOT}/lib/libcurl.a ${PS4_SYSROOT}/lib/libssl.a ${PS4_SYSROOT}/lib/libcrypto.a)
 +
 +# RADV on GNM, the system libraries, and eboot.bin
 +ps4_link_mesa(${PROJECT_NAME})
 +target_link_libraries(${PROJECT_NAME} PRIVATE
-+	SceSysmodule SceSystemService SceUserService SceVideoOut SceAudioOut ScePad SceNet)
++	SceSysmodule SceSystemService SceUserService SceVideoOut SceAudioOut ScePad SceNet SceCommonDialog SceImeDialog)
 +ps4_add_eboot(${PROJECT_NAME})
 diff --git a/shell/ps4/audiobackend_ps4.cpp b/shell/ps4/audiobackend_ps4.cpp
 new file mode 100644
@@ -45530,6 +46334,177 @@ index 000000000..e8eac7a60
 +}
 +
 +} // namespace launcher
+diff --git a/shell/ps4/launcher/keyboard.cpp b/shell/ps4/launcher/keyboard.cpp
+new file mode 100644
+index 000000000..d8426aabd
+--- /dev/null
++++ b/shell/ps4/launcher/keyboard.cpp
+@@ -0,0 +1,165 @@
++/*
++	Resonance: the PS4's on-screen keyboard (IME dialog) over the menus, for typing a share's
++	server, folder and login. Opened with a title and a starting text; the menus call
++	keyboardUpdate() every frame, which hands the text over when the keyboard closes. From
++	Crema's launcher (Menu::OpenKeyboard).
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "launcher_internal.h"
++
++#include <orbis/CommonDialog.h>
++#include <orbis/ImeDialog.h>
++#include <orbis/Sysmodule.h>
++#include <orbis/UserService.h>
++
++extern "C" void ps4_boot_trace(const char *line);
++
++namespace launcher
++{
++namespace
++{
++constexpr u32 OPTION_NO_AUTO_CAPITALIZATION = 0x2;
++constexpr u32 OPTION_PASSWORD = 0x4;			// typed characters shown as dots
++
++bool gOpen;
++char16_t gText[256];
++char16_t gTitle[128];
++std::function<void(bool, const std::string&)> gDone;
++
++void toUtf16(const std::string& in, char16_t *out, size_t size)
++{
++	size_t n = 0;
++	for (size_t i = 0; i < in.size() && n + 2 < size;)
++	{
++		const unsigned char c = in[i];
++		char32_t cp;
++		int len;
++		if (c < 0x80) { cp = c; len = 1; }
++		else if ((c >> 5) == 6) { cp = c & 0x1F; len = 2; }
++		else if ((c >> 4) == 14) { cp = c & 0x0F; len = 3; }
++		else { cp = c & 0x07; len = 4; }
++		for (int k = 1; k < len && i + k < in.size(); k++)
++			cp = (cp << 6) | (in[i + k] & 0x3F);
++		i += len;
++		if (cp >= 0x10000)
++		{
++			cp -= 0x10000;
++			out[n++] = (char16_t)(0xD800 + (cp >> 10));
++			out[n++] = (char16_t)(0xDC00 + (cp & 0x3FF));
++		}
++		else
++			out[n++] = (char16_t)cp;
++	}
++	out[n] = 0;
++}
++
++std::string toUtf8(const char16_t *in)
++{
++	std::string out;
++	for (size_t i = 0; in[i] != 0; i++)
++	{
++		char32_t cp = in[i];
++		if (cp >= 0xD800 && cp < 0xDC00 && in[i + 1] >= 0xDC00 && in[i + 1] < 0xE000)
++		{
++			cp = 0x10000 + ((cp - 0xD800) << 10) + (in[i + 1] - 0xDC00);
++			i++;
++		}
++		if (cp < 0x80)
++			out += (char)cp;
++		else if (cp < 0x800) {
++			out += (char)(0xC0 | (cp >> 6));
++			out += (char)(0x80 | (cp & 0x3F));
++		}
++		else if (cp < 0x10000) {
++			out += (char)(0xE0 | (cp >> 12));
++			out += (char)(0x80 | ((cp >> 6) & 0x3F));
++			out += (char)(0x80 | (cp & 0x3F));
++		}
++		else {
++			out += (char)(0xF0 | (cp >> 18));
++			out += (char)(0x80 | ((cp >> 12) & 0x3F));
++			out += (char)(0x80 | ((cp >> 6) & 0x3F));
++			out += (char)(0x80 | (cp & 0x3F));
++		}
++	}
++	return out;
++}
++} // namespace
++
++bool keyboardOpen() {
++	return gOpen;
++}
++
++void openKeyboard(const std::string& title, const std::string& text, bool secret,
++		std::function<void(bool ok, const std::string& text)> done)
++{
++	if (gOpen)
++		return;
++	static bool loaded;
++	if (!loaded)
++	{
++		sceSysmoduleLoadModule(ORBIS_SYSMODULE_IME_DIALOG);
++		sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_COMMON_DIALOG);
++		sceCommonDialogInitialize();
++		loaded = true;
++	}
++	toUtf16(text, gText, std::size(gText));
++	toUtf16(title, gTitle, std::size(gTitle));
++	int32_t user = -1;
++	sceUserServiceGetInitialUser(&user);
++	OrbisImeDialogSetting setting {};
++	setting.userId = (uint32_t)user;
++	setting.type = ORBIS_TYPE_TYPE_URL;
++	setting.enterLabel = ORBIS_BUTTON_LABEL_DEFAULT;
++	setting.option = OPTION_NO_AUTO_CAPITALIZATION | (secret ? OPTION_PASSWORD : 0);
++	setting.maxTextLength = (u32)std::size(gText) - 2;
++	setting.inputTextBuffer = reinterpret_cast<wchar_t *>(gText);
++	setting.posx = 1920.f / 2;
++	setting.posy = 1080.f / 2;
++	setting.horizontalAlignment = ORBIS_H_CENTER;
++	setting.verticalAlignment = ORBIS_V_CENTER;
++	setting.title = reinterpret_cast<const wchar_t *>(gTitle);
++	const int r = sceImeDialogInit(&setting, nullptr);
++	char line[96];
++	snprintf(line, sizeof(line), "keyboard: open %x", (unsigned)r);
++	ps4_boot_trace(line);
++	gOpen = r >= 0;
++	gDone = gOpen ? std::move(done) : nullptr;
++	if (!gOpen)
++		playSound(Sound::Error);
++}
++
++void keyboardUpdate()
++{
++	if (!gOpen)
++		return;
++	const OrbisDialogStatus status = sceImeDialogGetStatus();
++	if (status == ORBIS_DIALOG_STATUS_RUNNING)
++		return;
++	OrbisDialogResult result {};
++	if (status == ORBIS_DIALOG_STATUS_STOPPED)
++		sceImeDialogGetResult(&result);
++	sceImeDialogTerm();
++	gOpen = false;
++	const bool ok = status == ORBIS_DIALOG_STATUS_STOPPED && result.endstatus == ORBIS_DIALOG_OK;
++	auto done = std::move(gDone);
++	gDone = nullptr;
++	if (done)
++		done(ok, ok ? toUtf8(gText) : std::string());
++}
++
++} // namespace launcher
 diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
 new file mode 100644
 index 000000000..f3fe55131
@@ -46358,10 +47333,10 @@ index 000000000..f3fe55131
 +}
 diff --git a/shell/ps4/launcher/launcher.h b/shell/ps4/launcher/launcher.h
 new file mode 100644
-index 000000000..24b465595
+index 000000000..0e648b80a
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher.h
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,69 @@
 +/*
 +	Resonance: the PS4 home screen (launcher) that replaces Flycast's game list.
 +
@@ -46416,6 +47391,7 @@ index 000000000..24b465595
 +void gui_ps4_swap_disc();
 +void gui_ps4_quit_game();
 +void gui_ps4_open_quick_menu();
++void gui_ps4_rescan_games();	// after a network share was added or removed
 +// Settings changed: saved; devices changed while a game runs are plugged in again
 +void gui_ps4_apply_settings(const bool mapleChanged[4], const bool expansionChanged[4][2]);
 +// The settings screen is done: back to the quick menu (in a game) or the home screen
@@ -46432,10 +47408,10 @@ index 000000000..24b465595
 +void launcher_open_quick_menu();
 diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
 new file mode 100644
-index 000000000..217ffc754
+index 000000000..6dfaaefff
 --- /dev/null
 +++ b/shell/ps4/launcher/launcher_internal.h
-@@ -0,0 +1,215 @@
+@@ -0,0 +1,223 @@
 +/*
 +	Resonance launcher internals: what the core (launcher.cpp) shares with the themes
 +	(theme_*.cpp), covers (covers.cpp) and sounds (sound.cpp).
@@ -46461,6 +47437,7 @@ index 000000000..217ffc754
 +#include "oslib/i18n.h"
 +
 +#include <cmath>
++#include <functional>
 +#include <memory>
 +#include <string>
 +#include <vector>
@@ -46634,6 +47611,13 @@ index 000000000..217ffc754
 +	struct Impl;
 +	std::unique_ptr<Impl> impl;
 +};
++// keyboard.cpp: the PS4's on-screen keyboard over the menus (they skip the pad while it is open
++// and call keyboardUpdate() every frame); done(ok, text) when it closes
++bool keyboardOpen();
++void openKeyboard(const std::string& title, const std::string& text, bool secret,
++		std::function<void(bool ok, const std::string& text)> done);
++void keyboardUpdate();
++
 +// The cover of the game being played, for the quick menu (the launcher sets it when starting one)
 +extern std::string currentGameCover;
 +
@@ -47000,10 +47984,10 @@ index 000000000..bc4c1d7ce
 +}
 diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_menu.cpp
 new file mode 100644
-index 000000000..233587a4b
+index 000000000..9082929ea
 --- /dev/null
 +++ b/shell/ps4/launcher/settings_menu.cpp
-@@ -0,0 +1,566 @@
+@@ -0,0 +1,760 @@
 +/*
 +	Resonance's settings, PS3 style, in place of Flycast's settings window: five groups (Video,
 +	Audio, Controllers, System, Home Screen); a group lists its options with the current value on the
@@ -47033,8 +48017,10 @@ index 000000000..233587a4b
 +#include "hw/maple/maple_cfg.h"
 +#include "stdclass.h"
 +#include "ui/IconsFontAwesome6.h"
++#include "netfs.h"
 +
 +#include <functional>
++#include <future>
 +
 +using i18n::T;
 +
@@ -47056,6 +48042,8 @@ index 000000000..233587a4b
 +	std::function<int()> get;
 +	std::function<void(int)> set;
 +	bool lockedInGame = false;		// needs the game restarted: not while one runs
++	std::function<std::string()> value;	// shown instead of the chosen value's label
++	std::function<void()> action;		// Cross does this instead of opening a list
 +};
 +
 +struct Group
@@ -47234,8 +48222,179 @@ index 000000000..233587a4b
 +			[] { return introEnabled() ? 1 : 0; },
 +			[](int v) { setIntroEnabled(v != 0); } });
 +		groups.push_back(std::move(home));
++		groups.push_back(networkGroup());
++		groups.push_back(aboutGroup());
++	}
++
++	// ---- about ----
++	static std::string appVersion()
++	{
++		std::string v;
++		if (FILE *f = fopen("/app0/version.txt", "r"))
++		{
++			char buf[32] = {};
++			if (fgets(buf, sizeof(buf), f) != nullptr)
++				v = buf;
++			fclose(f);
++		}
++		while (!v.empty() && (v.back() == '\n' || v.back() == '\r'))
++			v.pop_back();
++		return v.empty() ? "?" : v;
++	}
++
++	Group aboutGroup()
++	{
++		Group about { ICON_FA_CIRCLE_INFO, T("About"), T("Version, author, credits"), {} };
++		auto line = [&about](const std::string& name, const std::string& value, const std::string& help) {
++			Setting s { name, help, {}, [] { return 0; }, [](int) {} };
++			s.value = [value] { return value; };
++			s.action = [] {};
++			about.items.push_back(s);
++		};
++		line("Resonance", appVersion(), T("Dreamcast for PlayStation 4"));
++		line(T("Made by"), "ShiroKlein", "");
++		line("GitHub", "github.com/iHaiDeeZ", "");
++		line(T("Emulator"), "Flycast", "Flycast by flyinghead and contributors (GPL-2.0)");
++		line(T("Libraries"), "Mesa RADV, Dear ImGui, libnfs, libsmb2", "PS4 graphics from DolphinPS4's RADV port; OpenOrbis toolchain");
++		return about;
 +	}
 +	bool rebuildPending = false;
++
++	// ---- network shares ----
++	std::string status;
++	float statusAt = -10;
++	bool statusBad = false;
++	std::future<std::string> testing;
++	netfs::Share testingShare;
++	int testingEntries = 0;
++	bool testingAdds = false;
++	float now = 0;
++
++	void say(const std::string& text, bool bad)
++	{
++		status = text;
++		statusAt = now;
++		statusBad = bad;
++		playSound(bad ? Sound::Error : Sound::Confirm);
++	}
++
++	void startTest(const netfs::Share& share, bool addIfOk)
++	{
++		if (testing.valid())
++			return;
++		testingShare = share;
++		testingAdds = addIfOk;
++		testingEntries = 0;
++		status = T("Connecting...");
++		statusAt = now;
++		statusBad = false;
++		testing = std::async(std::launch::async, [this, share] { return netfs::test(share, testingEntries); });
++	}
++
++	// the test running in the background, when it is over
++	void pollTest()
++	{
++		if (!testing.valid() || testing.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
++			return;
++		const std::string error = testing.get();
++		char buf[512];
++		if (!error.empty())
++		{
++			snprintf(buf, sizeof(buf), T("Couldn't connect: %s"), error.c_str());
++			say(buf, true);
++			return;
++		}
++		if (testingAdds)
++		{
++			netfs::addShare(testingShare);
++			gui_ps4_rescan_games();
++			const int g = group, s = sel;
++			build();
++			group = g;
++			sel = s;
++		}
++		snprintf(buf, sizeof(buf), T("Connected: %d items in the top folder"), testingEntries);
++		say(buf, false);
++	}
++
++	void addShare(bool smb)
++	{
++		const std::string type = smb ? "smb" : "nfs";
++		openKeyboard(T("Server address (e.g. 192.168.0.10)"), "", false, [this, type, smb](bool ok, const std::string& host) {
++			if (!ok || host.empty())
++				return;
++			openKeyboard(smb ? T("Share name and folder (e.g. Games/Dreamcast)") : T("Exported folder (e.g. /d/games)"),
++					smb ? "" : "/", false, [this, type, smb, host](bool ok, const std::string& path) {
++				if (!ok || path.empty())
++					return;
++				netfs::Share share;
++				share.type = type;
++				share.host = host;
++				share.path = path;
++				share.label = netfs::makeLabel(host, path);
++				if (!smb)
++				{
++					startTest(share, true);
++					return;
++				}
++				openKeyboard(T("Username"), "", false, [this, share](bool ok, const std::string& user) {
++					if (!ok)
++						return;
++					netfs::Share withUser = share;
++					withUser.user = user;
++					if (user.empty())
++					{
++						startTest(withUser, true);	// a guest share
++						return;
++					}
++					openKeyboard(T("Password"), "", true, [this, withUser](bool ok, const std::string& password) {
++						if (!ok)
++							return;
++						netfs::Share full = withUser;
++						full.password = password;
++						startTest(full, true);
++					});
++				});
++			});
++		});
++	}
++
++	Group networkGroup()
++	{
++		Group net { ICON_FA_NETWORK_WIRED, T("Network Library"), T("Games on NFS and SMB shares"), {} };
++		for (const netfs::Share& s : netfs::shares())
++		{
++			const netfs::Share share = s;
++			Setting item { share.describe(), T("Cross: test the connection or remove the share"),
++				{ { T("Test Connection"), 0 }, { T("Remove"), 1 } },
++				[] { return -1; },
++				[this, share](int v) {
++					if (v == 0)
++						startTest(share, false);
++					else
++					{
++						netfs::removeShare(share.label);
++						gui_ps4_rescan_games();
++						const int g = group;
++						build();
++						group = g;
++						sel = 0;
++						say(T("Share removed"), false);
++					}
++				} };
++			item.value = [] { return std::string(ICON_FA_FOLDER_OPEN); };
++			net.items.push_back(item);
++		}
++		Setting addNfs { T("Add NFS Share"), T("A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)"), {}, [] { return 0; }, [](int) {} };
++		addNfs.action = [this] { addShare(false); };
++		addNfs.value = [] { return std::string(ICON_FA_PLUS); };
++		net.items.push_back(addNfs);
++		Setting addSmb { T("Add SMB Share"), T("A shared Windows folder, or Samba on a NAS"), {}, [] { return 0; }, [](int) {} };
++		addSmb.action = [this] { addShare(true); };
++		addSmb.value = [] { return std::string(ICON_FA_PLUS); };
++		net.items.push_back(addSmb);
++		return net;
++	}
 +
 +	int current(const Setting& s) const
 +	{
@@ -47247,6 +48406,8 @@ index 000000000..233587a4b
 +	}
 +	std::string valueText(const Setting& s) const
 +	{
++		if (s.value)
++			return s.value();
 +		const int i = current(s);
 +		return i >= 0 ? s.choices[i].label : std::to_string(s.get());
 +	}
@@ -47307,7 +48468,10 @@ index 000000000..233587a4b
 +void SettingsPanel::input(const MenuInput& in, float t)
 +{
 +	Impl& m = *impl;
-+	if (!m.open)
++	m.now = t;
++	keyboardUpdate();
++	m.pollTest();
++	if (!m.open || keyboardOpen())
 +		return;
 +	std::vector<Setting>& items = m.groups[m.group].items;
 +	if (m.dropOpen)
@@ -47367,7 +48531,15 @@ index 000000000..233587a4b
 +	if (in.cross || in.dx > 0)
 +	{
 +		Setting& s = items[m.sel];
-+		if (m.locked(s))
++		if (s.action)
++		{
++			if (in.cross)
++			{
++				playSound(Sound::Confirm);
++				s.action();
++			}
++		}
++		else if (m.locked(s))
 +			playSound(Sound::Error);
 +		else
 +		{
@@ -47440,7 +48612,13 @@ index 000000000..233587a4b
 +	const size_t nl = help.find('\n');
 +	if (nl != std::string::npos)
 +		help = help.substr(0, nl);
-+	xmbText(dl, bodyFont(), f.h * .022f, ImVec2(f.w * .07f, f.h * .875f), in * .85f, help, 0, f.w * .86f, IM_COL32(220, 228, 240, 255));
++	if (!m.status.empty() && (f.t - m.statusAt < 8.f || m.testing.valid()))
++	{
++		const ImU32 col = m.statusBad ? IM_COL32(255, 150, 140, 255) : IM_COL32(170, 240, 190, 255);
++		xmbText(dl, bodyFont(), f.h * .024f, ImVec2(f.w * .07f, f.h * .875f), in, m.status, 0, f.w * .86f, col);
++	}
++	else
++		xmbText(dl, bodyFont(), f.h * .022f, ImVec2(f.w * .07f, f.h * .875f), in * .85f, help, 0, f.w * .86f, IM_COL32(220, 228, 240, 255));
 +
 +	// the drop-down list beside the value
 +	if (m.dropOpen)
@@ -49166,6 +50344,930 @@ index 000000000..0506dd1cb
 +}
 +
 +} // namespace launcher
+diff --git a/shell/ps4/netfs.cpp b/shell/ps4/netfs.cpp
+new file mode 100644
+index 000000000..50665129e
+--- /dev/null
++++ b/shell/ps4/netfs.cpp
+@@ -0,0 +1,861 @@
++/*
++	Resonance: games on network shares (see netfs.h).
++
++	One connection per share, opened when first needed and kept (a mutex per share: libnfs' and
++	libsmb2's synchronous calls aren't thread-safe on one context). A broken connection is closed
++	and opened again on the next call; a share that can't be reached isn't tried again for 20 s
++	(the library scanner asks often).
++
++	Files are read in 1 MiB pieces kept in a small cache, and the piece after the one just read is
++	fetched in the background, so a game reading its disc in order mostly finds the data there.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#include "netfs.h"
++#include "types.h"
++#include "cfg/cfg.h"
++#include "cfg/option.h"
++#include "emulator.h"
++#include "oslib/oslib.h"
++#include "oslib/storage.h"
++#include "stdclass.h"
++
++#include <nfsc/libnfs.h>
++#include <smb2/smb2.h>
++#include <smb2/libsmb2.h>
++
++#include <algorithm>
++#include <chrono>
++#include <condition_variable>
++#include <cstring>
++#include <deque>
++#include <fcntl.h>
++#include <list>
++#include <map>
++#include <memory>
++#include <mutex>
++#include <set>
++#include <sys/stat.h>
++#include <thread>
++
++extern "C" void ps4_boot_trace(const char *line);
++
++namespace netfs
++{
++namespace
++{
++
++u64 nowMs()
++{
++	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
++}
++
++// ---- the shares in emu.cfg: [resonance] NetShares = n, NetShare<i> = type|label|host|path|user|password ----
++
++std::vector<std::string> split(const std::string& s, char sep)
++{
++	std::vector<std::string> out;
++	size_t start = 0;
++	for (;;)
++	{
++		const size_t p = s.find(sep, start);
++		out.push_back(s.substr(start, p == std::string::npos ? std::string::npos : p - start));
++		if (p == std::string::npos)
++			return out;
++		start = p + 1;
++	}
++}
++
++std::vector<Share> loadShares()
++{
++	std::vector<Share> out;
++	const int n = config::loadInt("resonance", "NetShares", 0);
++	for (int i = 0; i < n; i++)
++	{
++		const std::vector<std::string> f = split(config::loadStr("resonance", "NetShare" + std::to_string(i)), '|');
++		if (f.size() < 4 || (f[0] != "nfs" && f[0] != "smb"))
++			continue;
++		Share s;
++		s.type = f[0];
++		s.label = f[1];
++		s.host = f[2];
++		s.path = f[3];
++		if (f.size() > 4)
++			s.user = f[4];
++		if (f.size() > 5)
++			s.password = f[5];
++		out.push_back(s);
++	}
++	return out;
++}
++
++void saveShares(const std::vector<Share>& list)
++{
++	const int old = config::loadInt("resonance", "NetShares", 0);
++	config::saveInt("resonance", "NetShares", (int)list.size());
++	for (int i = 0; i < (int)list.size(); i++)
++	{
++		const Share& s = list[i];
++		config::saveStr("resonance", "NetShare" + std::to_string(i),
++				s.type + "|" + s.label + "|" + s.host + "|" + s.path + "|" + s.user + "|" + s.password);
++	}
++	for (int i = (int)list.size(); i < old; i++)
++		config::saveStr("resonance", "NetShare" + std::to_string(i), "");
++}
++
++// ---- connections ----
++
++class Connection
++{
++public:
++	explicit Connection(const Share& share) : share(share) {}
++	~Connection() {
++		disconnect();
++	}
++
++	std::mutex mutex;		// held around every call below
++	u64 generation = 0;		// bumped at every new connection: file handles from before are gone
++
++	// connected, or why not
++	bool connect(std::string& error)
++	{
++		if (nfs != nullptr || smb != nullptr)
++			return true;
++		if (nowMs() < retryAt)
++		{
++			error = lastError;
++			return false;
++		}
++		if (share.type == "nfs")
++		{
++			nfs = nfs_init_context();
++			if (nfs == nullptr)
++				return fail("out of memory", error);
++			nfs_set_timeout(nfs, 6000);
++			if (nfs_mount(nfs, share.host.c_str(), share.path.c_str()) != 0)
++				return fail(nfs_get_error(nfs), error);
++		}
++		else
++		{
++			smb = smb2_init_context();
++			if (smb == nullptr)
++				return fail("out of memory", error);
++			smb2_set_timeout(smb, 6);
++			smb2_set_security_mode(smb, SMB2_NEGOTIATE_SIGNING_ENABLED);
++			if (!share.user.empty())
++				smb2_set_user(smb, share.user.c_str());
++			if (!share.password.empty())
++				smb2_set_password(smb, share.password.c_str());
++			const size_t slash = share.path.find('/');
++			const std::string shareName = share.path.substr(0, slash);
++			smbBase = slash == std::string::npos ? "" : share.path.substr(slash + 1);
++			while (!smbBase.empty() && smbBase.back() == '/')
++				smbBase.pop_back();
++			if (smb2_connect_share(smb, share.host.c_str(), shareName.c_str(), share.user.empty() ? nullptr : share.user.c_str()) != 0)
++				return fail(smb2_get_error(smb), error);
++		}
++		generation++;
++		lastError.clear();
++		char line[256];
++		snprintf(line, sizeof(line), "netfs: %s connected", share.url().c_str());
++		ps4_boot_trace(line);
++		return true;
++	}
++
++	void disconnect()
++	{
++		if (nfs != nullptr)
++		{
++			nfs_destroy_context(nfs);
++			nfs = nullptr;
++		}
++		if (smb != nullptr)
++		{
++			smb2_disconnect_share(smb);
++			smb2_destroy_context(smb);
++			smb = nullptr;
++		}
++	}
++
++	// rel: path under the share's folder, "" or "a/b" (no leading slash)
++	bool list(const std::string& rel, std::vector<hostfs::FileInfo>& out, const std::string& url, std::string& error)
++	{
++		if (!connect(error))
++			return false;
++		if (nfs != nullptr)
++		{
++			struct nfsdir *dir = nullptr;
++			if (nfs_opendir(nfs, ("/" + rel).c_str(), &dir) != 0)
++				return broken(nfs_get_error(nfs), error);
++			while (struct nfsdirent *e = nfs_readdir(nfs, dir))
++			{
++				if (e->name[0] == '.')
++					continue;
++				const bool isDir = S_ISDIR(e->mode);
++				out.emplace_back(e->name, url + e->name, isDir, (size_t)e->size, false, (u64)e->mtime.tv_sec);
++			}
++			nfs_closedir(nfs, dir);
++		}
++		else
++		{
++			struct smb2dir *dir = smb2_opendir(smb, smbPath(rel).c_str());
++			if (dir == nullptr)
++				return broken(smb2_get_error(smb), error);
++			while (struct smb2dirent *e = smb2_readdir(smb, dir))
++			{
++				if (e->name[0] == '.')
++					continue;
++				const bool isDir = e->st.smb2_type == SMB2_TYPE_DIRECTORY;
++				out.emplace_back(e->name, url + e->name, isDir, (size_t)e->st.smb2_size, false, (u64)e->st.smb2_mtime);
++			}
++			smb2_closedir(smb, dir);
++		}
++		return true;
++	}
++
++	bool stat(const std::string& rel, bool& isDir, u64& size, std::string& error)
++	{
++		if (!connect(error))
++			return false;
++		if (nfs != nullptr)
++		{
++			struct nfs_stat_64 st {};
++			if (nfs_stat64(nfs, ("/" + rel).c_str(), &st) != 0)
++				return softFail(nfs_get_error(nfs), error);
++			isDir = S_ISDIR(st.nfs_mode);
++			size = st.nfs_size;
++		}
++		else
++		{
++			struct smb2_stat_64 st {};
++			if (smb2_stat(smb, smbPath(rel).c_str(), &st) != 0)
++				return softFail(smb2_get_error(smb), error);
++			isDir = st.smb2_type == SMB2_TYPE_DIRECTORY;
++			size = st.smb2_size;
++		}
++		return true;
++	}
++
++	void *open(const std::string& rel, std::string& error)
++	{
++		if (!connect(error))
++			return nullptr;
++		if (nfs != nullptr)
++		{
++			struct nfsfh *fh = nullptr;
++			if (nfs_open(nfs, ("/" + rel).c_str(), O_RDONLY, &fh) != 0)
++			{
++				softFail(nfs_get_error(nfs), error);
++				return nullptr;
++			}
++			return fh;
++		}
++		struct smb2fh *fh = smb2_open(smb, smbPath(rel).c_str(), O_RDONLY);
++		if (fh == nullptr)
++			softFail(smb2_get_error(smb), error);
++		return fh;
++	}
++
++	void close(void *fh)
++	{
++		if (fh == nullptr)
++			return;
++		if (nfs != nullptr)
++			nfs_close(nfs, (struct nfsfh *)fh);
++		else if (smb != nullptr)
++			smb2_close(smb, (struct smb2fh *)fh);
++	}
++
++	// bytes read (0 at the end), -1 when the connection broke
++	s64 pread(void *fh, u8 *buf, size_t count, u64 offset)
++	{
++		size_t done = 0;
++		while (done < count)
++		{
++			int r;
++			if (nfs != nullptr)
++			{
++				const size_t step = std::min<size_t>(count - done, std::max<size_t>(nfs_get_readmax(nfs), 32768));
++				r = nfs_pread(nfs, (struct nfsfh *)fh, buf + done, step, offset + done);
++			}
++			else if (smb != nullptr)
++			{
++				const size_t step = std::min<size_t>(count - done, std::max<u32>(smb2_get_max_read_size(smb), 65536));
++				r = smb2_pread(smb, (struct smb2fh *)fh, buf + done, (u32)step, offset + done);
++			}
++			else
++				return -1;
++			if (r < 0)
++			{
++				std::string ignored;
++				broken(nfs != nullptr ? nfs_get_error(nfs) : smb2_get_error(smb), ignored);
++				return -1;
++			}
++			if (r == 0)
++				break;
++			done += r;
++		}
++		return (s64)done;
++	}
++
++	const Share share;
++
++private:
++	std::string smbPath(const std::string& rel) const
++	{
++		if (smbBase.empty())
++			return rel;
++		return rel.empty() ? smbBase : smbBase + "/" + rel;
++	}
++
++	bool fail(const char *what, std::string& error)
++	{
++		error = what != nullptr && *what ? what : "connection failed";
++		lastError = error;
++		retryAt = nowMs() + 20000;
++		char line[512];
++		snprintf(line, sizeof(line), "netfs: %s: %s", share.url().c_str(), error.c_str());
++		ps4_boot_trace(line);
++		disconnect();
++		return false;
++	}
++	// the call failed and the connection may be gone: start again next time
++	bool broken(const char *what, std::string& error)
++	{
++		error = what != nullptr && *what ? what : "network error";
++		char line[512];
++		snprintf(line, sizeof(line), "netfs: %s: %s (reconnecting)", share.url().c_str(), error.c_str());
++		ps4_boot_trace(line);
++		disconnect();
++		return false;
++	}
++	// a missing file: the connection is fine
++	bool softFail(const char *what, std::string& error)
++	{
++		error = what != nullptr && *what ? what : "not found";
++		return false;
++	}
++
++	struct nfs_context *nfs = nullptr;
++	struct smb2_context *smb = nullptr;
++	std::string smbBase;
++	std::string lastError;
++	u64 retryAt = 0;
++};
++
++std::mutex gConnectionsMutex;
++std::map<std::string, std::shared_ptr<Connection>> gConnections;	// by label
++
++std::shared_ptr<Connection> connectionFor(const std::string& label)
++{
++	std::lock_guard<std::mutex> _(gConnectionsMutex);
++	auto it = gConnections.find(label);
++	if (it != gConnections.end())
++		return it->second;
++	for (const Share& s : loadShares())
++		if (s.label == label)
++		{
++			auto c = std::make_shared<Connection>(s);
++			gConnections[label] = c;
++			return c;
++		}
++	return nullptr;
++}
++
++void forget(const std::string& label)
++{
++	std::lock_guard<std::mutex> _(gConnectionsMutex);
++	gConnections.erase(label);
++}
++
++// "nfs://label/a/b" -> label, "a/b"
++bool parse(const std::string& url, std::string& label, std::string& rel)
++{
++	const size_t scheme = url.find("://");
++	if (scheme == std::string::npos)
++		return false;
++	const size_t start = scheme + 3;
++	const size_t slash = url.find('/', start);
++	label = url.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
++	rel = slash == std::string::npos ? "" : url.substr(slash + 1);
++	while (!rel.empty() && rel.back() == '/')
++		rel.pop_back();
++	return !label.empty();
++}
++
++// ---- files: 1 MiB pieces, a few kept, the next one fetched ahead ----
++
++constexpr size_t PIECE = 1 << 20;
++constexpr size_t KEEP = 6;
++
++struct FileState
++{
++	std::shared_ptr<Connection> conn;
++	std::string rel;
++	u64 size = 0;
++	std::mutex mutex;					// the pieces below
++	std::list<std::pair<u64, std::vector<u8>>> pieces;	// most recent first
++	std::set<u64> loading;
++	std::condition_variable loaded;
++	void *fh = nullptr;					// under conn->mutex
++	u64 fhGeneration = 0;
++
++	~FileState()
++	{
++		std::lock_guard<std::mutex> _(conn->mutex);
++		if (fh != nullptr && fhGeneration == conn->generation)
++			conn->close(fh);
++	}
++
++	// one piece from the share (conn->mutex held by the caller)
++	bool fetch(u64 index, std::vector<u8>& out)
++	{
++		for (int attempt = 0; attempt < 2; attempt++)
++		{
++			std::string error;
++			if (!conn->connect(error))
++				return false;
++			if (fh == nullptr || fhGeneration != conn->generation)
++			{
++				fh = conn->open(rel, error);
++				fhGeneration = conn->generation;
++				if (fh == nullptr)
++					return false;
++			}
++			const u64 offset = index * PIECE;
++			out.resize((size_t)std::min<u64>(PIECE, size - offset));
++			const s64 r = conn->pread(fh, out.data(), out.size(), offset);
++			if (r >= 0)
++			{
++				out.resize((size_t)r);
++				return true;
++			}
++			fh = nullptr;	// the connection broke: once more on a new one
++		}
++		return false;
++	}
++
++	void store(u64 index, std::vector<u8>&& data)
++	{
++		pieces.emplace_front(index, std::move(data));
++		while (pieces.size() > KEEP)
++			pieces.pop_back();
++	}
++
++	// the piece, from the cache or the share; nullptr when it can't be read
++	const std::vector<u8> *piece(u64 index, std::unique_lock<std::mutex>& lock)
++	{
++		for (;;)
++		{
++			for (auto it = pieces.begin(); it != pieces.end(); ++it)
++				if (it->first == index)
++				{
++					pieces.splice(pieces.begin(), pieces, it);
++					return &pieces.front().second;
++				}
++			if (loading.count(index) == 0)
++				break;
++			loaded.wait(lock);	// the read-ahead is bringing it
++		}
++		loading.insert(index);
++		lock.unlock();
++		std::vector<u8> data;
++		bool ok;
++		{
++			std::lock_guard<std::mutex> _(conn->mutex);
++			ok = fetch(index, data);
++		}
++		lock.lock();
++		loading.erase(index);
++		loaded.notify_all();
++		if (!ok)
++			return nullptr;
++		store(index, std::move(data));
++		return &pieces.front().second;
++	}
++};
++
++// One thread fetching the next pieces of the files being read
++class ReadAhead
++{
++public:
++	void request(const std::shared_ptr<FileState>& file, u64 index)
++	{
++		{
++			std::lock_guard<std::mutex> _(mutex);
++			if (!started)
++			{
++				started = true;
++				std::thread([this] { run(); }).detach();
++			}
++			if (queue.size() > 8)
++				queue.pop_front();
++			queue.emplace_back(file, index);
++		}
++		cv.notify_one();
++	}
++
++private:
++	void run()
++	{
++		ThreadName _("NetReadAhead");
++		for (;;)
++		{
++			std::weak_ptr<FileState> weak;
++			u64 index;
++			{
++				std::unique_lock<std::mutex> lock(mutex);
++				cv.wait_for(lock, std::chrono::milliseconds(500), [this] { return !queue.empty(); });
++				if (queue.empty())
++					continue;
++				weak = queue.front().first;
++				index = queue.front().second;
++				queue.pop_front();
++			}
++			std::shared_ptr<FileState> file = weak.lock();
++			if (!file || index * PIECE >= file->size)
++				continue;
++			{
++				std::unique_lock<std::mutex> lock(file->mutex);
++				bool have = file->loading.count(index) != 0;
++				for (auto& p : file->pieces)
++					have = have || p.first == index;
++				if (have)
++					continue;
++				file->loading.insert(index);
++			}
++			std::vector<u8> data;
++			bool ok;
++			{
++				std::lock_guard<std::mutex> _(file->conn->mutex);
++				ok = file->fetch(index, data);
++			}
++			std::unique_lock<std::mutex> lock(file->mutex);
++			file->loading.erase(index);
++			if (ok)
++				file->store(index, std::move(data));
++			file->loaded.notify_all();
++		}
++	}
++
++	std::mutex mutex;
++	std::condition_variable cv;
++	std::deque<std::pair<std::weak_ptr<FileState>, u64>> queue;
++	bool started = false;
++};
++
++ReadAhead gReadAhead;
++
++class NetFile : public hostfs::File
++{
++public:
++	explicit NetFile(std::shared_ptr<FileState> state) : state(std::move(state)) {}
++
++	size_t read(void *buffer, size_t size, size_t count) override
++	{
++		const u64 want = (u64)size * count;
++		if (size == 0 || want == 0)
++			return 0;
++		u8 *out = (u8 *)buffer;
++		u64 done = 0;
++		std::unique_lock<std::mutex> lock(state->mutex);
++		while (done < want && pos < state->size)
++		{
++			const u64 index = pos / PIECE;
++			const std::vector<u8> *p = state->piece(index, lock);
++			if (p == nullptr)
++			{
++				failed = true;
++				break;
++			}
++			const u64 inPiece = pos - index * PIECE;
++			if (inPiece >= p->size())
++				break;
++			const u64 n = std::min<u64>(want - done, p->size() - inPiece);
++			memcpy(out + done, p->data() + inPiece, (size_t)n);
++			done += n;
++			pos += n;
++			if (index != lastPiece)
++			{
++				// reading on in order: have the next piece fetched meanwhile
++				lastPiece = index;
++				if ((index + 1) * PIECE < state->size)
++				{
++					lock.unlock();
++					gReadAhead.request(state, index + 1);
++					lock.lock();
++				}
++			}
++		}
++		if (pos >= state->size)
++			atEnd = done < want;
++		return (size_t)(done / size);
++	}
++
++	size_t write(const void *, size_t, size_t) override {
++		return 0;	// read only
++	}
++	s64 tell() override {
++		return (s64)pos;
++	}
++	int seek(s64 offset, int whence) override
++	{
++		s64 base = whence == SEEK_SET ? 0 : whence == SEEK_CUR ? (s64)pos : (s64)state->size;
++		const s64 target = base + offset;
++		if (target < 0)
++			return -1;
++		pos = (u64)target;
++		atEnd = false;
++		return 0;
++	}
++	char *gets(char *str, int count) override
++	{
++		if (count <= 0)
++			return nullptr;
++		int n = 0;
++		while (n < count - 1)
++		{
++			char c;
++			if (read(&c, 1, 1) != 1)
++				break;
++			str[n++] = c;
++			if (c == '\n')
++				break;
++		}
++		if (n == 0)
++			return nullptr;
++		str[n] = '\0';
++		return str;
++	}
++	s64 size() override {
++		return (s64)state->size;
++	}
++	int eof() override {
++		return atEnd ? 1 : 0;
++	}
++	int error() override {
++		return failed ? 1 : 0;
++	}
++
++private:
++	std::shared_ptr<FileState> state;
++	u64 pos = 0;
++	u64 lastPiece = ~0ull;
++	bool atEnd = false, failed = false;
++};
++
++// ---- Flycast's storage layer ----
++
++class NetStorage : public hostfs::CustomStorage
++{
++public:
++	bool isKnownPath(const std::string& path) override {
++		return path.rfind("nfs://", 0) == 0 || path.rfind("smb://", 0) == 0;
++	}
++
++	std::vector<hostfs::FileInfo> listContent(const std::string& path) override
++	{
++		std::vector<hostfs::FileInfo> out;
++		if (!isKnownPath(path))
++			return out;
++		std::string label, rel, error;
++		if (!parse(path, label, rel))
++			return out;
++		std::shared_ptr<Connection> c = connectionFor(label);
++		if (!c)
++			throw hostfs::StorageException("unknown share " + label);
++		std::string base = path;
++		if (base.back() != '/')
++			base += '/';
++		std::lock_guard<std::mutex> _(c->mutex);
++		if (!c->list(rel, out, base, error))
++			throw hostfs::StorageException(path + ": " + error);
++		return out;
++	}
++
++	hostfs::File *openFile(const std::string& path, const std::string& mode) override
++	{
++		if (mode.find('w') != std::string::npos || mode.find('a') != std::string::npos || mode.find('+') != std::string::npos)
++			return nullptr;	// the library is read only
++		std::string label, rel, error;
++		if (!parse(path, label, rel))
++			return nullptr;
++		std::shared_ptr<Connection> c = connectionFor(label);
++		if (!c)
++			return nullptr;
++		auto state = std::make_shared<FileState>();
++		state->conn = c;
++		state->rel = rel;
++		{
++			std::lock_guard<std::mutex> _(c->mutex);
++			bool isDir = false;
++			u64 size = 0;
++			if (!c->stat(rel, isDir, size, error) || isDir)
++				return nullptr;
++			state->size = size;
++			state->fh = c->open(rel, error);
++			state->fhGeneration = c->generation;
++			if (state->fh == nullptr)
++				return nullptr;
++		}
++		return new NetFile(state);
++	}
++
++	std::string getParentPath(const std::string& path) override
++	{
++		std::string label, rel;
++		if (!parse(path, label, rel))
++			return path;
++		const std::string root = path.substr(0, path.find("://") + 3) + label;
++		const size_t slash = rel.find_last_of('/');
++		return slash == std::string::npos ? root : root + "/" + rel.substr(0, slash);
++	}
++
++	std::string getSubPath(const std::string& reference, const std::string& subpath) override
++	{
++		std::string out = reference;
++		if (!out.empty() && out.back() != '/')
++			out += '/';
++		return out + subpath;
++	}
++
++	hostfs::FileInfo getFileInfo(const std::string& path) override
++	{
++		std::string label, rel, error;
++		if (!parse(path, label, rel))
++			throw hostfs::StorageException("bad path " + path);
++		std::shared_ptr<Connection> c = connectionFor(label);
++		if (!c)
++			throw hostfs::StorageException("unknown share " + label);
++		bool isDir = rel.empty();
++		u64 size = 0;
++		if (!rel.empty())
++		{
++			std::lock_guard<std::mutex> _(c->mutex);
++			if (!c->stat(rel, isDir, size, error))
++				throw hostfs::StorageException(path + ": " + error);
++		}
++		const size_t slash = path.find_last_of('/');
++		return hostfs::FileInfo(path.substr(slash + 1), path, isDir, (size_t)size);
++	}
++
++	bool exists(const std::string& path) override
++	{
++		try {
++			getFileInfo(path);
++			return true;
++		} catch (const hostfs::StorageException&) {
++			return false;
++		}
++	}
++
++	bool addStorage(bool, bool, const std::string&, void (*)(bool, std::string), const std::string&) override {
++		return false;	// shares are added in Resonance's settings
++	}
++};
++
++} // namespace
++
++std::string Share::describe() const
++{
++	if (type == "nfs")
++		return "NFS  " + host + ":" + path;
++	return "SMB  \\\\" + host + "\\" + path + (user.empty() ? "" : "  (" + user + ")");
++}
++
++std::vector<Share> shares() {
++	return loadShares();
++}
++
++std::string makeLabel(const std::string& host, const std::string& path)
++{
++	std::string tail = path;
++	while (!tail.empty() && tail.back() == '/')
++		tail.pop_back();
++	const size_t slash = tail.find_last_of('/');
++	if (slash != std::string::npos)
++		tail = tail.substr(slash + 1);
++	std::string label;
++	for (char c : host + (tail.empty() ? "" : "-" + tail))
++		label += isalnum((unsigned char)c) || c == '.' || c == '-' || c == '_' ? c : '_';
++	std::string unique = label;
++	const std::vector<Share> list = loadShares();
++	for (int n = 2;; n++)
++	{
++		bool used = false;
++		for (const Share& s : list)
++			used = used || s.label == unique;
++		if (!used)
++			return unique;
++		unique = label + "-" + std::to_string(n);
++	}
++}
++
++void addShare(Share share)
++{
++	std::vector<Share> list = loadShares();
++	list.erase(std::remove_if(list.begin(), list.end(), [&](const Share& s) { return s.label == share.label; }), list.end());
++	list.push_back(share);
++	saveShares(list);
++	forget(share.label);
++	std::vector<std::string> content = config::ContentPath.get();
++	if (std::find(content.begin(), content.end(), share.url()) == content.end())
++	{
++		content.push_back(share.url());
++		config::ContentPath.set(content);
++	}
++	SaveSettings();
++}
++
++void removeShare(const std::string& label)
++{
++	std::vector<Share> list = loadShares();
++	std::string url;
++	for (const Share& s : list)
++		if (s.label == label)
++			url = s.url();
++	list.erase(std::remove_if(list.begin(), list.end(), [&](const Share& s) { return s.label == label; }), list.end());
++	saveShares(list);
++	forget(label);
++	std::vector<std::string> content = config::ContentPath.get();
++	content.erase(std::remove(content.begin(), content.end(), url), content.end());
++	config::ContentPath.set(content);
++	SaveSettings();
++}
++
++std::string test(const Share& share, int& entries)
++{
++	Connection c(share);
++	std::lock_guard<std::mutex> _(c.mutex);
++	std::vector<hostfs::FileInfo> list;
++	std::string error;
++	if (!c.list("", list, share.url(), error))
++		return error.empty() ? "connection failed" : error;
++	entries = (int)list.size();
++	return "";
++}
++
++} // namespace netfs
++
++namespace hostfs
++{
++// Flycast's storage layer asks here for the paths it doesn't know (core/oslib/storage.cpp)
++CustomStorage& customStorage()
++{
++	static netfs::NetStorage storage;
++	return storage;
++}
++}
+diff --git a/shell/ps4/netfs.h b/shell/ps4/netfs.h
+new file mode 100644
+index 000000000..6735da5ed
+--- /dev/null
++++ b/shell/ps4/netfs.h
+@@ -0,0 +1,51 @@
++/*
++	Resonance: games on network shares. NFS (libnfs: a NAS, WinNFSd on a PC) and SMB2/3 (libsmb2: a
++	shared Windows folder, Samba) behind Flycast's storage layer (hostfs::customStorage), so the
++	library scanner and the disc readers use them like folders: nfs://<label>/<path>,
++	smb://<label>/<path>. A share's server, folder and login are in emu.cfg ([resonance]
++	NetShareN); its label is all that appears in paths.
++
++	This file is part of Flycast.
++
++    Flycast is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    Flycast is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Flycast.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#pragma once
++#include <string>
++#include <vector>
++
++namespace netfs
++{
++
++struct Share
++{
++	std::string type;		// "nfs" or "smb"
++	std::string label;		// in paths: nfs://<label>/...
++	std::string host;		// IP address or name
++	std::string path;		// NFS: the exported folder ("/d/games"); SMB: share[/folder] ("Games/Dreamcast")
++	std::string user, password;	// SMB only
++	std::string url() const { return type + "://" + label + "/"; }
++	std::string describe() const;	// "NFS  192.168.0.10:/d/games"
++};
++
++std::vector<Share> shares();
++// Adds (or, label already there, replaces) a share and puts it in the content folders; saved
++void addShare(Share share);
++void removeShare(const std::string& label);
++// A label for a new share from its server and folder, unique among the shares
++std::string makeLabel(const std::string& host, const std::string& path);
++// Connects and lists the share's top folder: "" when it works, else what went wrong.
++// games = files with a game extension found directly in it (for the message)
++std::string test(const Share& share, int& entries);
++
++}
 diff --git a/shell/ps4/ps4_gamepad.cpp b/shell/ps4/ps4_gamepad.cpp
 new file mode 100644
 index 000000000..a7c2fd3ee

@@ -749,3 +749,24 @@
 2043	Läuft beim Start der App
 2044	Ändern
 2045	PAUSIERT
+2046	Netzwerk-Bibliothek
+2047	Spiele auf NFS- und SMB-Freigaben
+2048	NFS-Freigabe hinzufügen
+2049	Ein von einem NAS oder PC freigegebener Ordner (WinNFSd, Linux-NFS-Server)
+2050	SMB-Freigabe hinzufügen
+2051	Ein freigegebener Windows-Ordner oder Samba auf einem NAS
+2052	Serveradresse (z. B. 192.168.0.10)
+2053	Freigegebener Ordner (z. B. /d/games)
+2054	Freigabename und Ordner (z. B. Games/Dreamcast)
+2055	Kreuz: Verbindung testen oder Freigabe entfernen
+2056	Verbindung testen
+2057	Entfernen
+2058	Freigabe entfernt
+2059	Verbinde...
+2060	Keine Verbindung: %s
+2061	Verbunden: %d Einträge im obersten Ordner
+2062	Version, Autor, Mitwirkende
+2063	Dreamcast für PlayStation 4
+2064	Erstellt von
+370	Emulator
+2065	Bibliotheken

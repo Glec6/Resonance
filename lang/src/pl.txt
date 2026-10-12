@@ -749,3 +749,24 @@
 2043	Odtwarzana przy starcie aplikacji
 2044	Zmień
 2045	WSTRZYMANO
+2046	Biblioteka sieciowa
+2047	Gry z udziałów NFS i SMB
+2048	Dodaj udział NFS
+2049	Folder udostępniony przez NAS lub PC (WinNFSd, serwer NFS w Linuksie)
+2050	Dodaj udział SMB
+2051	Udostępniony folder Windows lub Samba na NAS
+2052	Adres serwera (np. 192.168.0.10)
+2053	Udostępniony folder (np. /d/games)
+2054	Nazwa udziału i folder (np. Games/Dreamcast)
+2055	Krzyżyk: sprawdź połączenie lub usuń udział
+2056	Sprawdź połączenie
+2057	Usuń
+2058	Usunięto udział
+2059	Łączenie...
+2060	Nie można połączyć: %s
+2061	Połączono: elementy w głównym folderze: %d
+2062	Wersja, autor, podziękowania
+2063	Dreamcast na PlayStation 4
+2064	Autor
+370	Emulator
+2065	Biblioteki

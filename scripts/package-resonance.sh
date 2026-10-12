@@ -40,9 +40,19 @@ mkdir -p "$PS4_BUILD_ROOT/oelf"
 cp "$BUILD/shell/ps4/flycast_eboot/flycast.oelf" "$PS4_BUILD_ROOT/oelf/v$VERSION.oelf"
 cp "$BUILD/flycast" "$PS4_BUILD_ROOT/oelf/v$VERSION.elf"
 if [ "${1:-}" = upload ]; then
-    for old in $(curl -sS --list-only "$HOST/data/pkg/" | tr -d '\r' | grep -E '^(Resonance-v[0-9.]+|DeCast-S4-v[0-9.]+|IV0000-DCST00001_00-[A-Z0-9]+)[.]pkg$' | grep -vx "$NAME"); do
-        if curl -sS "$HOST/" -Q "DELE /data/pkg/$old" > /dev/null; then echo "console: removed old $old"; else echo "console: could not remove $old"; fi
-    done
+    listing() { curl -sS --list-only "$HOST/data/pkg/" | tr -d '\r'; }
+    # the new build first; the console's FTP server has lost a file deleted right before an upload
     curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
     echo "uploaded $NAME"
+    sleep 2
+    for old in $(listing | grep -E '^(Resonance-v[0-9.]+|DeCast-S4-v[0-9.]+|IV0000-DCST00001_00-[A-Z0-9]+)[.]pkg$' | grep -vx "$NAME"); do
+        if curl -sS "$HOST/" -Q "DELE /data/pkg/$old" > /dev/null; then echo "console: removed old $old"; else echo "console: could not remove $old"; fi
+        sleep 1
+    done
+    sleep 2
+    if ! listing | grep -qx "$NAME"; then
+        echo "console: $NAME went missing, uploading again"
+        curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
+    fi
+    listing | grep -E '^(Resonance|DeCast)' | sed 's/^/console has: /'
 fi

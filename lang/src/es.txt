@@ -749,3 +749,24 @@
 2043	Se reproduce al abrir la aplicación
 2044	Cambiar
 2045	EN PAUSA
+2046	Biblioteca en red
+2047	Juegos en carpetas compartidas NFS y SMB
+2048	Añadir carpeta NFS
+2049	Una carpeta exportada por un NAS o un PC (WinNFSd, servidor NFS de Linux)
+2050	Añadir carpeta SMB
+2051	Una carpeta compartida de Windows, o Samba en un NAS
+2052	Dirección del servidor (p. ej. 192.168.0.10)
+2053	Carpeta exportada (p. ej. /d/games)
+2054	Recurso y carpeta (p. ej. Games/Dreamcast)
+2055	Equis: probar la conexión o quitar la carpeta
+2056	Probar conexión
+2057	Quitar
+2058	Carpeta quitada
+2059	Conectando...
+2060	No se pudo conectar: %s
+2061	Conectado: %d elementos en la carpeta principal
+2062	Versión, autor, créditos
+2063	Dreamcast para PlayStation 4
+2064	Creado por
+370	Emulador
+2065	Bibliotecas

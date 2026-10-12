@@ -44,3 +44,24 @@
 2043	Joue au lancement de l'application
 2044	Changer
 2045	EN PAUSE
+2046	Bibliothèque réseau
+2047	Jeux sur des partages NFS et SMB
+2048	Ajouter un partage NFS
+2049	Un dossier exporté par un NAS ou un PC (WinNFSd, serveur NFS Linux)
+2050	Ajouter un partage SMB
+2051	Un dossier partagé Windows, ou Samba sur un NAS
+2052	Adresse du serveur (ex. 192.168.0.10)
+2053	Dossier exporté (ex. /d/games)
+2054	Nom du partage et dossier (ex. Games/Dreamcast)
+2055	Croix : tester la connexion ou retirer le partage
+2056	Tester la connexion
+2057	Retirer
+2058	Partage retiré
+2059	Connexion...
+2060	Connexion impossible : %s
+2061	Connecté : %d éléments dans le dossier principal
+2062	Version, auteur, crédits
+2063	La Dreamcast sur PlayStation 4
+2064	Créé par
+370	Émulateur
+2065	Bibliothèques

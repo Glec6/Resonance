@@ -51,3 +51,24 @@ Opening Animation
 Plays when the app starts
 Change
 PAUSED
+Network Library
+Games on NFS and SMB shares
+Add NFS Share
+A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)
+Add SMB Share
+A shared Windows folder, or Samba on a NAS
+Server address (e.g. 192.168.0.10)
+Exported folder (e.g. /d/games)
+Share name and folder (e.g. Games/Dreamcast)
+Cross: test the connection or remove the share
+Test Connection
+Remove
+Share removed
+Connecting...
+Couldn't connect: %s
+Connected: %d items in the top folder
+Version, author, credits
+Dreamcast for PlayStation 4
+Made by
+Emulator
+Libraries

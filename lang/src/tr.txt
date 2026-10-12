@@ -750,3 +750,24 @@
 2043	Uygulama açılırken oynar
 2044	Değiştir
 2045	DURAKLATILDI
+2046	Ağ kitaplığı
+2047	NFS ve SMB paylaşımlarındaki oyunlar
+2048	NFS paylaşımı ekle
+2049	Bir NAS veya bilgisayarın dışa aktardığı klasör (WinNFSd, Linux NFS sunucusu)
+2050	SMB paylaşımı ekle
+2051	Paylaşılan bir Windows klasörü veya NAS üzerinde Samba
+2052	Sunucu adresi (örn. 192.168.0.10)
+2053	Dışa aktarılan klasör (örn. /d/games)
+2054	Paylaşım adı ve klasör (örn. Games/Dreamcast)
+2055	Çarpı: bağlantıyı dene veya paylaşımı kaldır
+2056	Bağlantıyı dene
+2057	Kaldır
+2058	Paylaşım kaldırıldı
+2059	Bağlanılıyor...
+2060	Bağlanılamadı: %s
+2061	Bağlandı: üst klasörde %d öğe
+2062	Sürüm, yapımcı, katkıda bulunanlar
+2063	PlayStation 4 için Dreamcast
+2064	Yapan
+370	Öykünücü
+2065	Kitaplıklar

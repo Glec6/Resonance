@@ -749,3 +749,24 @@
 2043	Speelt bij het starten van de app
 2044	Wijzigen
 2045	GEPAUZEERD
+2046	Netwerkbibliotheek
+2047	Games op NFS- en SMB-shares
+2048	NFS-share toevoegen
+2049	Een map die een NAS of pc deelt (WinNFSd, Linux-NFS-server)
+2050	SMB-share toevoegen
+2051	Een gedeelde Windows-map, of Samba op een NAS
+2052	Serveradres (bijv. 192.168.0.10)
+2053	Gedeelde map (bijv. /d/games)
+2054	Sharenaam en map (bijv. Games/Dreamcast)
+2055	Kruisje: verbinding testen of share verwijderen
+2056	Verbinding testen
+2057	Verwijderen
+2058	Share verwijderd
+2059	Verbinden...
+2060	Kan geen verbinding maken: %s
+2061	Verbonden: %d items in de bovenste map
+2062	Versie, maker, credits
+2063	Dreamcast voor PlayStation 4
+2064	Gemaakt door
+370	Emulator
+2065	Bibliotheken

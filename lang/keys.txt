@@ -750,3 +750,23 @@
 2043	Plays when the app starts
 2044	Change
 2045	PAUSED
+2046	Network Library
+2047	Games on NFS and SMB shares
+2048	Add NFS Share
+2049	A folder exported by a NAS or a PC (WinNFSd, Linux NFS server)
+2050	Add SMB Share
+2051	A shared Windows folder, or Samba on a NAS
+2052	Server address (e.g. 192.168.0.10)
+2053	Exported folder (e.g. /d/games)
+2054	Share name and folder (e.g. Games/Dreamcast)
+2055	Cross: test the connection or remove the share
+2056	Test Connection
+2057	Remove
+2058	Share removed
+2059	Connecting...
+2060	Couldn't connect: %s
+2061	Connected: %d items in the top folder
+2062	Version, author, credits
+2063	Dreamcast for PlayStation 4
+2064	Made by
+2065	Libraries
