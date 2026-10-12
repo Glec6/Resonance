@@ -53,10 +53,16 @@ if [ "${1:-}" = upload ]; then
         if curl -sS "$HOST/" -Q "DELE /data/pkg/$old" > /dev/null; then echo "console: removed old $old"; else echo "console: could not remove $old"; fi
         sleep 1
     done
-    sleep 2
-    if ! listing | grep -qx "$NAME"; then
-        echo "console: $NAME went missing, uploading again"
+    # the server has also shown the new file and then lost it a while later: check its size after a
+    # pause, and upload again until it stays
+    SIZE="$(stat -c %s "$HERE/../out/$NAME")"
+    for try in 1 2 3; do
+        sleep 10
+        if curl -sS "$HOST/data/pkg/" | tr -d '\r' | awk -v n="$NAME" -v s="$SIZE" '$NF == n && $5 == s { f = 1 } END { exit !f }'; then
+            break
+        fi
+        echo "console: $NAME missing or short, uploading again ($try)"
         curl -sS -T "$HERE/../out/$NAME" "$HOST/data/pkg/"
-    fi
+    done
     listing | grep -E '^(Resonance|DeCast)' | sed 's/^/console has: /'
 fi
