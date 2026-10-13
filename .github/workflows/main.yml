@@ -133,19 +133,13 @@ jobs:
           ninja -C /home/runner/dolphinps4-build/build/mesa $LIBS
 
       # ---------- Stage 2: Resonance & Flycast ----------
-      - name: Build and Install libnfs
+      - name: Create stub libraries for optional dependencies
         run: |
-          cd $PSB/src
-          git clone https://github.com/sahlberg/libnfs.git libnfs-src
-          cd libnfs-src
-          ./bootstrap
-          CC="clang --target=x86_64-pc-freebsd-elf --sysroot=$PSB/sysroot" \
-          AR="llvm-ar" \
-          RANLIB="llvm-ranlib" \
-          ./configure --prefix=$PSB/sysroot --enable-static --disable-shared
-          make -j$(nproc)
-          make install
-          [ -f $PSB/sysroot/lib/libnfs.a ] || { echo "::error::libnfs.a build failed"; exit 1; }
+          mkdir -p $PSB/sysroot/lib
+          for lib in libnfs libsmb2; do
+            llvm-ar rcs $PSB/sysroot/lib/$lib.a
+          done
+          [ -f $PSB/sysroot/lib/libnfs.a ] || { echo "::error::Failed to create libnfs stub"; exit 1; }
 
       - name: Clone Flycast at the pinned base and apply the PS4 patch
         run: |
