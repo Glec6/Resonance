@@ -1,4 +1,4 @@
-name: Build Resonance PS4 2.0
+name: Build Resonance PS4
 
 on:
   push:
@@ -40,4 +40,187 @@ jobs:
         run: |
           for r in Resonance Crema; do
             cd $GITHUB_WORKSPACE/$r
-            find toolchain scripts -type f -exec chmod
+            find toolchain scripts -type f -exec chmod +x {} + 2>/dev/null || true
+          done
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: echo "RESONANCE_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Install build dependencies
+        run: |
+          sudo apt -yq update
+          sudo apt -yq install git build-essential cmake zip xz-utils perl \
+            pacman-package-manager makepkg libarchive-tools autoconf libtool \
+            nasm curl ninja-build glslang-tools python3-pip python3-venv \
+            python3-pil wget lsb-release software-properties-common gnupg \
+            bison flex pkg-config
+
+      - name: Install Mesa Python tools
+        run: |
+          mkdir -p $PSB
+          python3 -m venv $PSB/mesa-venv
+          $PSB/mesa-venv/bin/pip install meson mako pyyaml packaging setuptools
+          echo "$PSB/mesa-venv/bin" >> $GITHUB_PATH
+          $PSB/mesa-venv/bin/meson --version
+
+      - name: Install clang 21 and LLVM tools
+        run: |
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 21
+          sudo apt -yq install clang-21 lld-21 llvm-21
+          for t in llvm-ar llvm-ranlib llvm-nm llvm-objcopy llvm-strip ld.lld; do
+            if [ -x /usr/bin/$t-21 ] && ! command -v $t >/dev/null; then
+              sudo ln -s /usr/bin/$t-21 /usr/local/bin/$t
+            fi
+          done
+          clang-21 --version
+          ninja --version
+
+      - name: Install ps4 toolchain (OpenOrbis from PacBrew)
+        run: |
+          sudo tee -a /etc/pacman.conf > /dev/null <<EOF
+          [pacbrew]
+          SigLevel = Optional TrustAll
+          Server = https://pacman.mydedibox.fr/pacbrew/packages/
+          EOF
+          sudo pacman -Syu
+          sudo pacman --noconfirm -S ps4-openorbis ps4-openorbis-portlibs
+
+      - name: Prepare build tree and space-free repo links
+        run: |
+          mkdir -p $PSB/src $PSB/build $PSB/out $PSB/logs $PSB/oelf
+          # the scripts expect to be run through ~/resonance (and Crema's through ~/cemups4)
+          ln -sfn $GITHUB_WORKSPACE/Resonance $HOME/resonance
+          ln -sfn $GITHUB_WORKSPACE/Crema $HOME/cemups4
+
+      # ---------- Stage 1: sysroot, third-party libs, Mesa/RADV (cached) ----------
+      - name: Cache sysroot and Mesa build
+        id: base_cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/resonance-build/sysroot
+            /home/runner/resonance-build/build/mesa
+            /home/runner/resonance-build/build/libcxx
+          key: resonance-base-${{ runner.os }}-${{ hashFiles('Resonance/toolchain/**', 'Resonance/scripts/build-netfs.sh', 'Resonance/patches/BASE.txt', 'Crema/scripts/build-deps.sh', 'Crema/scripts/build-mesa.sh', 'Crema/patches/mesa-ps4.patch', 'Crema/port/mesa/**', 'Crema/port/mesa-overlay/**') }}
+
+      - name: Build sysroot (libc++ 21 and runtime)
+        if: steps.base_cache.outputs.cache-hit != 'true'
+        run: |
+          cd $HOME/resonance
+          bash toolchain/build-libcxx.sh
+          bash toolchain/build-runtime.sh
+
+      # Crema's recipes (from PSChrome, verified on hardware): OpenSSL 3.5.0, curl 8.14.1 and the
+      # libraries Flycast links or configures against. Cemu-only libs (boost, fmt, glm, ...) skipped.
+      - name: Build third-party libs (zlib, OpenSSL, curl, ...)
+        if: steps.base_cache.outputs.cache-hit != 'true'
+        run: |
+          cd $HOME/cemups4
+          bash scripts/build-deps.sh zlib libpng zstd libzip glslang openssl curl
+          for f in libz libcrypto libssl libcurl; do
+            [ -f $PSB/sysroot/lib/$f.a ] || { echo "::error::missing $f.a"; exit 1; }
+          done
+
+      - name: Build libnfs and libsmb2
+        if: steps.base_cache.outputs.cache-hit != 'true'
+        run: |
+          cd $HOME/resonance
+          NFS=$(awk '/^libnfs:/{print $2}' patches/BASE.txt)
+          SMB=$(awk '/^libsmb2:/{print $2}' patches/BASE.txt)
+          git clone https://github.com/sahlberg/libnfs $PSB/src/libnfs
+          git -C $PSB/src/libnfs checkout "$NFS"
+          git clone https://github.com/sahlberg/libsmb2 $PSB/src/libsmb2
+          git -C $PSB/src/libsmb2 checkout "$SMB"
+          bash scripts/build-netfs.sh
+
+      - name: Build Mesa/RADV static libraries
+        if: steps.base_cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --branch libdrm-2.4.125 --depth 1 https://gitlab.freedesktop.org/mesa/drm.git $PSB/src/libdrm
+          git clone --branch mesa-26.0.8 --depth 1 https://gitlab.freedesktop.org/mesa/mesa.git $PSB/src/mesa
+          git -C $PSB/src/mesa apply $GITHUB_WORKSPACE/Crema/patches/mesa-ps4.patch
+          cd $GITHUB_WORKSPACE/Crema
+          # builds RADV's static libraries itself (see its `libs=` list)
+          bash scripts/build-mesa.sh setup
+          for l in src/amd/vulkan/libvulkan_radeon.a src/compiler/nir/libnir.a src/c11/impl/libmesa_util_c11.a; do
+            [ -f "$PSB/build/mesa/$l" ] || { echo "::error::missing $l"; exit 1; }
+          done
+
+      # ---------- Stage 2: Resonance ----------
+      # Not scripts/clone-flycast.sh: it re-points ~/resonance at /mnt/e/... and clones master,
+      # but the patch applies to the base commit in patches/BASE.txt.
+      - name: Clone Flycast at the pinned base and apply the PS4 patch
+        run: |
+          cd $HOME/resonance
+          BASE=$(awk '/^base:/{print $2}' patches/BASE.txt)
+          echo "Flycast base: $BASE"
+          git clone https://github.com/flyinghead/flycast.git $PSB/src/flycast
+          cd $PSB/src/flycast
+          git checkout "$BASE"
+          git submodule update --init --recursive
+          git checkout -b ps4
+          git apply $HOME/resonance/patches/flycast-ps4.patch
+          git log -1 --format='%h %ci %s'
+
+      - name: Configure and build Flycast
+        run: |
+          cd $HOME/resonance
+          # rebuild-flycast.sh's own exit code is unreliable (grep|head under pipefail, ninja -k 0).
+          # logrun.sh appends "exit=<rc>" to each log, so judge by that.
+          set +e
+          bash scripts/rebuild-flycast.sh
+          set -e
+          LOGS="$PSB/logs"
+          for step in configure build; do
+            if [ "$(tail -n1 "$LOGS/$step.log" 2>/dev/null)" != "exit=0" ]; then
+              echo "::error::Flycast $step failed"
+              grep -E 'error:|FAILED:' "$LOGS/$step.log" | head -40 || true
+              tail -30 "$LOGS/$step.log" || true
+              exit 1
+            fi
+          done
+          echo "Flycast build OK"
+
+      - name: Package
+        run: |
+          cd $HOME/resonance
+          # no "upload" argument: that mode FTPs to a console
+          RESONANCE_VERSION=$RESONANCE_VERSION bash scripts/package-resonance.sh
+
+      - name: Collect .pkg
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/dist
+          cp -v $GITHUB_WORKSPACE/Resonance/out/*.pkg $GITHUB_WORKSPACE/dist/
+          ls -la $GITHUB_WORKSPACE/dist
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            /home/runner/resonance-build/logs
+            /home/runner/resonance-build/build/deps/*.log
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: dist/*.pkg
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save PS4 PKG to Summary Page
+        uses: actions/upload-artifact@v4
+        with:
+          name: resonance-ps4-pkg
+          path: dist/*.pkg
+
+      - name: Save symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: resonance-symbols-v${{ env.RESONANCE_VERSION }}
+          path: /home/runner/resonance-build/oelf/*
+          retention-days: 30
