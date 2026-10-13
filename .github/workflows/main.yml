@@ -136,10 +136,10 @@ jobs:
       - name: Create stub libraries for optional dependencies
         run: |
           mkdir -p $PSB/sysroot/lib
-          for lib in libnfs libsmb2; do
+          for lib in libnfs libsmb2 libcurl; do
             llvm-ar rcs $PSB/sysroot/lib/$lib.a
           done
-          [ -f $PSB/sysroot/lib/libnfs.a ] || { echo "::error::Failed to create libnfs stub"; exit 1; }
+          [ -f $PSB/sysroot/lib/libcurl.a ] || { echo "::error::Failed to create libcurl stub"; exit 1; }
 
       - name: Clone Flycast at the pinned base and apply the PS4 patch
         run: |
