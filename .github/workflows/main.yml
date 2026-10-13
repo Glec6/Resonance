@@ -21,13 +21,15 @@ jobs:
     env:
       OPENORBIS: /opt/pacbrew/ps4/openorbis
       RESONANCE_VERSION: ${{ github.event.inputs.resonance_version || '01.00' }}
+      PSB: /home/runner/resonance-build
     steps:
       - name: Check out Resonance
         uses: actions/checkout@v4
         with:
           path: Resonance
 
-      - name: Check out DolphinPS4 (source of sysroot + RADV)
+      # Only for scripts/build-mesa.sh and patches/mesa-ps4.patch (not in the Resonance repo).
+      - name: Check out DolphinPS4 (Mesa/RADV scripts)
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/DolphinPS4
@@ -48,7 +50,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt -yq update
-          sudo apt -yq install git build-essential cmake zip \
+          sudo apt -yq install git build-essential cmake zip xz-utils \
             pacman-package-manager makepkg libarchive-tools autoconf libtool \
             nasm curl ninja-build glslang-tools python3-pip python3-venv \
             python3-pil wget lsb-release software-properties-common gnupg \
@@ -56,10 +58,11 @@ jobs:
 
       - name: Install Mesa Python tools
         run: |
-          python3 -m venv /home/runner/mesa-venv
-          /home/runner/mesa-venv/bin/pip install meson mako pyyaml packaging setuptools
-          echo "/home/runner/mesa-venv/bin" >> $GITHUB_PATH
-          /home/runner/mesa-venv/bin/meson --version
+          mkdir -p $PSB
+          python3 -m venv $PSB/mesa-venv
+          $PSB/mesa-venv/bin/pip install meson mako pyyaml packaging setuptools
+          echo "$PSB/mesa-venv/bin" >> $GITHUB_PATH
+          $PSB/mesa-venv/bin/meson --version
 
       - name: Install clang 21 and LLVM tools
         run: |
@@ -85,65 +88,99 @@ jobs:
           sudo pacman -Syu
           sudo pacman --noconfirm -S ps4-openorbis ps4-openorbis-portlibs
 
-      # ---------- Stage 1: source tree for seed-build-tree.sh (CRM) ----------
-      - name: Cache source tree (sysroot + built Mesa)
-        id: crm_cache
+      - name: Prepare Resonance build tree and ~/resonance link
+        run: |
+          mkdir -p $PSB/src $PSB/build $PSB/out $PSB/logs $PSB/oelf
+          # Resonance's scripts expect to be run through ~/resonance
+          ln -sfn $GITHUB_WORKSPACE/Resonance $HOME/resonance
+
+      # ---------- Stage 1: sysroot + Mesa/RADV (cached) ----------
+      - name: Cache sysroot and Mesa build
+        id: base_cache
         uses: actions/cache@v4
         with:
-          path: /home/runner/dolphinps4-build
-          key: crm-tree-${{ runner.os }}-${{ hashFiles('DolphinPS4/toolchain/**', 'DolphinPS4/port/**', 'DolphinPS4/patches/mesa-ps4.patch', 'DolphinPS4/scripts/build-mesa.sh') }}
+          path: |
+            /home/runner/resonance-build/sysroot
+            /home/runner/resonance-build/build/mesa
+            /home/runner/resonance-build/build/libcxx
+          key: resonance-base-${{ runner.os }}-${{ hashFiles('Resonance/toolchain/**', 'DolphinPS4/scripts/build-mesa.sh', 'DolphinPS4/patches/mesa-ps4.patch') }}
 
-      - name: Build sysroot (libc++ and runtime)
-        if: steps.crm_cache.outputs.cache-hit != 'true'
-        env:
-          PSB: /home/runner/dolphinps4-build
+      - name: Build sysroot (libc++ 21 and runtime)
+        if: steps.base_cache.outputs.cache-hit != 'true'
         run: |
-          cd $GITHUB_WORKSPACE/DolphinPS4
+          cd $HOME/resonance
           bash toolchain/build-libcxx.sh
           bash toolchain/build-runtime.sh
 
-      - name: Build Mesa/RADV
-        if: steps.crm_cache.outputs.cache-hit != 'true'
+      - name: Install prebuilt sysroot extras (curl, OpenSSL, libnfs, libsmb2, ...)
         env:
-          PSB: /home/runner/dolphinps4-build
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p $PSB/src
+          gh release download sysroot-deps --repo $GITHUB_REPOSITORY \
+            --pattern resonance-sysroot-extras.tgz --dir /tmp --clobber
+          tar xzf /tmp/resonance-sysroot-extras.tgz -C $PSB/sysroot
+          # pkg-config / cmake files carry the home directory they were built in
+          grep -rlIE '/home/[^/]+/(resonance|cemups4|dolphinps4)-build' \
+            $PSB/sysroot/lib/pkgconfig $PSB/sysroot/lib/cmake 2>/dev/null \
+            | xargs -r sed -i -E "s#/home/[^/]+/(resonance|cemups4|dolphinps4)-build#$PSB#g"
+          for f in libnfs libsmb2 libcurl libssl libcrypto; do
+            [ -f $PSB/sysroot/lib/$f.a ] || { echo "::error::missing $f.a in sysroot extras"; exit 1; }
+          done
+
+      - name: Build Mesa/RADV static libraries
+        if: steps.base_cache.outputs.cache-hit != 'true'
+        run: |
+          MS=$GITHUB_WORKSPACE/DolphinPS4
+          MP=$MS/patches/mesa-ps4.patch
           git clone --branch libdrm-2.4.125 --depth 1 https://gitlab.freedesktop.org/mesa/drm.git $PSB/src/libdrm
           git clone --branch mesa-26.0.8 --depth 1 https://gitlab.freedesktop.org/mesa/mesa.git $PSB/src/mesa
-          cd $PSB/src/mesa
-          git apply $GITHUB_WORKSPACE/DolphinPS4/patches/mesa-ps4.patch
-          cd $GITHUB_WORKSPACE/DolphinPS4
+          git -C $PSB/src/mesa apply $MP
+
+          cd $MS
           bash scripts/build-mesa.sh setup
-          ninja -C $PSB/build/mesa
-          echo "static libs built: $(find $PSB/build/mesa -name '*.a' | wc -l)"
+
+          # Build ONLY the archives Resonance links (ps4_link_mesa in ps4-love-style.cmake).
+          # A bare `ninja` also links a full-Mesa target that hits duplicate mtx_*/thrd_create
+          # symbols against OpenOrbis libc.a, which Resonance never uses.
+          LIBS="src/amd/vulkan/libvulkan_radeon.a src/amd/common/libamd_common.a
+                src/amd/compiler/libaco.a src/amd/addrlib/libaddrlib.a src/vulkan/util/libvulkan_util.a
+                src/compiler/spirv/libvtn.a src/compiler/nir/libnir.a src/compiler/libcompiler.a
+                src/util/libxmlconfig.a src/util/libmesa_util.a src/util/libmesa_util_simd.a
+                src/util/libmesa_util_clflush.a src/util/libmesa_util_clflushopt.a src/util/libparson.a
+                src/util/blake3/libblake3.a src/c11/impl/libmesa_util_c11.a"
+          ninja -C $PSB/build/mesa $LIBS
+
+          missing=0
+          for l in $LIBS; do
+            [ -f "$PSB/build/mesa/$l" ] || { echo "::error::missing $l"; missing=1; }
+          done
+          [ $missing -eq 0 ]
 
       # ---------- Stage 2: Resonance ----------
-      - name: Clone and patch Flycast
+      # Not scripts/clone-flycast.sh: it re-points ~/resonance at /mnt/e/... and clones master,
+      # but the patch applies to the base commit in patches/BASE.txt.
+      - name: Clone Flycast at the pinned base and apply the PS4 patch
         run: |
-          cd $GITHUB_WORKSPACE/Resonance
-          bash scripts/clone-flycast.sh
-          git -C $HOME/resonance-build/src/flycast checkout -b ps4
-          git -C $HOME/resonance-build/src/flycast apply $GITHUB_WORKSPACE/Resonance/patches/flycast-ps4.patch
-
-      - name: Seed Resonance build tree
-        env:
-          CRM: /home/runner/dolphinps4-build
-        run: |
-          if [ ! -d "$CRM/host-compat" ]; then
-            echo "::warning::$CRM/host-compat missing, creating empty dir"
-            mkdir -p "$CRM/host-compat"
-          fi
-          cd $GITHUB_WORKSPACE/Resonance
-          bash scripts/seed-build-tree.sh
+          cd $HOME/resonance
+          BASE=$(awk '/^base:/{print $2}' patches/BASE.txt)
+          echo "Flycast base: $BASE"
+          git clone https://github.com/flyinghead/flycast.git $PSB/src/flycast
+          cd $PSB/src/flycast
+          git checkout "$BASE"
+          git submodule update --init --recursive
+          git checkout -b ps4
+          git apply $HOME/resonance/patches/flycast-ps4.patch
+          git log -1 --format='%h %ci %s'
 
       - name: Configure and build Flycast
         run: |
-          cd $GITHUB_WORKSPACE/Resonance
-          # rebuild-flycast.sh's exit code is unreliable; logrun.sh appends "exit=<rc>" to each log.
+          cd $HOME/resonance
+          # rebuild-flycast.sh's own exit code is unreliable (grep|head under pipefail, ninja -k 0).
+          # logrun.sh appends "exit=<rc>" to each log, so judge by that.
           set +e
           bash scripts/rebuild-flycast.sh
           set -e
-          LOGS="$HOME/resonance-build/logs"
+          LOGS="$PSB/logs"
           for step in configure build; do
             if [ "$(tail -n1 "$LOGS/$step.log" 2>/dev/null)" != "exit=0" ]; then
               echo "::error::Flycast $step failed"
@@ -156,7 +193,8 @@ jobs:
 
       - name: Package
         run: |
-          cd $GITHUB_WORKSPACE/Resonance
+          cd $HOME/resonance
+          # no "upload" argument: that mode FTPs to a console
           RESONANCE_VERSION=$RESONANCE_VERSION bash scripts/package-resonance.sh
 
       - name: Collect release files
