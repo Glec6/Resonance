@@ -1,0 +1,43 @@
+name: Build Resonance PS4 2.0
+
+on:
+  push:
+    tags:
+      - "v*.*"
+  workflow_dispatch:
+    inputs:
+      resonance_version:
+        description: "Resonance version (e.g. 01.00)"
+        required: true
+        default: "01.00"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      OPENORBIS: /opt/pacbrew/ps4/openorbis
+      RESONANCE_VERSION: ${{ github.event.inputs.resonance_version || '01.00' }}
+      PSB: /home/runner/resonance-build
+      PS4_BUILD_ROOT: /home/runner/resonance-build
+    steps:
+      - name: Check out Resonance
+        uses: actions/checkout@v4
+        with:
+          path: Resonance
+
+      # Provides build-deps.sh (OpenSSL, curl, zlib, ...), build-mesa.sh and the Mesa patch/port files.
+      - name: Check out Crema
+        uses: actions/checkout@v4
+        with:
+          repository: Glec6/Crema
+          path: Crema
+
+      - name: Make repo scripts executable
+        run: |
+          for r in Resonance Crema; do
+            cd $GITHUB_WORKSPACE/$r
+            find toolchain scripts -type f -exec chmod
