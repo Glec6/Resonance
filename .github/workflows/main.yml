@@ -99,7 +99,7 @@ jobs:
             /home/runner/resonance-build/sysroot
             /home/runner/dolphinps4-build/build/mesa
             /home/runner/resonance-build/build/libcxx
-          key: resonance-native-base-${{ runner.os }}-${{ hashFiles('Resonance/toolchain/**', 'DolphinPS4/scripts/build-mesa.sh', 'DolphinPS4/patches/mesa-ps4.patch') }}
+          key: resonance-native-base-v2-${{ runner.os }}-${{ hashFiles('Resonance/toolchain/**', 'DolphinPS4/scripts/build-mesa.sh', 'DolphinPS4/patches/mesa-ps4.patch') }}
 
       - name: Build sysroot (libc++ 21 and runtime)
         if: steps.base_cache.outputs.cache-hit != 'true'
