@@ -58,8 +58,7 @@ jobs:
       - name: Install Mesa Python tools
         run: |
           mkdir -p $PSB /home/runner/dolphinps4-build
-          python3 -m venv $PSB/mesa-venv
-          $PSB/mesa-venv/bin/pip install meson mako pyyaml packaging setuptools
+          python3 -m venv $PSB/mesa-venv$PSB/mesa-venv/bin/pip install meson mako pyyaml packaging setuptools
           echo "$PSB/mesa-venv/bin" >> $GITHUB_PATH
 
       - name: Install clang 21 and LLVM tools
@@ -69,7 +68,7 @@ jobs:
           sudo ./llvm.sh 21
           sudo apt -yq install clang-21 lld-21 llvm-21
           for t in llvm-ar llvm-ranlib llvm-nm llvm-objcopy llvm-strip ld.lld; do
-            if [ -x /usr/bin/$t-21 ] && ! command -v $t >/dev/null; then
+            if [ -x /usr/bin/$t-21 ] && ! command -v$t >/dev/null; then
               sudo ln -s /usr/bin/$t-21 /usr/local/bin/$t
             fi
           done
@@ -86,8 +85,8 @@ jobs:
 
       - name: Prepare Resonance build tree and ~/resonance link
         run: |
-          mkdir -p $PSB/src $PSB/build $PSB/out $PSB/logs $PSB/oelf
-          ln -sfn $GITHUB_WORKSPACE/Resonance $HOME/resonance
+          mkdir -p $PSB/src $PSB/build$PSB/out $PSB/logs$PSB/oelf
+          ln -sfn $GITHUB_WORKSPACE/Resonance$HOME/resonance
 
       # ---------- Stage 1: Native Build for Sysroot + Mesa/RADV (Cached) ----------
       - name: Cache sysroot and Mesa build
@@ -132,6 +131,20 @@ jobs:
           ninja -C /home/runner/dolphinps4-build/build/mesa $LIBS
 
       # ---------- Stage 2: Resonance & Flycast ----------
+      - name: Build and Install libnfs
+        run: |
+          cd $PSB/src
+          git clone https://github.com/sahlberg/libnfs.git libnfs-src
+          cd libnfs-src
+          ./bootstrap
+          CC="clang --target=x86_64-pc-freebsd-elf --sysroot=$PSB/sysroot" \
+          AR="llvm-ar" \
+          RANLIB="llvm-ranlib" \
+          ./configure --prefix=$PSB/sysroot --enable-static --disable-shared
+          make -j$(nproc)
+          make install
+          [ -f $PSB/sysroot/lib/libnfs.a ] || { echo "::error::libnfs.a build failed"; exit 1; }
+
       - name: Clone Flycast at the pinned base and apply the PS4 patch
         run: |
           cd $HOME/resonance
@@ -163,37 +176,4 @@ jobs:
       - name: Package
         run: |
           cd $HOME/resonance
-          RESONANCE_VERSION=$RESONANCE_VERSION bash scripts/package-resonance.sh
-
-      - name: Collect .pkg
-        run: |
-          mkdir -p $GITHUB_WORKSPACE/dist
-          cp -v $GITHUB_WORKSPACE/Resonance/out/*.pkg $GITHUB_WORKSPACE/dist/
-          ls -la $GITHUB_WORKSPACE/dist
-
-      - name: Upload build logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: /home/runner/resonance-build/logs
-
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: dist/*.pkg
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Save PS4 PKG to Summary Page
-        uses: actions/upload-artifact@v4
-        with:
-          name: resonance-ps4-pkg
-          path: dist/*.pkg
-
-      - name: Save symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: resonance-symbols-v${{ env.RESONANCE_VERSION }}
-          path: /home/runner/resonance-build/oelf/*
-          retention-days: 30
+          RESONANCE_VERSION=$RESONANCE_VERSION bash scripts/package
