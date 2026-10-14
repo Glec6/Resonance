@@ -42,7 +42,13 @@ jobs:
         with:
           repository: Glec6/DolphinPS4
           path: DolphinPS4
-
+          
+      - name: Rename data folder to MK64
+        run: |
+          cd $GITHUB_WORKSPACE/DolphinPS4
+          grep -rIl "/data/Resonance" --exclude-dir=.git patches port scripts toolchain \
+            | xargs sed -i 's#/data/Resonance#/data/NFLBlitz2000#g'
+            
       - name: Make repo scripts executable
         run: |
           for r in Resonance Crema DolphinPS4; do
