@@ -29,17 +29,23 @@ jobs:
         with:
           path: Resonance
 
-      # Provides build-deps.sh (OpenSSL, curl, zlib, ...), install-overlay.sh, build-mesa.sh
-      # and the Mesa patch/port files.
+      # Crema: build-deps.sh (OpenSSL, curl, zlib, ...) and install-overlay.sh
       - name: Check out Crema
         uses: actions/checkout@v4
         with:
           repository: Glec6/Crema
           path: Crema
 
+      # DolphinPS4: the RADV/Mesa port Resonance was built against (build-mesa.sh, patch, port files)
+      - name: Check out DolphinPS4
+        uses: actions/checkout@v4
+        with:
+          repository: Glec6/DolphinPS4
+          path: DolphinPS4
+
       - name: Make repo scripts executable
         run: |
-          for r in Resonance Crema; do
+          for r in Resonance Crema DolphinPS4; do
             cd $GITHUB_WORKSPACE/$r
             find toolchain scripts -type f -exec chmod +x {} + 2>/dev/null || true
           done
@@ -97,15 +103,16 @@ jobs:
           ln -sfn $GITHUB_WORKSPACE/Crema $HOME/cemups4
 
       # ---------- Stage 1: sysroot, third-party libs, Mesa/RADV (cached) ----------
-      - name: Cache sysroot and Mesa build
+      # restore + explicit save (below), so Stage 1 is kept even if a later step fails.
+      - name: Restore sysroot and Mesa cache
         id: base_cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             /home/runner/resonance-build/sysroot
             /home/runner/resonance-build/build/mesa
             /home/runner/resonance-build/build/libcxx
-          key: resonance-base-${{ runner.os }}-${{ hashFiles('Resonance/toolchain/**', 'Resonance/scripts/build-netfs.sh', 'Resonance/patches/BASE.txt', 'Crema/scripts/build-deps.sh', 'Crema/scripts/build-mesa.sh', 'Crema/scripts/install-overlay.sh', 'Crema/patches/mesa-ps4.patch', 'Crema/port/mesa/**', 'Crema/port/mesa-overlay/**', 'Crema/toolchain/libc-overlay/**') }}
+          key: resonance-base-${{ runner.os }}-${{ hashFiles('Resonance/toolchain/**', 'Resonance/scripts/build-netfs.sh', 'Resonance/patches/BASE.txt', 'Crema/scripts/build-deps.sh', 'Crema/scripts/install-overlay.sh', 'Crema/toolchain/libc-overlay/**', 'DolphinPS4/scripts/build-mesa.sh', 'DolphinPS4/patches/mesa-ps4.patch', 'DolphinPS4/port/mesa/**', 'DolphinPS4/port/mesa-overlay/**') }}
 
       - name: Build sysroot (libc++ 21 and runtime)
         if: steps.base_cache.outputs.cache-hit != 'true'
@@ -115,7 +122,6 @@ jobs:
           bash toolchain/build-runtime.sh
 
       # FreeBSD-layout netinet/in.h, sys/socket.h, poll.h, fcntl.h over the sysroot's libc overlay.
-      # OpenSSL, Mesa and Flycast all compile against it.
       - name: Install FreeBSD-layout libc overlay (netinet/socket/poll/fcntl)
         if: steps.base_cache.outputs.cache-hit != 'true'
         run: |
@@ -123,8 +129,6 @@ jobs:
           bash scripts/install-overlay.sh
           test -f $PSB/sysroot/libc-overlay/netinet/in.h
 
-      # Crema's recipes (from PSChrome, verified on hardware): OpenSSL 3.5.0, curl 8.14.1 and the
-      # libraries Flycast links or configures against. Cemu-only libs (boost, fmt, glm, ...) skipped.
       - name: Build third-party libs (zlib, OpenSSL, curl, ...)
         if: steps.base_cache.outputs.cache-hit != 'true'
         run: |
@@ -146,18 +150,28 @@ jobs:
           git -C $PSB/src/libsmb2 checkout "$SMB"
           bash scripts/build-netfs.sh
 
-      - name: Build Mesa/RADV static libraries
+      - name: Build Mesa/RADV static libraries (DolphinPS4's port)
         if: steps.base_cache.outputs.cache-hit != 'true'
         run: |
           git clone --branch libdrm-2.4.125 --depth 1 https://gitlab.freedesktop.org/mesa/drm.git $PSB/src/libdrm
           git clone --branch mesa-26.0.8 --depth 1 https://gitlab.freedesktop.org/mesa/mesa.git $PSB/src/mesa
-          git -C $PSB/src/mesa apply $GITHUB_WORKSPACE/Crema/patches/mesa-ps4.patch
-          cd $GITHUB_WORKSPACE/Crema
+          git -C $PSB/src/mesa apply $GITHUB_WORKSPACE/DolphinPS4/patches/mesa-ps4.patch
+          cd $GITHUB_WORKSPACE/DolphinPS4
           # builds RADV's static libraries itself (see its `libs=` list)
           bash scripts/build-mesa.sh setup
           for l in src/amd/vulkan/libvulkan_radeon.a src/compiler/nir/libnir.a src/c11/impl/libmesa_util_c11.a; do
             [ -f "$PSB/build/mesa/$l" ] || { echo "::error::missing $l"; exit 1; }
           done
+
+      - name: Save Stage 1 cache
+        if: steps.base_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            /home/runner/resonance-build/sysroot
+            /home/runner/resonance-build/build/mesa
+            /home/runner/resonance-build/build/libcxx
+          key: ${{ steps.base_cache.outputs.cache-primary-key }}
 
       # ---------- Stage 2: Resonance ----------
       # Not scripts/clone-flycast.sh: it re-points ~/resonance at /mnt/e/... and clones master,
