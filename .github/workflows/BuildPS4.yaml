@@ -29,7 +29,8 @@ jobs:
         with:
           path: Resonance
 
-      # Provides build-deps.sh (OpenSSL, curl, zlib, ...), build-mesa.sh and the Mesa patch/port files.
+      # Provides build-deps.sh (OpenSSL, curl, zlib, ...), install-overlay.sh, build-mesa.sh
+      # and the Mesa patch/port files.
       - name: Check out Crema
         uses: actions/checkout@v4
         with:
@@ -104,7 +105,7 @@ jobs:
             /home/runner/resonance-build/sysroot
             /home/runner/resonance-build/build/mesa
             /home/runner/resonance-build/build/libcxx
-          key: resonance-base-${{ runner.os }}-${{ hashFiles('Resonance/toolchain/**', 'Resonance/scripts/build-netfs.sh', 'Resonance/patches/BASE.txt', 'Crema/scripts/build-deps.sh', 'Crema/scripts/build-mesa.sh', 'Crema/patches/mesa-ps4.patch', 'Crema/port/mesa/**', 'Crema/port/mesa-overlay/**') }}
+          key: resonance-base-${{ runner.os }}-${{ hashFiles('Resonance/toolchain/**', 'Resonance/scripts/build-netfs.sh', 'Resonance/patches/BASE.txt', 'Crema/scripts/build-deps.sh', 'Crema/scripts/build-mesa.sh', 'Crema/scripts/install-overlay.sh', 'Crema/patches/mesa-ps4.patch', 'Crema/port/mesa/**', 'Crema/port/mesa-overlay/**', 'Crema/toolchain/libc-overlay/**') }}
 
       - name: Build sysroot (libc++ 21 and runtime)
         if: steps.base_cache.outputs.cache-hit != 'true'
@@ -112,6 +113,15 @@ jobs:
           cd $HOME/resonance
           bash toolchain/build-libcxx.sh
           bash toolchain/build-runtime.sh
+
+      # FreeBSD-layout netinet/in.h, sys/socket.h, poll.h, fcntl.h over the sysroot's libc overlay.
+      # OpenSSL, Mesa and Flycast all compile against it.
+      - name: Install FreeBSD-layout libc overlay (netinet/socket/poll/fcntl)
+        if: steps.base_cache.outputs.cache-hit != 'true'
+        run: |
+          cd $HOME/cemups4
+          bash scripts/install-overlay.sh
+          test -f $PSB/sysroot/libc-overlay/netinet/in.h
 
       # Crema's recipes (from PSChrome, verified on hardware): OpenSSL 3.5.0, curl 8.14.1 and the
       # libraries Flycast links or configures against. Cemu-only libs (boost, fmt, glm, ...) skipped.
