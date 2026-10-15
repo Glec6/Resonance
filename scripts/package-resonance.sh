@@ -27,7 +27,7 @@ cp -r "$HERE/../launcher-assets/launcher" "$STAGE/"
 # PkgTool's pkg_build crashes ("Sequence contains no elements") on empty folders.
 find "$STAGE" -type d -empty -delete
 # Vulkan (RADV on GNM) runs under the plain homebrew identity (4.5 GiB of direct memory).
-PKG="$(SFO_STYLE=plain NO_RIGHT_SPRX=1 DOLPHIN_PS4_MODULES_DIR=/nonexistent "$HERE/make-pkg.sh" "$STAGE" DCST00002 "NFL Blitz 2000" "$VERSION" Blitz2000 "$PS4_BUILD_ROOT/out" | tail -1)"
+PKG="$(SFO_STYLE=plain NO_RIGHT_SPRX=1 DOLPHIN_PS4_MODULES_DIR=/nonexistent "$HERE/make-pkg.sh" "$STAGE" DCST00003 "NFL Blitz 2001" "$VERSION" Blitz2001 "$PS4_BUILD_ROOT/out" | tail -1)"
 ls -la "$PKG"
 # a copy next to the repo (E:\PS4 Projects\Resonance\out), easy to find from Windows; *.pkg is ignored by git
 mkdir -p "$HERE/../out"
