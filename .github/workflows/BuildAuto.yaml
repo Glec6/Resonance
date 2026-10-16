@@ -190,6 +190,15 @@ jobs:
           # Settings > System Settings > Auto-Start Game
           git apply $HOME/resonance/patches/autostart.patch
           git log -1 --format='%h %ci %s'
+          
+      - name: Rename data folder to NFLBlitz2001
+        run: |
+          OLD=/data/Resonance
+          NEW=/data/NFLBlitz2001
+          for d in $PSB/src/flycast $GITHUB_WORKSPACE/Resonance/port $GITHUB_WORKSPACE/Resonance/scripts $GITHUB_WORKSPACE/Resonance/toolchain; do
+            grep -rIl --exclude-dir=.git "$OLD" "$d" | xargs -r sed -i "s#$OLD#$NEW#g"
+          done
+          echo "files still mentioning $OLD: $(grep -rIl --exclude-dir=.git "$OLD" $PSB/src/flycast $GITHUB_WORKSPACE/Resonance/port | wc -l)"
 
       - name: Configure and build Flycast
         run: |
