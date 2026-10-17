@@ -194,10 +194,10 @@ jobs:
           git log -1 --format='%h %ci %s'
 
       # Must run after the patches are applied (it also renames the autostart file path).
-      - name: Rename data folder to WWFRR
+      - name: Rename data folder to DyanmiteCop
         run: |
           OLD=/data/Resonance
-          NEW=/data/WWFRoyalRumble
+          NEW=/data/DynamiteCop
           for d in $PSB/src/flycast $GITHUB_WORKSPACE/Resonance/port $GITHUB_WORKSPACE/Resonance/scripts $GITHUB_WORKSPACE/Resonance/toolchain; do
             grep -rIl --exclude-dir=.git "$OLD" "$d" | xargs -r sed -i "s#$OLD#$NEW#g"
           done
