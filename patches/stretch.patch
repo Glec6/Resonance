@@ -1,0 +1,12 @@
+diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_menu.cpp
+--- a/shell/ps4/launcher/settings_menu.cpp
++++ b/shell/ps4/launcher/settings_menu.cpp
+@@ -126,6 +126,8 @@
+ 		video.items.push_back(toggle(Tnop("Widescreen"), Tnop("Draw geometry outside of the normal 4:3 aspect ratio. May produce graphical glitches in the revealed areas.\nAspect Fit and shows the full 16:9 content."), config::Widescreen));
+ 		video.items.push_back(toggle(Tnop("Super Widescreen"), Tnop("Use the full width of the screen or window when its aspect ratio is greater than 16:9.\nAspect Fill and remove black bars. Not compatible with integer scaling."), config::SuperWidescreen));
+ 		video.items.push_back(toggle(Tnop("Widescreen Game Cheats"), Tnop("Modify the game so that it displays in 16:9 anamorphic format and use horizontal screen stretching. Only some games are supported."), config::WidescreenGameHacks));
++		video.items.push_back(pick(Tnop("Horizontal Stretching"), Tnop("Stretch the picture sideways without drawing extra geometry or changing the game. 133% turns a 4:3 game into 16:9. For a plain stretch, leave Widescreen and Widescreen Game Cheats off."), config::ScreenStretching,
++				{ { T("Off"), 100 }, { "125%", 125 }, { "133% (4:3 to 16:9)", 133 }, { "150%", 150 }, { "175%", 175 }, { "200%", 200 } }));
+ 		video.items.push_back(toggle(Tnop("Integer Scaling"), Tnop("Scales the output by the maximum integer multiple allowed by the display resolution."), config::IntegerScale));
+ 		video.items.push_back(toggle(Tnop("Linear Interpolation"), Tnop("Scales the output with linear interpolation. Will use nearest neighbor interpolation otherwise. Disable with integer scaling."), config::LinearInterpolation));
+ 		video.items.push_back(toggle(Tnop("VSync"), Tnop("Synchronizes the frame rate with the screen refresh rate. Recommended"), config::VSync));
