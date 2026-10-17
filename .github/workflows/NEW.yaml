@@ -194,10 +194,10 @@ jobs:
           git log -1 --format='%h %ci %s'
 
       # Must run after the patches are applied (it also renames the autostart file path).
-      - name: Rename data folder to NFLBlitz2001
+      - name: Rename data folder to NFLBlitz2000
         run: |
           OLD=/data/Resonance
-          NEW=/data/NFLBlitz2001
+          NEW=/data/NFLBlitz2000
           for d in $PSB/src/flycast $GITHUB_WORKSPACE/Resonance/port $GITHUB_WORKSPACE/Resonance/scripts $GITHUB_WORKSPACE/Resonance/toolchain; do
             grep -rIl --exclude-dir=.git "$OLD" "$d" | xargs -r sed -i "s#$OLD#$NEW#g"
           done
