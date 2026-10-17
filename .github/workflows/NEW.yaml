@@ -197,7 +197,7 @@ jobs:
       - name: Rename data folder to DyanmiteCop
         run: |
           OLD=/data/Resonance
-          NEW=/data/DynamiteCop
+          NEW=/data/NBASHOWTIME
           for d in $PSB/src/flycast $GITHUB_WORKSPACE/Resonance/port $GITHUB_WORKSPACE/Resonance/scripts $GITHUB_WORKSPACE/Resonance/toolchain; do
             grep -rIl --exclude-dir=.git "$OLD" "$d" | xargs -r sed -i "s#$OLD#$NEW#g"
           done
