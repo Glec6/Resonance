@@ -1,0 +1,210 @@
+diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
+--- a/shell/ps4/launcher/launcher_internal.h
++++ b/shell/ps4/launcher/launcher_internal.h
+@@ -147,6 +147,11 @@
+ bool introEnabled();
+ void setIntroEnabled(bool on);
+ 
++// launcher.cpp: the game that starts by itself when the app starts (Settings > System Settings >
++// Auto-Start Game). /data/Resonance/autostart.txt holds its path; empty: none.
++std::string autoStartPath();
++void setAutoStartPath(const std::string& path);
++
+ // xmb_style.cpp: the PS3 look shared by the Cross bar, the settings and the quick menu
+ Color xmbTone();							// this month's colour, as on the PS3
+ // Gradient and the slow wave; overGame: translucent, the paused game shows through
+diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
+--- a/shell/ps4/launcher/launcher.cpp
++++ b/shell/ps4/launcher/launcher.cpp
+@@ -343,6 +343,32 @@
+ 	gSelectedPath = gGames[gSel].e.path;
+ 	gSelectedAt = gTime;
+ 	playSound(Sound::Move);
++}
++
++static const char *const kAutoStartFile = "/data/Resonance/autostart.txt";
++
++std::string autoStartPath()
++{
++	std::string path;
++	if (FILE *f = nowide::fopen(kAutoStartFile, "rb"))
++	{
++		char buf[2048];
++		const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
++		fclose(f);
++		path.assign(buf, n);
++		while (!path.empty() && (path.back() == '\n' || path.back() == '\r' || path.back() == ' '))
++			path.pop_back();
++	}
++	return path;
++}
++
++void setAutoStartPath(const std::string& path)
++{
++	if (FILE *f = nowide::fopen(kAutoStartFile, "wb"))
++	{
++		fwrite(path.data(), 1, path.size(), f);
++		fclose(f);
++	}
+ }
+ 
+ const char *themeName(int index)
+@@ -905,6 +931,33 @@
+ 	}
+ }
+ 
++// Auto-Start Game: the started game's loading shows black only (no cover, label or progress bar)
++static bool gQuietLoad;
++
++// the start animation is over (or Auto-Start skips it): boot the game, Flycast shows its loading screen
++static void bootGame(const Game& g)
++{
++	char line[600];
++	snprintf(line, sizeof(line), "launcher: starting %s", g.e.path.c_str());
++	ps4_boot_trace(line);
++	soundStop();
++	currentGameCover = g.cover;
++	currentGameDiscs = g.e.discs;
++	gLaunched = g;
++	gLaunchedPixels.clear();
++	if (FILE *cf = g.cover.empty() ? nullptr : nowide::fopen(g.cover.c_str(), "rb"))
++	{
++		int n;
++		if (u8 *data = stbi_load_from_file(cf, &gLaunchedW, &gLaunchedH, &n, 4))
++		{
++			gLaunchedPixels.assign(data, data + (size_t)gLaunchedW * gLaunchedH * 4);
++			stbi_image_free(data);
++		}
++		fclose(cf);
++	}
++	gui_ps4_start_game(g.e.path, g.e.title);
++}
++
+ void launcher_loading_draw(const char *label, float progress)
+ {
+ 	if (imguiDriver == nullptr)
+@@ -914,6 +967,8 @@
+ 	gLast = now;
+ 	Frame f = makeFrame();
+ 	f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 255));
++	if (gQuietLoad)
++		return;
+ 	drawLaunchCard(f, gLaunched, 1.f, progress, label != nullptr ? label : "");
+ }
+ 
+@@ -958,6 +1013,43 @@
+ 	Frame f = makeFrame();
+ 	// the opening (intro.cpp) first, then the home screen fades in
+ 	static bool introOver;
++	// Auto-Start Game (Settings > System Settings): no opening, home screen, start animation or loading
++	// bar. A black screen, then the game. Holding Circle while the app starts skips it (the opening
++	// and the home screen come as usual); so does a game that doesn't show up within 12 s.
++	static bool autoDone;
++	if (autoDone)
++		gQuietLoad = false;	// back on the home screen after a game: loading looks as usual again
++	else if (!introOver && gLaunchAt < 0.f)
++	{
++		static const std::string wanted = autoStartPath();
++		static float autoSince = -1.f;
++		u32 b = 0;
++		float ax = 0, ay = 0;
++		ps4_pad_state(b, ax, ay);
++		if (autoSince < 0.f)
++			autoSince = gTime;
++		int found = -1;
++		for (int i = 0; i < (int)gGames.size(); i++)
++			if (gGames[i].e.path == wanted)
++				found = i;
++		if (wanted.empty() || (b & ORBIS_PAD_BUTTON_CIRCLE) || gTime - autoSince > 12.f)
++			autoDone = true;
++		else
++		{
++			f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 255));
++			if (found >= 0 && gTime - autoSince >= 1.f)	// a second to hold Circle
++			{
++				autoDone = true;
++				introOver = true;	// the opening doesn't play when the home screen comes back after the game
++				gFadeAt = gTime;
++				gQuietLoad = true;
++				gSel = found;
++				gSelectedPath = gGames[found].e.path;
++				bootGame(gGames[found]);
++			}
++			return true;
++		}
++	}
+ 	if (!introOver)
+ 	{
+ 		if (introDraw(f))
+@@ -1024,26 +1116,7 @@
+ 		gLaunchAt = -1;
+ 		if (!gGames.empty())
+ 		{
+-			const Game& g = gGames[gSel];
+-			char line[600];
+-			snprintf(line, sizeof(line), "launcher: starting %s", g.e.path.c_str());
+-			ps4_boot_trace(line);
+-			soundStop();
+-			currentGameCover = g.cover;
+-			currentGameDiscs = g.e.discs;
+-			gLaunched = g;
+-			gLaunchedPixels.clear();
+-			if (FILE *cf = g.cover.empty() ? nullptr : nowide::fopen(g.cover.c_str(), "rb"))
+-			{
+-				int n;
+-				if (u8 *data = stbi_load_from_file(cf, &gLaunchedW, &gLaunchedH, &n, 4))
+-				{
+-					gLaunchedPixels.assign(data, data + (size_t)gLaunchedW * gLaunchedH * 4);
+-					stbi_image_free(data);
+-				}
+-				fclose(cf);
+-			}
+-			gui_ps4_start_game(g.e.path, g.e.title);
++			bootGame(gGames[gSel]);
+ 		}
+ 	}
+ 	return true;
+diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_menu.cpp
+--- a/shell/ps4/launcher/settings_menu.cpp
++++ b/shell/ps4/launcher/settings_menu.cpp
+@@ -30,9 +30,11 @@
+ #include "netfs.h"
+ #include "updater.h"
+ 
++#include <algorithm>
+ #include <atomic>
+ #include <functional>
+ #include <future>
++#include <strings.h>
+ 
+ using i18n::T;
+ 
+@@ -210,6 +212,28 @@
+ 		}
+ 		system.items.push_back(toggle(Tnop("Multi-threaded emulation"), Tnop("Run the emulated CPU and GPU on different threads"), config::ThreadedRendering, true));
+ 		system.items.push_back(toggle(Tnop("Dreamcast 32MB RAM Mod"), Tnop("Enables 32MB RAM Mod for Dreamcast. May affect compatibility"), config::RamMod32MB, true));
++		{
++			// this game starts by itself when the app starts (launcher_draw, launcher.cpp)
++			std::vector<LauncherEntry> library;
++			gui_ps4_list_games(library);
++			std::sort(library.begin(), library.end(), [](const LauncherEntry& a, const LauncherEntry& b) {
++				return strcasecmp(a.title.c_str(), b.title.c_str()) < 0;
++			});
++			std::vector<Choice> games { { T("Off"), -1 } };
++			for (int i = 0; i < (int)library.size(); i++)
++				games.push_back({ library[i].title, i });
++			system.items.push_back(Setting { T("Auto-Start Game"), T("This game starts by itself when the app starts, with no menus or loading screen. Hold Circle while the app starts to skip it"), games,
++				[library] {
++					const std::string wanted = autoStartPath();
++					for (int i = 0; i < (int)library.size(); i++)
++						if (library[i].path == wanted)
++							return i;
++					return -1;
++				},
++				[library](int v) {
++					setAutoStartPath(v >= 0 && v < (int)library.size() ? library[v].path : std::string());
++				} });
++		}
+ 		system.items.push_back(toggle(Tnop("Load State at Start"), Tnop("Load the last saved state of the game when starting"), config::AutoLoadState));
+ 		system.items.push_back(toggle(Tnop("Save State on Exit"), Tnop("Save the state of the game when stopping"), config::AutoSaveState));
+ 		system.items.push_back(Setting { T("Cheat Source"), T("Put .cht files in /data/Resonance/cheats"),
