@@ -189,8 +189,6 @@ jobs:
           git apply $HOME/resonance/patches/flycast-ps4.patch
           # Settings > System Settings > Auto-Start Game (quiet boot into the game)
           git apply $HOME/resonance/patches/autostart.patch
-          # Settings > Video Settings > Horizontal Stretching
-          git apply $HOME/resonance/patches/stretch.patch
           git log -1 --format='%h %ci %s'
 
       # Must run after the patches are applied (it also renames the autostart file path).
