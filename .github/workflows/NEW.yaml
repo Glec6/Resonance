@@ -1,4 +1,4 @@
-name: Build Resonance PS4 - AUTO Blitz
+name: Build NFL Blitz 2027 PS4 (auto-start)
 
 on:
   push:
@@ -191,10 +191,10 @@ jobs:
           git apply $HOME/resonance/patches/autostart.patch
           git log -1 --format='%h %ci %s'
           
-      - name: Rename data folder to NFLBlitz2001
+      - name: Rename data folder to NFLBlitz2027
         run: |
           OLD=/data/Resonance
-          NEW=/data/NBASHTDC
+          NEW=/data/NFLBlitz2027
           for d in $PSB/src/flycast $GITHUB_WORKSPACE/Resonance/port $GITHUB_WORKSPACE/Resonance/scripts $GITHUB_WORKSPACE/Resonance/toolchain; do
             grep -rIl --exclude-dir=.git "$OLD" "$d" | xargs -r sed -i "s#$OLD#$NEW#g"
           done

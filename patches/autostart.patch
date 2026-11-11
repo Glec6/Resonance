@@ -1,27 +1,11 @@
-diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
---- a/shell/ps4/launcher/launcher_internal.h
-+++ b/shell/ps4/launcher/launcher_internal.h
-@@ -147,6 +147,11 @@
- bool introEnabled();
- void setIntroEnabled(bool on);
- 
-+// launcher.cpp: the game that starts by itself when the app starts (Settings > System Settings >
-+// Auto-Start Game). /data/Resonance/autostart.txt holds its path; empty: none.
-+std::string autoStartPath();
-+void setAutoStartPath(const std::string& path);
-+
- // xmb_style.cpp: the PS3 look shared by the Cross bar, the settings and the quick menu
- Color xmbTone();							// this month's colour, as on the PS3
- // Gradient and the slow wave; overGame: translucent, the paused game shows through
 diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
+index e19db16a2..0b23948f6 100644
 --- a/shell/ps4/launcher/launcher.cpp
 +++ b/shell/ps4/launcher/launcher.cpp
-@@ -343,6 +343,32 @@
- 	gSelectedPath = gGames[gSel].e.path;
- 	gSelectedAt = gTime;
+@@ -423,6 +423,32 @@ void moveSelection(int delta)
  	playSound(Sound::Move);
-+}
-+
+ }
+ 
 +static const char *const kAutoStartFile = "/data/Resonance/autostart.txt";
 +
 +std::string autoStartPath()
@@ -46,10 +30,12 @@ diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
 +		fwrite(path.data(), 1, path.size(), f);
 +		fclose(f);
 +	}
- }
- 
++}
++
  const char *themeName(int index)
-@@ -905,6 +931,33 @@
+ {
+ 	static const char *const names[] = { Tnop("Orbit"), Tnop("Channel"), Tnop("Shelf"), Tnop("Cross bar") };
+@@ -1088,6 +1114,33 @@ void launcher::drawLaunchCard(Frame& f, const Game& g, float alpha, float progre
  	}
  }
  
@@ -83,7 +69,7 @@ diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
  void launcher_loading_draw(const char *label, float progress)
  {
  	if (imguiDriver == nullptr)
-@@ -914,6 +967,8 @@
+@@ -1097,6 +1150,8 @@ void launcher_loading_draw(const char *label, float progress)
  	gLast = now;
  	Frame f = makeFrame();
  	f.dl->AddRectFilled(ImVec2(0, 0), ImVec2(f.w, f.h), IM_COL32(0, 0, 0, 255));
@@ -92,7 +78,7 @@ diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
  	drawLaunchCard(f, gLaunched, 1.f, progress, label != nullptr ? label : "");
  }
  
-@@ -958,6 +1013,43 @@
+@@ -1153,6 +1208,43 @@ bool launcher_draw()
  	Frame f = makeFrame();
  	// the opening (intro.cpp) first, then the home screen fades in
  	static bool introOver;
@@ -136,7 +122,7 @@ diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
  	if (!introOver)
  	{
  		if (introDraw(f))
-@@ -1024,26 +1116,7 @@
+@@ -1220,26 +1312,7 @@ bool launcher_draw()
  		gLaunchAt = -1;
  		if (!gGames.empty())
  		{
@@ -164,10 +150,27 @@ diff --git a/shell/ps4/launcher/launcher.cpp b/shell/ps4/launcher/launcher.cpp
  		}
  	}
  	return true;
+diff --git a/shell/ps4/launcher/launcher_internal.h b/shell/ps4/launcher/launcher_internal.h
+index bf443dee4..f6eda76e0 100644
+--- a/shell/ps4/launcher/launcher_internal.h
++++ b/shell/ps4/launcher/launcher_internal.h
+@@ -162,6 +162,11 @@ bool introDraw(Frame& f);
+ bool introEnabled();
+ void setIntroEnabled(bool on);
+ 
++// launcher.cpp: the game that starts by itself when the app starts (Settings > System Settings >
++// Auto-Start Game). /data/Resonance/autostart.txt holds its path; empty: none.
++std::string autoStartPath();
++void setAutoStartPath(const std::string& path);
++
+ // xmb_style.cpp: the PS3 look shared by the Cross bar, the settings and the quick menu
+ Color xmbTone();							// this month's colour, as on the PS3
+ // Gradient and the slow wave; overGame: translucent, the paused game shows through
 diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_menu.cpp
+index 41a3fc711..a788eff24 100644
 --- a/shell/ps4/launcher/settings_menu.cpp
 +++ b/shell/ps4/launcher/settings_menu.cpp
-@@ -30,9 +30,11 @@
+@@ -35,9 +35,11 @@
  #include "netfs.h"
  #include "updater.h"
  
@@ -179,7 +182,7 @@ diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_
  
  using i18n::T;
  
-@@ -210,6 +212,28 @@
+@@ -250,6 +252,28 @@ struct SettingsPanel::Impl
  		}
  		system.items.push_back(toggle(Tnop("Multi-threaded emulation"), Tnop("Run the emulated CPU and GPU on different threads"), config::ThreadedRendering, true));
  		system.items.push_back(toggle(Tnop("Dreamcast 32MB RAM Mod"), Tnop("Enables 32MB RAM Mod for Dreamcast. May affect compatibility"), config::RamMod32MB, true));
@@ -207,4 +210,4 @@ diff --git a/shell/ps4/launcher/settings_menu.cpp b/shell/ps4/launcher/settings_
 +		}
  		system.items.push_back(toggle(Tnop("Load State at Start"), Tnop("Load the last saved state of the game when starting"), config::AutoLoadState));
  		system.items.push_back(toggle(Tnop("Save State on Exit"), Tnop("Save the state of the game when stopping"), config::AutoSaveState));
- 		system.items.push_back(Setting { T("Cheat Source"), T("Put .cht files in /data/Resonance/cheats"),
+ 		system.items.push_back(Setting { T("Cheat Source"), T("Put .cht or .txt files in /data/Resonance/cheats"),
