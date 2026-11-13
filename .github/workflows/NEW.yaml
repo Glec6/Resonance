@@ -1,4 +1,4 @@
-name: Build NFL Blitz LEGENDS PS4 (auto-start)
+name: Build NBA showtime LegendsPS4 (auto-start)
 
 on:
   push:
@@ -191,10 +191,10 @@ jobs:
           git apply $HOME/resonance/patches/autostart.patch
           git log -1 --format='%h %ci %s'
           
-      - name: Rename data folder to NFLBlitzLEGENDS
+      - name: Rename data folder to NBAshowtimeLEGENDS
         run: |
           OLD=/data/Resonance
-          NEW=/data/NFLBlitzLEGENDS
+          NEW=/data/NBAShowtimeLegends
           for d in $PSB/src/flycast $GITHUB_WORKSPACE/Resonance/port $GITHUB_WORKSPACE/Resonance/scripts $GITHUB_WORKSPACE/Resonance/toolchain; do
             grep -rIl --exclude-dir=.git "$OLD" "$d" | xargs -r sed -i "s#$OLD#$NEW#g"
           done
